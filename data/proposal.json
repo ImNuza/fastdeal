@@ -1,0 +1,96 @@
+{
+  "title": "IS216 - Group Project - Proposal",
+  "snapshotNote": "Placeholder page. Text copied from the Drive proposal Word on 24 Sep 2026. Not a live Google Doc.",
+  "section": "G8",
+  "teamName": "FastDeal",
+  "members": [
+    { "n": 1, "name": "BERNARD LO", "email": "bernard.lo.2025" },
+    { "n": 2, "name": "CHUA JUN LIN JAYDEN", "email": "jayden.chua.2025" },
+    { "n": 3, "name": "DEWA BRATANUSA EKA SATYA", "email": "dbe.satya.2025" },
+    { "n": 4, "name": "MARVEL NATHANAEL TEDJAKUSUMA", "email": "marvel.t.2025" },
+    { "n": 5, "name": "STEVANUS RONALD SUSANTO", "email": "sr.susanto.2025" },
+    { "n": 6, "name": "ZOE DHARMADI", "email": "zoedharmadi.2024" }
+  ],
+  "overview": [
+    "With numerous online shopping platforms offering the same products at varying prices, consumers constantly face a purchase dilemma. They constantly have to switch between multiple online shopping platforms to compare prices and reviews before making a purchase. This takes time and effort, and they may still be unsure if they found the best deal or if the purchase is actually worth it.",
+    "FastDeal is a website for that. A user types a product name, or uploads a photo of the product. The app calls SerpApi Google Shopping, shows listings side by side, marks the cheapest, and asks Gemini for a short worth-it note. It also stores searches in FastDeal so a user can see what other FastDeal users searched, and which names often appear together."
+  ],
+  "objectives": [
+    "Put prices, store names, ratings, and review counts for one product on one page.",
+    "Let the user start from a typed name or from a photo.",
+    "Use Gemini AI to generate a Worth It? verdict based on price and reviews, and give a short explanation behind each verdict, making trade-offs clear to users",
+    "Let a logged-in user save a product and open it again.",
+    "Show what other FastDeal users searched, and which product names were searched together."
+  ],
+  "functionality": [
+    {
+      "name": "Product Search",
+      "text": "User types a product name. The app fetches live listings from Google Shopping via SerpApi."
+    },
+    {
+      "name": "Price Comparison and Best Price",
+      "text": "The app displays price, store name, seller rating, and review count in a single table, highlighting the cheapest row with badges."
+    },
+    {
+      "name": "AI Worth It? Verdict",
+      "text": "AI analyses all listings and returns a verdict (Worth It / Maybe / Not Worth It) with a short explanation."
+    },
+    {
+      "name": "Save / Wishlist",
+      "text": "Logged-in users can save products to revisit later."
+    },
+    {
+      "name": "User Authentication",
+      "text": "Sign up and log in with email or password via Firebase."
+    },
+    {
+      "name": "Image search",
+      "text": "User uploads a product photo on the website. The app identifies the product and opens the same compare table as a typed search. This is a file input in Chrome, not a phone camera app."
+    },
+    {
+      "name": "Other users' searches",
+      "text": "The app stores anonymised queries and product names. One screen lists what people searched for and how often. A product page can list names that were searched with it. Demo rows are seeded, so the screens are not empty."
+    }
+  ],
+  "technology": [
+    { "name": "Vue 3 (Composition API) + Vite", "text": "Front-end framework and build tool." },
+    { "name": "Bootstrap 5.3.3", "text": "Layout and responsive pages." },
+    { "name": "Node.js + Express.js", "text": "Back-end server and API routing." },
+    { "name": "Firebase Authentication", "text": "User sign-up and login." },
+    { "name": "SerpApi Google Shopping API", "text": "Real-time product and price data." },
+    { "name": "SerpApi Google Lens", "text": "Photo to product name for image search." },
+    { "name": "Google Gemini API", "text": "AI analysis and verdict generation." },
+    { "name": "Render", "text": "For Deployment. Vue front-end and Express back-end on one web service" }
+  ],
+  "dataStores": "MongoDB Atlas stores user records, wishlist items, and search logs (query text, product name, count). Firebase Authentication stores credentials. Search logs are anonymised on the public screens.",
+  "apis": [
+    {
+      "name": "SerpApi Google Shopping API",
+      "text": "Fetches real-time product listings (price, store, seller, rating) across multiple online retailers when a user searches for a product.",
+      "url": "https://serpapi.com/google-shopping-api"
+    },
+    {
+      "name": "Google Gemini API",
+      "text": "Receives the aggregated product listings and generates an AI Worth It? verdict with a plain-English explanation of the best deal.",
+      "url": "https://ai.google.dev/"
+    },
+    {
+      "name": "SerpApi Google Lens",
+      "text": "Turns an uploaded product photo into a product name, then performs the same Shopping search.",
+      "url": "https://serpapi.com/google-lens-api"
+    },
+    {
+      "name": "Firebase Authentication API",
+      "text": "Handles user sign-up, login, and session management via email/password.",
+      "url": "https://firebase.google.com/docs/auth"
+    }
+  ],
+  "whoDoWhat": [
+    { "n": 1, "name": "BERNARD", "task": "Backend" },
+    { "n": 2, "name": "JAYDEN", "task": "Backend" },
+    { "n": 3, "name": "DEWA", "task": "Product Search Feature, Deployment, User Authentication" },
+    { "n": 4, "name": "MARVEL", "task": "Image search, save/wishlist, Price comparison" },
+    { "n": 5, "name": "RONALD", "task": "Backend" },
+    { "n": 6, "name": "ZOE", "task": "Frontend design" }
+  ]
+}

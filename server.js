@@ -1,0 +1,33 @@
+import dotenv from 'dotenv'
+import express from 'express'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+dotenv.config()
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+const app = express()
+const PORT = process.env.PORT || 3000
+const proposalPath = path.join(__dirname, 'data', 'proposal.json')
+
+app.get('/health', (req, res) => {
+  res.json({ ok: true })
+})
+
+app.get('/api/proposal', (req, res) => {
+  const raw = fs.readFileSync(proposalPath, 'utf8')
+  res.json(JSON.parse(raw))
+})
+
+app.use(express.static(path.join(__dirname, 'dist')))
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'))
+})
+
+app.listen(PORT, () => {
+  console.log('FastDeal listening on port ' + PORT)
+})
