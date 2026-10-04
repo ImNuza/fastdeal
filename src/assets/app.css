@@ -1,0 +1,53 @@
+body {
+  background: #f4f1ea;
+  color: #1c1917;
+}
+
+.fd-nav {
+  background: #1c1917;
+}
+
+.fd-nav .navbar-brand {
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.verdict {
+  border-left: 4px solid #78716c;
+  background: #fff;
+}
+
+.verdict.worth {
+  border-left-color: #1f7a4d;
+}
+
+.verdict.maybe {
+  border-left-color: #b7791f;
+}
+
+.verdict.not {
+  border-left-color: #b42318;
+}
+
+tr.cheapest td {
+  background: #e7f5ee;
+}
+
+.history {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 84px;
+}
+
+.history span {
+  flex: 1;
+  background: #1f7a4d;
+  min-height: 4px;
+  border-radius: 2px 2px 0 0;
+}
+
+.card,
+.table {
+  background: #fff;
+}

@@ -1,6 +1,9 @@
 FastDeal (IS216 G8-3)
 
-This first deploy is a placeholder. It shows a snapshot of the project proposal text. It is not the price-compare app yet. Search, SerpApi, Gemini, MongoDB, and Firebase login are not wired.
+This site is a frontend reference. Search, compare, login, wishlist, alerts, and Sleep on it run in the browser with sample listings. SerpApi, Gemini, Firebase, MongoDB, and email are not wired.
+
+Demo account: demo@smu.edu.sg / demo1234
+A search for "fail" shows the error state.
 
 Setup
 1. Copy .env.example to .env
@@ -8,19 +11,19 @@ Setup
 3. npm install
 
 Run locally
-- npm run build
-- npm start
-- Open http://localhost:3000
+- npm run dev
+- Or npm run build, then npm start, then open http://localhost:3000
 - Health check: http://localhost:3000/health
 
 Deploy (Render)
 - One web service
 - Build command: npm install && npm run build
 - Start command: npm start
-- Add the same keys as environment variables in the Render dashboard. Do not paste keys into the repo.
+- Add keys as environment variables in the Render dashboard. Do not paste keys into the repo.
+- A push to main is the deploy if the service is already tied to this repo.
 
 Test
-No automated tests in this placeholder. Check /health returns {"ok":true} and the home page shows the proposal sections.
+No automated tests. Open /, /compare?q=Sony%20WH-1000XM5, /trending, /login, /wishlist, and /sleep.
 
 AI / LLM
-Vue + Express boilerplate, proposal snapshot JSON, and this README were written with AI (Hermes). No core business logic, backend search endpoints, or compare-table interactivity is in this commit.
+The Vue screens, mock catalog, browser session, and this README were written with AI (Hermes). This commit is a reference frontend, not live search or auth.
