@@ -1,13 +1,52 @@
 <script setup>
-import { useRouter } from 'vue-router'
+import { nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { user, logout } from './mock/session.js'
 
+const ENTRY_CHOICE_KEY = 'fastdeal-entry-choice'
+
+const route = useRoute()
 const router = useRouter()
+const showEntryDialog = ref(false)
+const loginButton = ref(null)
+const guestButton = ref(null)
+
+function maybeShowEntryDialog() {
+  if (route.path !== '/' || user.value || localStorage.getItem(ENTRY_CHOICE_KEY)) {
+    return
+  }
+  showEntryDialog.value = true
+  nextTick(() => loginButton.value?.focus())
+}
+
+function chooseEntry(choice) {
+  localStorage.setItem(ENTRY_CHOICE_KEY, choice)
+  showEntryDialog.value = false
+  if (choice === 'login') {
+    router.push('/login')
+  }
+}
+
+function trapEntryFocus(event) {
+  if (event.key !== 'Tab') {
+    return
+  }
+  if (event.shiftKey && document.activeElement === loginButton.value) {
+    event.preventDefault()
+    guestButton.value?.focus()
+  } else if (!event.shiftKey && document.activeElement === guestButton.value) {
+    event.preventDefault()
+    loginButton.value?.focus()
+  }
+}
 
 function onLogout() {
   logout()
   router.push('/')
 }
+
+onMounted(maybeShowEntryDialog)
+watch([() => route.path, user], maybeShowEntryDialog)
 </script>
 
 <template>
@@ -43,4 +82,34 @@ function onLogout() {
   <main class="container py-4">
     <router-view :key="$route.fullPath" />
   </main>
+  <div v-if="showEntryDialog" class="fd-entry-backdrop">
+    <section
+      class="fd-entry-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="fd-entry-title"
+      aria-describedby="fd-entry-description"
+      @keydown="trapEntryFocus"
+    >
+      <p class="fd-entry-eyebrow">Welcome to FastDeal</p>
+      <h1 id="fd-entry-title">How would you like to continue?</h1>
+      <p id="fd-entry-description" class="fd-entry-description">
+        Search and compare as a guest, or log in to save products and set price alerts.
+      </p>
+      <div class="fd-entry-actions">
+        <button
+          ref="loginButton"
+          class="btn fd-entry-login"
+          type="button"
+          @click="chooseEntry('login')"
+        >Log in</button>
+        <button
+          ref="guestButton"
+          class="btn fd-entry-guest"
+          type="button"
+          @click="chooseEntry('guest')"
+        >Continue as guest</button>
+      </div>
+    </section>
+  </div>
 </template>

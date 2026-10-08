@@ -51,3 +51,83 @@ tr.cheapest td {
 .table {
   background: #fff;
 }
+
+.fd-entry-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: grid;
+  place-items: center;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  background: rgb(28 25 23 / 72%);
+}
+
+.fd-entry-dialog {
+  width: min(100%, 36rem);
+  padding: clamp(1.5rem, 6vw, 2.5rem);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 24%);
+}
+
+.fd-entry-eyebrow {
+  margin-bottom: 0.5rem;
+  color: #57534e;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fd-entry-dialog h1 {
+  margin-bottom: 1rem;
+  font-size: clamp(1.75rem, 6vw, 2.25rem);
+  font-weight: 750;
+}
+
+.fd-entry-description {
+  margin-bottom: 1.5rem;
+  color: #44403c;
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  line-height: 1.4;
+}
+
+.fd-entry-actions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.fd-entry-actions .btn {
+  min-height: 60px;
+  padding: 0.75rem 1rem;
+  border: 2px solid #1c1917;
+  border-radius: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.fd-entry-login {
+  background: #1c1917;
+  color: #fff;
+}
+
+.fd-entry-login:hover {
+  background: #44403c;
+  color: #fff;
+}
+
+.fd-entry-guest {
+  background: #fff;
+  color: #1c1917;
+}
+
+.fd-entry-guest:hover {
+  background: #f4f1ea;
+  color: #1c1917;
+}
+
+.fd-entry-actions .btn:focus-visible {
+  outline: 4px solid #a16207;
+  outline-offset: 3px;
+}
