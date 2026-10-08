@@ -131,3 +131,45 @@ tr.cheapest td {
   outline: 4px solid #a16207;
   outline-offset: 3px;
 }
+
+.fd-entry-back {
+  min-height: 60px;
+  margin: -0.5rem 0 1rem -0.5rem;
+  padding: 0.5rem;
+  border: 0;
+  background: transparent;
+  color: #44403c;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.fd-entry-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.fd-entry-form label {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.fd-entry-form input {
+  min-height: 60px;
+  padding: 0.75rem;
+  border: 2px solid #57534e;
+  border-radius: 0.5rem;
+  color: #1c1917;
+  font-size: 1.25rem;
+}
+
+.fd-entry-form input:focus-visible,
+.fd-entry-back:focus-visible {
+  outline: 4px solid #a16207;
+  outline-offset: 3px;
+}
+
+.fd-entry-form .fd-entry-login {
+  margin-top: 0.5rem;
+}

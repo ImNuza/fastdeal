@@ -24,7 +24,7 @@ Deploy (Render)
 
 Test
 No automated tests. Open /, /compare?q=Sony%20WH-1000XM5, /trending, /login, /wishlist, and /sleep.
-On first visit, choose Log in or Continue as guest. That choice is remembered in this browser.
+On first visit, choose Log in or Continue as guest. Log in opens inside the welcome popup without changing pages. The choice is remembered in this browser.
 
 AI / LLM
 The Vue screens, mock catalog, browser session, and this README were written with AI (Hermes). This commit is a reference frontend, not live search or auth.
