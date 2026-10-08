@@ -167,8 +167,8 @@ onMounted(function () {
 
   <div v-else-if="result">
     <p v-if="route.query.from === 'photo'" class="small text-secondary mb-1">Identified from your photo</p>
-    <h1 class="h3">{{ result.name }}</h1>
-    <p class="text-secondary">{{ result.listings.length }} listings. Cheapest now is {{ sgd(verdict.cheapest) }}.</p>
+    <h1 class="fd-page-title">{{ result.name }}</h1>
+    <p class="fd-page-subtitle">{{ result.listings.length }} listings. Cheapest now is {{ sgd(verdict.cheapest) }}.</p>
 
     <div class="card verdict p-3 mb-3" :class="verdict.label === 'Worth It' ? 'worth' : verdict.label === 'Not Worth It' ? 'not' : 'maybe'">
       <p class="mb-1"><strong>{{ verdict.label }}</strong> · {{ verdict.action }}</p>
@@ -259,7 +259,7 @@ onMounted(function () {
       </table>
     </div>
 
-    <h2 class="h5">Price history</h2>
+    <h2 class="fd-section-title">Price history</h2>
     <p class="small text-secondary">Last 14 days. Taller bar means a higher price.</p>
     <div class="history mb-2">
       <span
@@ -271,7 +271,7 @@ onMounted(function () {
     </div>
     <p class="small text-secondary">{{ dayLabel(13) }} to {{ dayLabel(0) }}. Low {{ sgd(verdict.low) }}.</p>
 
-    <h2 class="h5 mt-4">Searched with this</h2>
+    <h2 class="fd-section-title mt-4">Searched with this</h2>
     <div class="d-flex flex-wrap gap-2">
       <router-link
         v-for="name in result.related"

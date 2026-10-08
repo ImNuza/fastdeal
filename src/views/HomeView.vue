@@ -33,8 +33,8 @@ function onPhoto(event) {
 <template>
   <div class="row justify-content-center">
     <div class="col-lg-8">
-      <h1 class="h2 mb-2">Compare the price before you buy</h1>
-      <p class="text-secondary mb-4">Type a product name, or upload a photo. FastDeal shows store listings on one page and marks the cheapest.</p>
+      <h1 class="fd-page-title">Compare the price before you buy</h1>
+      <p class="fd-page-subtitle mb-4">Type a product name, or upload a photo. FastDeal shows store listings on one page and marks the cheapest.</p>
 
       <form class="card p-3 mb-3" @submit.prevent="onSearch">
         <label class="form-label" for="q">Product name</label>
@@ -61,20 +61,20 @@ function onPhoto(event) {
       <div class="row g-3">
         <div class="col-md-4">
           <div class="card h-100 p-3">
-            <h2 class="h6">One table</h2>
-            <p class="small mb-0">Price, store, rating, and review count. The cheapest row has a badge.</p>
+            <h2 class="fd-section-subtitle">One table</h2>
+            <p class="mb-0">Price, store, rating, and review count. The cheapest row has a badge.</p>
           </div>
         </div>
         <div class="col-md-4">
           <div class="card h-100 p-3">
-            <h2 class="h6">Worth It?</h2>
-            <p class="small mb-0">A short note says Worth It, Maybe, or Not Worth It, and whether to buy now or wait.</p>
+            <h2 class="fd-section-subtitle">Worth It?</h2>
+            <p class="mb-0">A short note says Worth It, Maybe, or Not Worth It, and whether to buy now or wait.</p>
           </div>
         </div>
         <div class="col-md-4">
           <div class="card h-100 p-3">
-            <h2 class="h6">Save or wait</h2>
-            <p class="small mb-0">Log in to save a product, set a target price, or hold it for 24 hours.</p>
+            <h2 class="fd-section-subtitle">Save or wait</h2>
+            <p class="mb-0">Log in to save a product, set a target price, or hold it for 24 hours.</p>
           </div>
         </div>
       </div>

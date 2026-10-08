@@ -30,8 +30,8 @@ function onTarget(item, event) {
 
 <template>
   <div v-if="user">
-    <h1 class="h3">Wishlist</h1>
-    <p class="text-secondary">Saved price against the current cheapest price. A 10% drop is marked. Your target price is marked when the current price is at or below it.</p>
+    <h1 class="fd-page-title">Wishlist</h1>
+    <p class="fd-page-subtitle">Saved price against the current cheapest price. A 10% drop is marked. Your target price is marked when the current price is at or below it.</p>
 
     <div class="form-check form-switch mb-3">
       <input id="emailOn" class="form-check-input" type="checkbox" :checked="user.emailOn" @change="toggleEmail" />

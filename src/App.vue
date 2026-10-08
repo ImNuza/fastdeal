@@ -1,23 +1,38 @@
 <script setup>
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { user, logout, login as authenticate } from './mock/session.js'
+import { user, logout } from './mock/session.js'
+import FdLogo from './components/FdLogo.vue'
+import FdIcon from './components/FdIcon.vue'
+import FdFooter from './components/FdFooter.vue'
 
 const ENTRY_CHOICE_KEY = 'fastdeal-entry-choice'
 
 const route = useRoute()
 const router = useRouter()
+
+// A guest who taps Wishlist or Sleep lands on /login?next=..., so keep the tapped icon highlighted.
+const loginFor = computed(function () {
+  return route.path === '/login' && typeof route.query.next === 'string' ? route.query.next : ''
+})
+
+function isNavActive(path) {
+  if (path === '/login') {
+    return route.path === '/login' && !loginFor.value
+  }
+  return route.path === path || loginFor.value === path
+}
 const showEntryDialog = ref(false)
-const entryStep = ref('choice')
-const email = ref('')
-const password = ref('')
-const loginError = ref('')
 const entryDialog = ref(null)
 const loginButton = ref(null)
-const emailInput = ref(null)
 
+// Pages where the welcome prompt never shows: the person is already logging in or signing up.
+const NO_ENTRY_PROMPT = ['/login', '/signup']
+
+// Ask first-time visitors to log in or continue as a guest, on whichever page they land on.
 function maybeShowEntryDialog() {
-  if (route.path !== '/' || user.value || localStorage.getItem(ENTRY_CHOICE_KEY)) {
+  if (NO_ENTRY_PROMPT.includes(route.path) || user.value || localStorage.getItem(ENTRY_CHOICE_KEY)) {
+    showEntryDialog.value = false
     return
   }
   showEntryDialog.value = true
@@ -29,28 +44,16 @@ function focusEntryControl(control) {
 }
 
 function openEntryLogin() {
-  entryStep.value = 'login'
-  loginError.value = ''
-  focusEntryControl(emailInput)
-}
-
-function backToEntryChoice() {
-  entryStep.value = 'choice'
-  loginError.value = ''
-  focusEntryControl(loginButton)
+  localStorage.setItem(ENTRY_CHOICE_KEY, 'login')
+  showEntryDialog.value = false
+  // Come back to the page they landed on once they have logged in.
+  const next = route.path === '/' ? {} : { next: route.fullPath }
+  router.push({ path: '/login', query: next })
 }
 
 function chooseGuest() {
   localStorage.setItem(ENTRY_CHOICE_KEY, 'guest')
   showEntryDialog.value = false
-}
-
-function submitEntryLogin() {
-  loginError.value = authenticate(email.value, password.value)
-  if (!loginError.value) {
-    localStorage.setItem(ENTRY_CHOICE_KEY, 'login')
-    showEntryDialog.value = false
-  }
 }
 
 function trapEntryFocus(event) {
@@ -79,43 +82,79 @@ function onLogout() {
   router.push('/')
 }
 
-onMounted(maybeShowEntryDialog)
+// Keep --fd-nav-height equal to the real navbar height, so each page can fill exactly one screen below it.
+const navBar = ref(null)
+let navObserver = null
+
+function syncNavHeight() {
+  if (navBar.value) {
+    document.documentElement.style.setProperty('--fd-nav-height', navBar.value.offsetHeight + 'px')
+  }
+}
+
+onMounted(() => {
+  syncNavHeight()
+  navObserver = new ResizeObserver(syncNavHeight)
+  navObserver.observe(navBar.value)
+})
+
+onBeforeUnmount(() => navObserver?.disconnect())
+
+// Wait for the first route to resolve, otherwise every page looks like '/' on load.
+onMounted(() => router.isReady().then(maybeShowEntryDialog))
 watch([() => route.path, user], maybeShowEntryDialog)
 </script>
 
 <template>
-  <nav class="navbar navbar-expand-lg navbar-dark fd-nav">
+  <nav ref="navBar" class="navbar navbar-expand-lg navbar-dark fd-nav sticky-top">
     <div class="container">
-      <router-link class="navbar-brand" to="/">FastDeal</router-link>
+      <router-link class="navbar-brand" to="/" aria-label="FastDeal home"><FdLogo /></router-link>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#fdNav">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="fdNav">
         <ul class="navbar-nav me-auto">
           <li class="nav-item">
-            <router-link class="nav-link" to="/" exact-active-class="active">Search</router-link>
+            <router-link class="nav-link" to="/search" exact-active-class="active">Search</router-link>
           </li>
           <li class="nav-item">
             <router-link class="nav-link" to="/trending" exact-active-class="active">Trending</router-link>
           </li>
+        </ul>
+        <ul class="navbar-nav align-items-lg-center fd-nav-right">
           <li class="nav-item">
-            <router-link class="nav-link" to="/wishlist" exact-active-class="active">Wishlist</router-link>
+            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/wishlist') }" active-class="" exact-active-class="" to="/wishlist" title="Wishlist">
+              <FdIcon name="basket" />
+              <span class="fd-icon-label">Wishlist</span>
+            </router-link>
           </li>
           <li class="nav-item">
-            <router-link class="nav-link" to="/sleep" exact-active-class="active">Sleep</router-link>
+            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/sleep') }" active-class="" exact-active-class="" to="/sleep" title="Sleep on it">
+              <FdIcon name="moon" />
+              <span class="fd-icon-label">Sleep</span>
+            </router-link>
+          </li>
+          <li v-if="user" class="nav-item">
+            <span class="fd-nav-email small">{{ user.email }}</span>
+          </li>
+          <li class="nav-item">
+            <router-link v-if="!user" class="nav-link fd-icon-link" :class="{ active: isNavActive('/login') }" active-class="" exact-active-class="" to="/login" title="Log in">
+              <FdIcon name="account" />
+              <span class="fd-icon-label">Log in</span>
+            </router-link>
+            <button v-else class="nav-link fd-icon-link" type="button" title="Log out" @click="onLogout">
+              <FdIcon name="logout" />
+              <span class="fd-icon-label">Log out</span>
+            </button>
           </li>
         </ul>
-        <div class="d-flex align-items-center gap-2 py-2 py-lg-0">
-          <span v-if="user" class="text-white-50 small">{{ user.email }}</span>
-          <router-link v-if="!user" class="btn btn-sm btn-outline-light" to="/login">Log in</router-link>
-          <button v-else class="btn btn-sm btn-outline-light" type="button" @click="onLogout">Log out</button>
-        </div>
       </div>
     </div>
   </nav>
-  <main class="container py-4">
+  <main class="fd-main" :class="{ 'container py-4': !route.meta.fullBleed }">
     <router-view :key="$route.fullPath" />
   </main>
+  <FdFooter />
   <div v-if="showEntryDialog" class="fd-entry-backdrop">
     <section
       ref="entryDialog"
@@ -125,57 +164,24 @@ watch([() => route.path, user], maybeShowEntryDialog)
       aria-labelledby="fd-entry-title"
       @keydown="trapEntryFocus"
     >
-      <template v-if="entryStep === 'choice'">
-        <p class="fd-entry-eyebrow">Welcome to FastDeal</p>
-        <h1 id="fd-entry-title">How would you like to continue?</h1>
-        <p class="fd-entry-description">
-          Search and compare as a guest, or log in to save products and set price alerts.
-        </p>
-        <div class="fd-entry-actions">
-          <button
-            ref="loginButton"
-            class="btn fd-entry-login"
-            type="button"
-            @click="openEntryLogin"
-          >Log in</button>
-          <button
-            class="btn fd-entry-guest"
-            type="button"
-            @click="chooseGuest"
-          >Continue as guest</button>
-        </div>
-      </template>
-      <template v-else>
-        <button class="fd-entry-back" type="button" @click="backToEntryChoice">
-          Back
-        </button>
-        <p class="fd-entry-eyebrow">Welcome back</p>
-        <h1 id="fd-entry-title">Log in to FastDeal</h1>
-        <p class="fd-entry-description">
-          Log in to save products and set price alerts.
-        </p>
-        <form class="fd-entry-form" @submit.prevent="submitEntryLogin">
-          <p v-if="loginError" class="alert alert-danger" role="alert">{{ loginError }}</p>
-          <label for="fd-entry-email">Email</label>
-          <input
-            id="fd-entry-email"
-            ref="emailInput"
-            v-model="email"
-            type="email"
-            autocomplete="email"
-            required
-          />
-          <label for="fd-entry-password">Password</label>
-          <input
-            id="fd-entry-password"
-            v-model="password"
-            type="password"
-            autocomplete="current-password"
-            required
-          />
-          <button class="btn fd-entry-login" type="submit">Log in</button>
-        </form>
-      </template>
+      <p class="fd-entry-eyebrow">Welcome to FastDeal</p>
+      <h1 id="fd-entry-title" class="fd-page-title">How would you like to continue?</h1>
+      <p class="fd-entry-description fd-page-subtitle">
+        Search and compare as a guest, or log in to save products and set price alerts.
+      </p>
+      <div class="fd-entry-actions">
+        <button
+          ref="loginButton"
+          class="btn fd-entry-login"
+          type="button"
+          @click="openEntryLogin"
+        >Log in</button>
+        <button
+          class="btn fd-entry-guest"
+          type="button"
+          @click="chooseGuest"
+        >Continue as guest</button>
+      </div>
     </section>
   </div>
 </template>

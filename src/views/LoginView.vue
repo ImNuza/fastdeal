@@ -35,8 +35,8 @@ function useDemo() {
 <template>
   <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
-      <h1 class="h3">Log in</h1>
-      <p class="text-secondary">Search works without an account. Save, alerts, and Sleep on it need a login.</p>
+      <h1 class="fd-page-title">Log in</h1>
+      <p class="fd-page-subtitle">Search works without an account. Save, alerts, and Sleep on it need a login.</p>
       <form class="card p-3" @submit.prevent="onSubmit">
         <p v-if="errorText" class="alert alert-danger">{{ errorText }}</p>
         <label class="form-label" for="email">Email</label>

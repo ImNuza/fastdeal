@@ -19,8 +19,8 @@ function onSubmit() {
 <template>
   <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
-      <h1 class="h3">Sign up</h1>
-      <p class="text-secondary">Email and password. After sign up you are logged in.</p>
+      <h1 class="fd-page-title">Sign up</h1>
+      <p class="fd-page-subtitle">Email and password. After sign up you are logged in.</p>
       <form class="card p-3" @submit.prevent="onSubmit">
         <p v-if="errorText" class="alert alert-danger">{{ errorText }}</p>
         <label class="form-label" for="email">Email</label>
