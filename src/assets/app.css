@@ -232,9 +232,21 @@ tr.cheapest td {
   color: var(--fd-beige) !important;
 }
 
+/* Eyebrow: small capitals above a heading */
+
+.fd-eyebrow {
+  margin-bottom: 1rem;
+  color: var(--fd-blue);
+  font-size: var(--fd-eyebrow);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /* Buttons */
 
 .btn {
+  --bs-btn-font-size: var(--fd-button);
   --bs-btn-font-weight: 700;
   --bs-btn-border-width: var(--fd-border);
   --bs-btn-border-radius: 999px;
@@ -242,7 +254,16 @@ tr.cheapest td {
 }
 
 .btn-sm {
+  --bs-btn-font-size: var(--fd-button-sm);
   --bs-btn-padding-x: 0.875rem;
+}
+
+.fd-btn-lg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0.75rem 1.5rem;
 }
 
 .btn-dark {
@@ -315,7 +336,7 @@ tr.cheapest td {
   background-color: var(--fd-blue);
 }
 
-/* First-visit dialog */
+/* First-visit dialog: same paper card, type scale, and buttons as the rest of the app */
 
 .fd-entry-backdrop {
   position: fixed;
@@ -329,35 +350,23 @@ tr.cheapest td {
 }
 
 .fd-entry-dialog {
-  width: min(100%, 36rem);
+  width: min(100%, 32rem);
   padding: clamp(1.5rem, 6vw, 2.5rem);
+  border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: 1.25rem;
-  background: var(--fd-vanilla);
-  color: var(--fd-ink);
-  box-shadow: 0 1.5rem 4rem rgb(52 59 27 / 30%);
+  background: var(--fd-paper);
+  color: var(--fd-text);
+  box-shadow: 0 1.5rem 4rem rgb(24 44 74 / 25%);
 }
 
-.fd-entry-eyebrow {
-  margin-bottom: 0.5rem;
-  color: var(--fd-ink);
-  font-family: var(--fd-font-display);
-  font-size: 1.125rem;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.fd-entry-dialog h1 {
-  margin-bottom: 1rem;
+.fd-entry-dialog .fd-page-title {
+  margin-bottom: 0.75rem;
   color: var(--fd-blue);
-}
-
-.fd-entry-dialog .fd-page-subtitle {
-  color: var(--fd-ink);
 }
 
 .fd-entry-description {
   margin-bottom: 1.5rem;
+  color: var(--fd-text-muted);
 }
 
 .fd-entry-actions {
@@ -365,40 +374,13 @@ tr.cheapest td {
   gap: 0.75rem;
 }
 
-.fd-entry-actions .btn {
-  min-height: 60px;
-  padding: 0.75rem 1rem;
-  border: var(--fd-border) solid var(--fd-blue);
-  border-radius: 999px;
-  font-size: 1.25rem;
+.fd-entry-signup {
+  margin: 1.25rem 0 0;
+  color: var(--fd-text-muted);
+  font-size: var(--fd-small);
+  text-align: center;
+}
+
+.fd-entry-signup a {
   font-weight: 700;
-}
-
-.fd-entry-login {
-  background: var(--fd-blue);
-  color: var(--fd-beige);
-}
-
-.fd-entry-login:hover,
-.fd-entry-login:focus-visible,
-.fd-entry-login:active {
-  background: var(--fd-blue-dark);
-  color: var(--fd-beige);
-}
-
-.fd-entry-guest {
-  background: var(--fd-beige);
-  color: var(--fd-blue);
-}
-
-.fd-entry-guest:hover,
-.fd-entry-guest:focus-visible,
-.fd-entry-guest:active {
-  background: var(--fd-paper);
-  color: var(--fd-blue);
-}
-
-.fd-entry-actions .btn:focus-visible {
-  outline: 4px solid var(--fd-blue);
-  outline-offset: 3px;
 }

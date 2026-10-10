@@ -176,8 +176,8 @@ onBeforeUnmount(function () {
             FastDeal puts every store's price on one page, tracks the last 14 days, and tells you if today is a good day to buy.
           </p>
           <div class="fd-hero-actions">
-            <router-link class="btn btn-dark fd-cta" to="/search">Start comparing</router-link>
-            <router-link class="btn btn-outline-dark fd-cta" to="/trending">See what's trending</router-link>
+            <router-link class="btn btn-dark fd-btn-lg" to="/search">Start comparing</router-link>
+            <router-link class="btn btn-outline-dark fd-btn-lg" to="/trending">See what's trending</router-link>
           </div>
         </div>
 
@@ -289,15 +289,6 @@ onBeforeUnmount(function () {
   }
 }
 
-.fd-eyebrow {
-  margin-bottom: 1rem;
-  color: var(--fd-blue);
-  font-size: 0.875rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .fd-display {
   margin-bottom: 1.25rem;
   color: var(--fd-blue);
@@ -342,14 +333,6 @@ onBeforeUnmount(function () {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-}
-
-.fd-cta {
-  display: inline-flex;
-  align-items: center;
-  min-height: 52px;
-  padding: 0.75rem 1.5rem;
-  font-size: 1.0625rem;
 }
 
 /* Analytics cards */

@@ -6,14 +6,17 @@ import FdLogo from './components/FdLogo.vue'
 import FdIcon from './components/FdIcon.vue'
 import FdFooter from './components/FdFooter.vue'
 
+// Remembered for this browser session only, so a guest is asked again on their next visit.
 const ENTRY_CHOICE_KEY = 'fastdeal-entry-choice'
 
 const route = useRoute()
 const router = useRouter()
 
 // A guest who taps Wishlist or Sleep lands on /login?next=..., so keep the tapped icon highlighted.
+const GATED_PAGES = ['/wishlist', '/sleep']
 const loginFor = computed(function () {
-  return route.path === '/login' && typeof route.query.next === 'string' ? route.query.next : ''
+  const next = route.query.next
+  return route.path === '/login' && GATED_PAGES.includes(next) ? next : ''
 })
 
 function isNavActive(path) {
@@ -31,7 +34,7 @@ const NO_ENTRY_PROMPT = ['/login', '/signup']
 
 // Ask first-time visitors to log in or continue as a guest, on whichever page they land on.
 function maybeShowEntryDialog() {
-  if (NO_ENTRY_PROMPT.includes(route.path) || user.value || localStorage.getItem(ENTRY_CHOICE_KEY)) {
+  if (NO_ENTRY_PROMPT.includes(route.path) || user.value || sessionStorage.getItem(ENTRY_CHOICE_KEY)) {
     showEntryDialog.value = false
     return
   }
@@ -43,16 +46,15 @@ function focusEntryControl(control) {
   nextTick(() => control.value?.focus())
 }
 
-function openEntryLogin() {
-  localStorage.setItem(ENTRY_CHOICE_KEY, 'login')
+// Log in and Sign up both go to an account page, then come back to the page they landed on.
+function openAccountPage(path) {
+  sessionStorage.setItem(ENTRY_CHOICE_KEY, 'account')
   showEntryDialog.value = false
-  // Come back to the page they landed on once they have logged in.
-  const next = route.path === '/' ? {} : { next: route.fullPath }
-  router.push({ path: '/login', query: next })
+  router.push({ path: path, query: { next: route.fullPath } })
 }
 
 function chooseGuest() {
-  localStorage.setItem(ENTRY_CHOICE_KEY, 'guest')
+  sessionStorage.setItem(ENTRY_CHOICE_KEY, 'guest')
   showEntryDialog.value = false
 }
 
@@ -164,24 +166,28 @@ watch([() => route.path, user], maybeShowEntryDialog)
       aria-labelledby="fd-entry-title"
       @keydown="trapEntryFocus"
     >
-      <p class="fd-entry-eyebrow">Welcome to FastDeal</p>
+      <p class="fd-eyebrow">Welcome to FastDeal</p>
       <h1 id="fd-entry-title" class="fd-page-title">How would you like to continue?</h1>
-      <p class="fd-entry-description fd-page-subtitle">
-        Search and compare as a guest, or log in to save products and set price alerts.
+      <p class="fd-entry-description">
+        Log in to save products and set price alerts, or continue as a guest to search, compare, and see what's trending.
       </p>
       <div class="fd-entry-actions">
         <button
           ref="loginButton"
-          class="btn fd-entry-login"
+          class="btn btn-dark fd-btn-lg"
           type="button"
-          @click="openEntryLogin"
+          @click="openAccountPage('/login')"
         >Log in</button>
         <button
-          class="btn fd-entry-guest"
+          class="btn btn-outline-dark fd-btn-lg"
           type="button"
           @click="chooseGuest"
         >Continue as guest</button>
       </div>
+      <p class="fd-entry-signup">
+        New to FastDeal?
+        <a href="/signup" @click.prevent="openAccountPage('/signup')">Create an account</a>
+      </p>
     </section>
   </div>
 </template>

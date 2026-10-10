@@ -46,7 +46,7 @@ function useDemo() {
         <button class="btn btn-dark" type="submit">Log in</button>
         <button class="btn btn-outline-dark mt-2" type="button" @click="useDemo">Use demo account</button>
         <p class="small text-secondary mt-3 mb-0">Demo: demo@smu.edu.sg / demo1234</p>
-        <p class="small mt-2 mb-0">No account? <router-link to="/signup">Sign up</router-link></p>
+        <p class="small mt-2 mb-0">No account? <router-link :to="{ path: '/signup', query: route.query }">Sign up</router-link></p>
       </form>
     </div>
   </div>
