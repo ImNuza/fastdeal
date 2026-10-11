@@ -37,15 +37,15 @@ function keep(item) {
 
 <template>
   <div v-if="user">
-    <h1 class="h3">Sleep on it</h1>
-    <p class="text-secondary">A product stays here for 24 hours. When the hold ends, the row shows the latest price so you can decide.</p>
+    <h1 class="fd-page-title">Sleep on it</h1>
+    <p class="fd-page-subtitle">A product stays here for 24 hours. When the hold ends, the row shows the latest price so you can decide.</p>
 
     <p v-if="!user.sleep.length" class="alert alert-secondary">No holds. Open a product and press Sleep on it.</p>
 
     <div v-else class="row g-3">
       <div v-for="item in user.sleep" :key="item.name" class="col-md-6">
         <div class="card p-3 h-100">
-          <h2 class="h5">
+          <h2 class="fd-section-subtitle">
             <router-link :to="{ path: '/compare', query: { q: item.name } }">{{ item.name }}</router-link>
           </h2>
           <p class="mb-1">Latest price {{ sgd(cheapestPrice(item.name)) }}</p>

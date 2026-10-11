@@ -1,36 +1,205 @@
-body {
-  background: #f4f1ea;
-  color: #1c1917;
+/* Bootstrap mapped onto the FastDeal tokens in tokens.css */
+:root {
+  --bs-body-font-family: var(--fd-font-body);
+  --bs-body-color: var(--fd-text);
+  --bs-body-bg: var(--fd-beige);
+  --bs-link-color-rgb: 39, 80, 138;
+  --bs-link-hover-color-rgb: 29, 63, 110;
+  --bs-border-color: var(--fd-vanilla-line);
+  --bs-border-width: var(--fd-border);
 }
 
+body {
+  background: var(--fd-beige);
+  color: var(--fd-text);
+  font-family: var(--fd-font-body);
+  font-size: var(--fd-body);
+  line-height: 1.5;
+}
+
+a {
+  text-underline-offset: 0.2em;
+}
+
+/* Type scale */
+
+.fd-page-title {
+  margin-bottom: 0.5rem;
+  color: var(--fd-blue);
+  font-family: var(--fd-font-display);
+  font-size: var(--fd-page-title);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+}
+
+.fd-page-subtitle {
+  color: var(--fd-text-muted);
+  font-size: var(--fd-page-subtitle);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.fd-section-title {
+  margin-bottom: 0.5rem;
+  color: var(--fd-text);
+  font-family: var(--fd-font-display);
+  font-size: var(--fd-section-title);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.fd-section-subtitle {
+  margin-bottom: 0.5rem;
+  color: var(--fd-text);
+  font-size: var(--fd-section-subtitle);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.small,
+small {
+  font-size: var(--fd-small);
+}
+
+.text-secondary {
+  color: var(--fd-text-muted) !important;
+}
+
+/* Page shell: every page fills at least the first screen below the sticky navbar,
+   so the footer only appears after scrolling, even on short pages. */
+
+.fd-main {
+  min-height: calc(100svh - var(--fd-nav-height));
+}
+
+/* Navbar */
+
 .fd-nav {
-  background: #1c1917;
+  --bs-navbar-padding-y: 0.875rem;
+  background: var(--fd-blue);
 }
 
 .fd-nav .navbar-brand {
-  font-weight: 650;
-  letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  padding: 0.25rem 0;
+  font-size: 1.875rem;
+  line-height: 1;
 }
 
-.verdict {
-  border-left: 4px solid #78716c;
-  background: #fff;
+.fd-nav .nav-link {
+  color: var(--fd-beige);
+  font-family: var(--fd-font-display);
+  font-size: 1.125rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.verdict.worth {
-  border-left-color: #1f7a4d;
+.fd-nav .nav-link:hover,
+.fd-nav .nav-link.active {
+  color: var(--fd-beige);
 }
 
-.verdict.maybe {
-  border-left-color: #b7791f;
+.fd-nav .nav-link.active {
+  text-decoration: underline;
+  text-decoration-color: var(--fd-vanilla);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 0.35em;
 }
 
-.verdict.not {
-  border-left-color: #b42318;
+.fd-icon-link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 44px;
+}
+
+@media (min-width: 992px) {
+  .fd-nav .fd-icon-link {
+    justify-content: center;
+    min-width: 44px;
+  }
+
+  .fd-nav-right {
+    gap: 0.8125rem;
+  }
+
+  .fd-nav .fd-icon-link.active {
+    text-decoration: none;
+    box-shadow: inset 0 -3px 0 var(--fd-vanilla);
+  }
+
+  .fd-icon-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.fd-nav-email {
+  display: block;
+  padding: var(--bs-nav-link-padding-y) 0;
+  color: var(--fd-beige);
+}
+
+@media (min-width: 992px) {
+  .fd-nav-email {
+    padding-inline: var(--bs-navbar-nav-link-padding-x);
+  }
+}
+
+/* Surfaces */
+
+.card {
+  border: var(--fd-border) solid var(--fd-vanilla-line);
+  border-radius: var(--fd-radius);
+  background: var(--fd-paper);
+  color: var(--fd-text);
+}
+
+.table {
+  --bs-table-bg: var(--fd-paper);
+  --bs-table-color: var(--fd-text);
+  --bs-table-border-color: var(--fd-vanilla-line);
+}
+
+.table thead th {
+  background: var(--fd-vanilla-soft);
+  font-family: var(--fd-font-display);
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 tr.cheapest td {
-  background: #e7f5ee;
+  background: var(--fd-green-soft);
+}
+
+.verdict {
+  border: var(--fd-border) solid var(--fd-vanilla-line);
+  border-radius: var(--fd-radius);
+  background: var(--fd-paper);
+}
+
+.verdict.worth {
+  border-color: #2f6b47;
+}
+
+.verdict.maybe {
+  border-color: #a8741a;
+}
+
+.verdict.not {
+  border-color: #a3301f;
 }
 
 .history {
@@ -42,12 +211,176 @@ tr.cheapest td {
 
 .history span {
   flex: 1;
-  background: #1f7a4d;
+  background: var(--fd-blue);
   min-height: 4px;
-  border-radius: 2px 2px 0 0;
+  border-radius: 4px 4px 0 0;
 }
 
-.card,
-.table {
-  background: #fff;
+.alert-secondary {
+  --bs-alert-bg: var(--fd-vanilla-soft);
+  --bs-alert-color: var(--fd-text);
+  --bs-alert-border-color: var(--fd-vanilla-line);
+}
+
+.text-bg-success {
+  background-color: var(--fd-green) !important;
+  color: var(--fd-ink) !important;
+}
+
+.text-bg-dark {
+  background-color: var(--fd-blue) !important;
+  color: var(--fd-beige) !important;
+}
+
+/* Eyebrow: small capitals above a heading */
+
+.fd-eyebrow {
+  margin-bottom: 1rem;
+  color: var(--fd-blue);
+  font-size: var(--fd-eyebrow);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Buttons */
+
+.btn {
+  --bs-btn-font-size: var(--fd-button);
+  --bs-btn-font-weight: 700;
+  --bs-btn-border-width: var(--fd-border);
+  --bs-btn-border-radius: 999px;
+  --bs-btn-padding-x: 1.25rem;
+}
+
+.btn-sm {
+  --bs-btn-font-size: var(--fd-button-sm);
+  --bs-btn-padding-x: 0.875rem;
+}
+
+.fd-btn-lg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0.75rem 1.5rem;
+}
+
+.btn-dark {
+  --bs-btn-color: var(--fd-beige);
+  --bs-btn-bg: var(--fd-blue);
+  --bs-btn-border-color: var(--fd-blue);
+  --bs-btn-hover-color: var(--fd-beige);
+  --bs-btn-hover-bg: var(--fd-blue-dark);
+  --bs-btn-hover-border-color: var(--fd-blue-dark);
+  --bs-btn-active-color: var(--fd-beige);
+  --bs-btn-active-bg: var(--fd-blue-dark);
+  --bs-btn-active-border-color: var(--fd-blue-dark);
+  --bs-btn-disabled-color: var(--fd-beige);
+  --bs-btn-disabled-bg: var(--fd-blue);
+  --bs-btn-disabled-border-color: var(--fd-blue);
+}
+
+.btn-outline-dark {
+  --bs-btn-color: var(--fd-blue);
+  --bs-btn-border-color: var(--fd-blue);
+  --bs-btn-hover-color: var(--fd-beige);
+  --bs-btn-hover-bg: var(--fd-blue);
+  --bs-btn-hover-border-color: var(--fd-blue);
+  --bs-btn-active-color: var(--fd-beige);
+  --bs-btn-active-bg: var(--fd-blue);
+  --bs-btn-active-border-color: var(--fd-blue);
+  --bs-btn-disabled-color: var(--fd-blue);
+  --bs-btn-disabled-border-color: var(--fd-blue);
+}
+
+.btn-outline-light {
+  --bs-btn-color: var(--fd-beige);
+  --bs-btn-border-color: var(--fd-beige);
+  --bs-btn-hover-color: var(--fd-blue);
+  --bs-btn-hover-bg: var(--fd-beige);
+  --bs-btn-hover-border-color: var(--fd-beige);
+  --bs-btn-active-color: var(--fd-blue);
+  --bs-btn-active-bg: var(--fd-beige);
+  --bs-btn-active-border-color: var(--fd-beige);
+}
+
+/* Forms */
+
+.form-label,
+.form-check-label {
+  font-weight: 500;
+}
+
+.form-control,
+.form-select {
+  border: var(--fd-border) solid var(--fd-vanilla-line);
+  border-radius: 0.625rem;
+  background-color: var(--fd-paper);
+  color: var(--fd-text);
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: var(--fd-blue);
+  box-shadow: 0 0 0 0.25rem rgb(39 80 138 / 35%);
+}
+
+.form-check-input {
+  border: var(--fd-border) solid var(--fd-text-muted);
+}
+
+.form-check-input:checked {
+  border-color: var(--fd-blue);
+  background-color: var(--fd-blue);
+}
+
+/* First-visit dialog: same paper card, type scale, and buttons as the rest of the app */
+
+.fd-entry-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: grid;
+  place-items: center;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  background: rgb(24 44 74 / 55%);
+}
+
+.fd-entry-dialog {
+  width: min(100%, 32rem);
+  padding: clamp(1.5rem, 6vw, 2.5rem);
+  border: var(--fd-border) solid var(--fd-vanilla-line);
+  border-radius: 1.25rem;
+  background: var(--fd-paper);
+  color: var(--fd-text);
+  box-shadow: 0 1.5rem 4rem rgb(24 44 74 / 25%);
+}
+
+.fd-entry-dialog .fd-page-title {
+  margin-bottom: 0.75rem;
+  color: var(--fd-blue);
+}
+
+.fd-entry-description {
+  margin-bottom: 1.5rem;
+  color: var(--fd-text-muted);
+}
+
+.fd-entry-actions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.fd-entry-signup {
+  margin: 1.25rem 0 0;
+  color: var(--fd-text-muted);
+  font-size: var(--fd-small);
+  text-align: center;
+}
+
+.fd-entry-signup a {
+  font-weight: 700;
 }

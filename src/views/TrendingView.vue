@@ -3,8 +3,8 @@ import { trending } from '../mock/catalog.js'
 </script>
 
 <template>
-  <h1 class="h3">Trending</h1>
-  <p class="text-secondary">Anonymised searches on FastDeal. A row opens the same compare table.</p>
+  <h1 class="fd-page-title">Trending</h1>
+  <p class="fd-page-subtitle">Anonymised searches on FastDeal. A row opens the same compare table.</p>
   <div class="table-responsive">
     <table class="table table-bordered">
       <thead>

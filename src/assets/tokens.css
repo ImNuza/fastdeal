@@ -1,0 +1,61 @@
+/*
+  FastDeal design tokens.
+  Every colour, font, size, border, and radius the app shares lives here.
+  Reference these variables instead of typing hex codes or pixel values.
+  See DESIGN.md for what each one is for.
+*/
+
+:root {
+  /* Main colour */
+  --fd-blue: #27508a;
+  --fd-blue-dark: #1d3f6e;
+
+  /* Backgrounds */
+  --fd-beige: #f4ede3;
+  --fd-paper: #fbf8f3;
+
+  /* Accent */
+  --fd-vanilla: #fae8a4;
+  --fd-vanilla-soft: #fcf2cc;
+  --fd-vanilla-line: #e8d9ad;
+
+  /* Results: green for good, red for bad */
+  --fd-green: #b3c77a;
+  --fd-green-soft: #d8e4b4;
+  --fd-red: #edb0a2;
+  --fd-red-soft: #f4d9cf;
+
+  /* Text */
+  --fd-ink: #343b1b;
+  --fd-text: var(--fd-ink);
+  --fd-text-muted: #585f3e;
+
+  /* Fonts */
+  --fd-font-display: 'Anton', 'Impact', 'Arial Narrow Bold', sans-serif;
+  --fd-font-body: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Type scale (phone sizes; larger screens below) */
+  --fd-page-title: 2.25rem;
+  --fd-page-subtitle: 1.125rem;
+  --fd-section-title: 1.5rem;
+  --fd-section-subtitle: 1.125rem;
+  --fd-body: 1rem;
+  --fd-small: 0.875rem;
+  --fd-eyebrow: 0.875rem;
+  --fd-button: 1rem;
+  --fd-button-sm: 0.875rem;
+
+  /* Shape */
+  --fd-radius: 1rem;
+  --fd-border: 2px;
+
+  /* Layout: fallback only, App.vue overwrites this with the measured navbar height */
+  --fd-nav-height: 71px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --fd-page-title: 3rem;
+    --fd-section-title: 1.75rem;
+  }
+}
