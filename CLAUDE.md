@@ -31,10 +31,23 @@ Replaced the old mock `session.js` login/signup with real Firebase Auth.
 - Auth domain: `fastdeal-e1b56.firebaseapp.com`
 - Messaging sender: `221615439446`
 
+### MongoDB user sync wired up (latest)
+
+**New file:**
+- `src/services/userApi.js` — axios wrappers: `createOrGetUser(uid, email)`, `getUser(uid)`, `updateUser(uid, patch)`
+
+**Updated files:**
+- `server.js` — added `POST /api/users` (upsert), `GET /api/users/:uid`, `PUT /api/users/:uid`; added `express.json()` middleware
+- `src/mock/session.js` — `watchAuthState` now calls `createOrGetUser` on every login (safe upsert); `toggleEmail` also calls `updateUser` to persist `emailAlertsOn` to MongoDB
+
+**How it works:**
+- Sign up / Google login → Firebase auth state fires → `createOrGetUser` POST upserts the user row in MongoDB → local `user.value` is populated
+- Login (returning user) → same POST (upsert finds existing, no duplicate)
+- `emailAlertsOn` is read from MongoDB on every login and written back on toggle
+- Wishlist / sleep still localStorage-only — migrate those next
+
 ### Things still to do
-- Friend is setting up MongoDB — wait for them to commit `.env` with Mongo connection string before wiring up database calls
-- Do NOT commit to git until MongoDB env is ready
-- The mock `session.js` wishlist/sleep data is still localStorage-only — once MongoDB is up, migrate those to API calls using axios async/await
+- Migrate wishlist (`wishlistItems` collection) and sleep holds (`sleepHolds` collection) from localStorage to MongoDB API calls
 - Enable **Google** sign-in method in Firebase Console → Authentication → Sign-in method (required before Google popup works)
 - Add `localhost` to Firebase Console → Authentication → Settings → Authorised domains
 
