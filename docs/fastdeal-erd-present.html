@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FastDeal Database</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4ede3;
+    --paper: #fbf8f3;
+    --ink: #343b1b;
+    --muted: #585f3e;
+    --blue: #27508a;
+    --head-bg: #27508a;
+    --head-ink: #f4ede3;
+    --line: #e8d9ad;
+    --vanilla: #fae8a4;
+    --uid: #27508a;
+    --uid-soft: #dfe7f3;
+    --pk: #55741a;
+    --pk-soft: #dfe9bf;
+    --sid: #9a6612;
+    --sid-soft: #f6e4bd;
+    --dim: 0.16;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #13161b;
+      --paper: #1d222a;
+      --ink: #ece6da;
+      --muted: #a9a394;
+      --blue: #8fb3e8;
+      --head-bg: #27508a;
+      --head-ink: #f4ede3;
+      --line: #39404a;
+      --vanilla: #e6cf7a;
+      --uid: #8fb3e8;
+      --uid-soft: #22324a;
+      --pk: #b3c77a;
+      --pk-soft: #2c3820;
+      --sid: #e3b866;
+      --sid-soft: #3d3220;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #13161b;
+    --paper: #1d222a;
+    --ink: #ece6da;
+    --muted: #a9a394;
+    --blue: #8fb3e8;
+    --head-bg: #27508a;
+    --head-ink: #f4ede3;
+    --line: #39404a;
+    --vanilla: #e6cf7a;
+    --uid: #8fb3e8;
+    --uid-soft: #22324a;
+    --pk: #b3c77a;
+    --pk-soft: #2c3820;
+    --sid: #e3b866;
+    --sid-soft: #3d3220;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.45 "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .page { max-width: 1320px; margin: 0 auto; padding: 22px 24px 28px; }
+
+  /* Header */
+  .top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px 24px; }
+  .kicker { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  h1 {
+    margin: 2px 0 0;
+    font: 400 44px/1 Anton, Impact, sans-serif;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    color: var(--blue);
+  }
+  .sub { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+  .seg { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 999px; overflow: hidden; }
+  .seg button {
+    border: 0;
+    border-left: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    font: 500 13.5px/1 "DM Sans", system-ui, sans-serif;
+    padding: 8px 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  .seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: -3px; }
+  .seglabel { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-right: 6px; }
+  .ctl { display: inline-flex; align-items: center; }
+  .key { font: 500 10px/1 "DM Mono", ui-monospace, monospace; opacity: 0.6; margin-left: 5px; }
+
+  /* Focus caption */
+  .caption {
+    margin: 16px 0 0;
+    padding: 12px 16px;
+    border-left: 5px solid var(--blue);
+    background: var(--paper);
+    border-radius: 0 10px 10px 0;
+    min-height: 66px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .caption .num {
+    flex: none;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--blue); color: var(--paper);
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 400 19px/1 Anton, Impact, sans-serif;
+  }
+  .caption b { display: block; font-size: 17px; }
+  .caption span { color: var(--muted); font-size: 15px; }
+  .caption[hidden] { display: none; }
+
+  /* Board */
+  .stage { margin-top: 18px; }
+  .board { position: relative; transform-origin: top center; }
+  .wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .grid { display: grid; column-gap: 104px; row-gap: 66px; align-items: start; }
+  .board.coll .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      "users wish price"
+      "sleep logs cache";
+  }
+  .board.full .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-areas:
+      "fire users wish ."
+      ".    sleep pkey price"
+      ".    sess  logs cache";
+  }
+  .board.coll .box.ext { display: none; }
+
+  .box {
+    background: var(--paper);
+    border: 1.5px solid var(--ink);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: opacity 0.2s ease, box-shadow 0.2s ease;
+  }
+  .box header { background: var(--head-bg); color: var(--head-ink); padding: 9px 13px 8px; }
+  .box h2 { margin: 0; font: 500 17px/1.2 "DM Mono", ui-monospace, monospace; }
+  .box .what { margin: 1px 0 0; font-size: 12.5px; opacity: 0.85; }
+  .box ul { list-style: none; margin: 0; padding: 8px 8px 6px; }
+  .box li {
+    font: 400 14.5px/1.35 "DM Mono", ui-monospace, monospace;
+    padding: 3px 7px;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .box li .note { font-family: "DM Sans", system-ui, sans-serif; font-size: 12px; color: var(--muted); }
+  .box li.id { font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+  .box li.uid { color: var(--uid); background: var(--uid-soft); font-weight: 500; }
+  .box li.pk { color: var(--pk); background: var(--pk-soft); font-weight: 500; }
+  .box li.sid { color: var(--sid); background: var(--sid-soft); font-weight: 500; }
+  .box li.extra { display: none; }
+  .board.all .box li.extra { display: flex; }
+  .box .idx {
+    display: none;
+    margin: 0 8px 8px;
+    padding: 5px 7px 0;
+    border-top: 1px dashed var(--line);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .board.all .box .idx { display: block; }
+  .box .idx b { color: var(--ink); font-weight: 700; }
+
+  .box.ext { border-style: dashed; border-color: var(--muted); background: transparent; }
+  .box.ext header { background: transparent; color: var(--ink); border-bottom: 1px dashed var(--muted); }
+  .box.ext h2 { font-family: "DM Sans", system-ui, sans-serif; font-weight: 700; }
+  .box.ext .what { color: var(--muted); opacity: 1; }
+
+  .board.focus .box.dim { opacity: var(--dim); }
+  .board.focus .box.lit { box-shadow: 0 0 0 4px var(--vanilla); }
+  .board.focus li.glow { outline: 2px solid currentColor; outline-offset: -2px; }
+
+  .wire { transition: opacity 0.2s ease; }
+  .board.focus .wire.dim { opacity: var(--dim); }
+  .wlabel rect { fill: var(--paper); stroke: var(--line); }
+  .wlabel .card { font: 700 12px "DM Sans", system-ui, sans-serif; fill: var(--ink); }
+  .wlabel .field { font: 400 11px "DM Mono", ui-monospace, monospace; }
+
+  /* Legend + footer */
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 22px; font-size: 13.5px; color: var(--muted); align-items: center; }
+  .chip { font: 500 12.5px/1 "DM Mono", ui-monospace, monospace; padding: 4px 7px; border-radius: 5px; margin-right: 6px; }
+  .chip.uid { color: var(--uid); background: var(--uid-soft); }
+  .chip.pk { color: var(--pk); background: var(--pk-soft); }
+  .chip.sid { color: var(--sid); background: var(--sid-soft); }
+  .dash { display: inline-block; width: 26px; height: 14px; border: 1.5px dashed var(--muted); border-radius: 4px; margin-right: 6px; vertical-align: -2px; }
+  .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+  .foot a { color: var(--blue); }
+
+  @media (max-width: 860px) {
+    h1 { font-size: 34px; }
+    .grid { column-gap: 0; row-gap: 14px; }
+    .board.coll .grid, .board.full .grid { grid-template-columns: 1fr; grid-template-areas: none; }
+    .box { grid-area: auto !important; }
+    .wires { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top">
+    <div>
+      <p class="kicker">FastDeal · IS216 G8-3</p>
+      <h1>Database design</h1>
+      <p class="sub">MongoDB Atlas · database <b>fastdeal</b> · 6 collections</p>
+    </div>
+    <div class="controls">
+      <div class="ctl"><span class="seglabel">Show</span>
+        <div class="seg" role="group" aria-label="Show">
+          <button type="button" data-set="view" data-val="coll">Collections<span class="key">V</span></button>
+          <button type="button" data-set="view" data-val="full">+ Firebase &amp; links</button>
+        </div>
+      </div>
+      <div class="ctl"><span class="seglabel">Fields</span>
+        <div class="seg" role="group" aria-label="Fields">
+          <button type="button" data-set="fields" data-val="main">Main<span class="key">F</span></button>
+          <button type="button" data-set="fields" data-val="all">All + indexes</button>
+        </div>
+      </div>
+      <div class="ctl"><span class="seglabel">Focus</span>
+        <div class="seg" role="group" aria-label="Focus">
+          <button type="button" data-set="focus" data-val="0">None<span class="key">0</span></button>
+          <button type="button" data-set="focus" data-val="1">1 Price history</button>
+          <button type="button" data-set="focus" data-val="2">2 Cache</button>
+          <button type="button" data-set="focus" data-val="3">3 Anonymous</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <div class="seg" role="group" aria-label="Theme">
+          <button type="button" data-set="theme" data-val="light">Light<span class="key">T</span></button>
+          <button type="button" data-set="theme" data-val="dark">Dark</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="caption" id="caption" hidden>
+    <span class="num" id="cap-num">1</span>
+    <div><b id="cap-title"></b><span id="cap-text"></span></div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="board coll" id="board">
+      <svg class="wires" id="wires" aria-hidden="true"></svg>
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><span class="chip uid">firebaseUid</span>links a row to one user</span>
+    <span><span class="chip pk">productKey</span>same product, lowercase name</span>
+    <span><span class="chip sid">sessionId</span>same browser visit, no user</span>
+    <span><span class="dash"></span>not a MongoDB collection</span>
+  </div>
+
+  <div class="foot">
+    <span>Keys: V show · F fields · 1 2 3 focus · 0 clear · T theme</span>
+    <a href="/erd">Full ERD with the reason for every field</a>
+  </div>
+</div>
+
+<script>
+  (function () {
+    // Field flags: id = key field, extra = only in "All", uid/pk/sid = link colour
+    var boxes = [
+      { id: 'users', name: 'users', what: 'One row per account', fields: [
+        ['_id', 'extra id'], ['firebaseUid', 'uid'], ['email'], ['emailAlertsOn'], ['createdAt', 'extra']
+      ], idx: '<b>unique</b> firebaseUid' },
+      { id: 'wish', name: 'wishlistItems', what: 'Products a user saved', fields: [
+        ['_id', 'extra id'], ['firebaseUid', 'uid'], ['productName'], ['productKey', 'pk'], ['savedPrice'], ['targetPrice'],
+        ['latestPrice'], ['latestStore', 'extra'], ['latestLink', 'extra'], ['flag', '', 'none / drop / target'],
+        ['lastCheckedAt', 'extra'], ['lastEmailAt', 'extra'], ['savedAt', 'extra']
+      ], idx: '<b>unique</b> firebaseUid + productKey' },
+      { id: 'price', name: 'priceDays', what: 'Lowest price per product per day', fields: [
+        ['_id', 'extra id'], ['productKey', 'pk'], ['day', '', 'YYYY-MM-DD'], ['price'], ['store', 'extra']
+      ], idx: '<b>unique</b> productKey + day' },
+      { id: 'sleep', name: 'sleepHolds', what: '24-hour "Sleep on it" holds', fields: [
+        ['_id', 'extra id'], ['firebaseUid', 'uid'], ['productName', 'extra'], ['productKey', 'pk'], ['priceAtStart'],
+        ['latestPrice', 'extra'], ['startedAt', 'extra'], ['endsAt'], ['status', '', 'waiting / done']
+      ], idx: '<b>index</b> firebaseUid' },
+      { id: 'logs', name: 'searchLogs', what: 'Anonymous searches', fields: [
+        ['_id', 'extra id'], ['sessionId', 'sid'], ['query'], ['productName', 'extra'], ['productKey', 'pk'], ['searchedAt']
+      ], idx: '<b>index</b> sessionId, productKey' },
+      { id: 'cache', name: 'searchCache', what: 'Saved SerpApi results', fields: [
+        ['_id', 'extra id'], ['queryKey', 'id'], ['listings', '', 'array'], ['fetchedAt', 'extra'], ['expiresAt', '', 'deleted after 24 h']
+      ], idx: '<b>unique</b> queryKey · <b>TTL</b> expiresAt' },
+      { id: 'fire', name: 'Firebase Auth', what: 'Login only, not in MongoDB', ext: true, fields: [
+        ['uid', 'uid'], ['email'], ['password', '', 'hashed']
+      ] },
+      { id: 'pkey', name: 'Product key', what: 'A shared rule, not a collection', ext: true, fields: [
+        ['productKey', 'pk']
+      ] },
+      { id: 'sess', name: 'Browser session', what: 'Made in the browser, not stored alone', ext: true, fields: [
+        ['sessionId', 'sid']
+      ] }
+    ]
+
+    // ends: which end is "many" (crow's foot) and which is "one" (bar)
+    var links = [
+      { a: 'fire', b: 'users', kind: 'uid', card: '1 : 1', field: 'uid', ends: ['one', 'one'], views: ['full'] },
+      { a: 'users', b: 'wish', kind: 'uid', card: '1 : many', field: 'firebaseUid', ends: ['one', 'many'], views: ['coll', 'full'] },
+      { a: 'users', b: 'sleep', kind: 'uid', card: '1 : many', field: 'firebaseUid', ends: ['one', 'many'], views: ['coll', 'full'] },
+      { a: 'wish', b: 'price', kind: 'pk', card: 'shares', field: 'productKey', ends: ['many', 'many'], views: ['coll'] },
+      { a: 'wish', b: 'pkey', kind: 'pk', card: 'many : 1', field: 'productKey', ends: ['many', 'one'], views: ['full'] },
+      { a: 'sleep', b: 'pkey', kind: 'pk', card: 'many : 1', field: 'productKey', ends: ['many', 'one'], views: ['full'] },
+      { a: 'pkey', b: 'price', kind: 'pk', card: '1 : many', field: 'productKey', ends: ['one', 'many'], views: ['full'] },
+      { a: 'logs', b: 'pkey', kind: 'pk', card: 'many : 1', field: 'productKey', ends: ['many', 'one'], views: ['full'] },
+      { a: 'sess', b: 'logs', kind: 'sid', card: '1 : many', field: 'sessionId', ends: ['one', 'many'], views: ['full'] }
+    ]
+
+    var focusInfo = {
+      1: { boxes: ['wish', 'sleep', 'price', 'pkey', 'logs'], kinds: ['pk'], glow: ['productKey'],
+        title: 'Price history belongs to the product, not to each user',
+        text: 'Every collection that stores a product uses the same productKey. priceDays keeps one row per product per day, so five users saving the same headphones means one price check a day, not five. That keeps us inside SerpApi’s 250 free searches a month.' },
+      2: { boxes: ['cache'], kinds: [], glow: ['expiresAt', 'queryKey'],
+        title: 'The search cache cleans itself',
+        text: 'Results are kept for 24 hours. A TTL index on expiresAt makes MongoDB delete old rows by itself. A repeat search in that time uses no API call.' },
+      3: { boxes: ['logs', 'sess'], kinds: ['sid'], glow: ['sessionId'],
+        title: 'Search logs are anonymous',
+        text: 'A log stores a random sessionId from the browser, never a firebaseUid. Same session with different products means “searched together”. This powers the Trending page.' }
+    }
+
+    var state = { view: 'coll', fields: 'main', focus: '0', theme: 'light' }
+    var board = document.getElementById('board')
+    var grid = document.getElementById('grid')
+    var wires = document.getElementById('wires')
+    var stage = document.getElementById('stage')
+    var scale = 1
+    var colours = { uid: 'var(--uid)', pk: 'var(--pk)', sid: 'var(--sid)' }
+
+    function esc(s) {
+      return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] })
+    }
+
+    boxes.forEach(function (b) {
+      var el = document.createElement('article')
+      el.className = 'box' + (b.ext ? ' ext' : '')
+      el.id = 'box-' + b.id
+      el.style.gridArea = b.id
+      var html = '<header><h2>' + esc(b.name) + '</h2><p class="what">' + esc(b.what) + '</p></header><ul>'
+      b.fields.forEach(function (f) {
+        var cls = (f[1] || '').trim()
+        var note = f[2] ? '<span class="note">' + esc(f[2]) + '</span>' : ''
+        html += '<li class="' + cls + '" data-field="' + esc(f[0]) + '"><span>' + esc(f[0]) + '</span>' + note + '</li>'
+      })
+      html += '</ul>'
+      if (b.idx) html += '<p class="idx">' + b.idx + '</p>'
+      el.innerHTML = html
+      grid.appendChild(el)
+    })
+
+    function rectOf(el) {
+      var r = el.getBoundingClientRect()
+      var o = board.getBoundingClientRect()
+      return { l: (r.left - o.left) / scale, t: (r.top - o.top) / scale, r: (r.right - o.left) / scale, b: (r.bottom - o.top) / scale }
+    }
+
+    function markers() {
+      var out = '<defs>'
+      Object.keys(colours).forEach(function (k) {
+        out += '<marker id="many-' + k + '" viewBox="0 0 16 16" refX="15" refY="8" markerWidth="16" markerHeight="16" markerUnits="userSpaceOnUse" orient="auto-start-reverse">' +
+          '<path d="M2,8 L15,1 M2,8 L15,8 M2,8 L15,15" fill="none" stroke="' + colours[k] + '" stroke-width="1.8"/></marker>'
+        out += '<marker id="one-' + k + '" viewBox="0 0 16 16" refX="15" refY="8" markerWidth="16" markerHeight="16" markerUnits="userSpaceOnUse" orient="auto-start-reverse">' +
+          '<path d="M9,1 L9,15" fill="none" stroke="' + colours[k] + '" stroke-width="1.8"/></marker>'
+      })
+      return out + '</defs>'
+    }
+
+    // Shrink the whole diagram so it fits one screen (projector), never below 55%.
+    function fit() {
+      board.style.transform = ''
+      scale = 1
+      if (window.innerWidth > 860) {
+        var avail = window.innerHeight - stage.getBoundingClientRect().top - window.scrollY - 86
+        scale = Math.max(0.55, Math.min(1, avail / board.offsetHeight))
+      }
+      if (scale < 1) board.style.transform = 'scale(' + scale + ')'
+      stage.style.height = board.offsetHeight * scale + 'px'
+    }
+
+    function draw() {
+      fit()
+      wires.setAttribute('viewBox', '0 0 ' + board.offsetWidth + ' ' + board.offsetHeight)
+      if (getComputedStyle(wires).display === 'none') return
+      var svg = markers()
+      var labels = []
+      var focus = focusInfo[state.focus]
+      links.forEach(function (lk) {
+        if (lk.views.indexOf(state.view) < 0) return
+        var A = rectOf(document.getElementById('box-' + lk.a))
+        var B = rectOf(document.getElementById('box-' + lk.b))
+        var x1, y1, x2, y2
+        var oy = Math.min(A.b, B.b) - Math.max(A.t, B.t)
+        var ox = Math.min(A.r, B.r) - Math.max(A.l, B.l)
+        if (oy > 0 && (A.r <= B.l || B.r <= A.l)) {
+          y1 = y2 = Math.max(A.t, B.t) + Math.min(oy / 2, 60)
+          x1 = A.r <= B.l ? A.r : A.l
+          x2 = A.r <= B.l ? B.l : B.r
+        } else if (ox > 0) {
+          x1 = x2 = Math.max(A.l, B.l) + ox / 2
+          y1 = A.b <= B.t ? A.b : A.t
+          y2 = A.b <= B.t ? B.t : B.b
+        } else {
+          x1 = (A.l + A.r) / 2; y1 = (A.t + A.b) / 2
+          x2 = (B.l + B.r) / 2; y2 = (B.t + B.b) / 2
+        }
+        var dim = focus && focus.kinds.indexOf(lk.kind) < 0 ? ' dim' : ''
+        svg += '<g class="wire' + dim + '"><line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + colours[lk.kind] +
+          '" stroke-width="2" marker-start="url(#' + lk.ends[0] + '-' + lk.kind + ')" marker-end="url(#' + lk.ends[1] + '-' + lk.kind + ')"/></g>'
+        labels.push({ x: (x1 + x2) / 2, y: (y1 + y2) / 2, lk: lk, dim: dim })
+      })
+      labels.forEach(function (l) {
+        svg += '<g class="wire wlabel' + l.dim + '" transform="translate(' + l.x + ',' + l.y + ')">' +
+          '<rect x="-46" y="-17" width="92" height="34" rx="6"/>' +
+          '<text class="card" text-anchor="middle" y="-2">' + esc(l.lk.card) + '</text>' +
+          '<text class="field" text-anchor="middle" y="12" fill="' + colours[l.lk.kind] + '">' + esc(l.lk.field) + '</text></g>'
+      })
+      wires.innerHTML = svg
+    }
+
+    function apply() {
+      board.classList.toggle('coll', state.view === 'coll')
+      board.classList.toggle('full', state.view === 'full')
+      board.classList.toggle('all', state.fields === 'all')
+      document.documentElement.setAttribute('data-theme', state.theme)
+
+      var focus = focusInfo[state.focus]
+      board.classList.toggle('focus', !!focus)
+      boxes.forEach(function (b) {
+        var el = document.getElementById('box-' + b.id)
+        var on = focus && focus.boxes.indexOf(b.id) >= 0
+        el.classList.toggle('dim', !!focus && !on)
+        el.classList.toggle('lit', !!on)
+        el.querySelectorAll('li').forEach(function (li) {
+          li.classList.toggle('glow', !!on && focus.glow.indexOf(li.getAttribute('data-field')) >= 0)
+        })
+      })
+      var cap = document.getElementById('caption')
+      cap.hidden = !focus
+      if (focus) {
+        document.getElementById('cap-num').textContent = state.focus
+        document.getElementById('cap-title').textContent = focus.title
+        document.getElementById('cap-text').textContent = focus.text
+      }
+
+      document.querySelectorAll('.seg button').forEach(function (btn) {
+        btn.setAttribute('aria-pressed', String(state[btn.getAttribute('data-set')] === btn.getAttribute('data-val')))
+      })
+      history.replaceState(null, '', '#view=' + state.view + '&fields=' + state.fields + '&focus=' + state.focus + '&theme=' + state.theme)
+      requestAnimationFrame(draw)
+    }
+
+    function set(key, val) {
+      state[key] = val
+      apply()
+    }
+
+    location.hash.replace(/^#/, '').split('&').forEach(function (pair) {
+      var kv = pair.split('=')
+      if (kv[0] in state && kv[1]) state[kv[0]] = kv[1]
+    })
+
+    document.querySelectorAll('.seg button').forEach(function (btn) {
+      btn.addEventListener('click', function () { set(btn.getAttribute('data-set'), btn.getAttribute('data-val')) })
+    })
+
+    document.addEventListener('keydown', function (e) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      var k = e.key.toLowerCase()
+      if (k === 'v') set('view', state.view === 'coll' ? 'full' : 'coll')
+      else if (k === 'f') set('fields', state.fields === 'main' ? 'all' : 'main')
+      else if (k === 't') set('theme', state.theme === 'light' ? 'dark' : 'light')
+      else if (k === '1' || k === '2' || k === '3') set('focus', state.focus === k ? '0' : k)
+      else if (k === '0' || k === 'escape') set('focus', '0')
+    })
+
+    window.addEventListener('resize', draw)
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw)
+    apply()
+  })()
+</script>
+</body>
+</html>

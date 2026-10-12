@@ -17,6 +17,7 @@ app.use(express.json())
 const PORT = process.env.PORT || 3000
 const proposalPath = path.join(__dirname, 'data', 'proposal.json')
 const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd-v2.html')
+const erdPresentPath = path.join(__dirname, 'docs', 'fastdeal-erd-present.html')
 
 app.get('/health', (req, res) => {
   res.json({ ok: true })
@@ -83,6 +84,11 @@ app.get('/api/proposal', (req, res) => {
 // Database ERD for the team and graders
 app.get('/erd', (req, res) => {
   res.sendFile(erdPath)
+})
+
+// Clean ERD for presenting in class
+app.get('/erd/present', (req, res) => {
+  res.sendFile(erdPresentPath)
 })
 
 app.use(express.static(path.join(__dirname, 'dist')))
