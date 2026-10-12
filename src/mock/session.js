@@ -1,9 +1,41 @@
 import { ref } from 'vue'
+import { watchAuthState } from '../services/auth.js'
 
 const USERS_KEY = 'fastdeal-users'
-const SESSION_KEY = 'fastdeal-session'
 
 export const user = ref(null)
+export const firebaseUser = ref(null)
+
+// Keep firebaseUser in sync with Firebase auth state
+watchAuthState(function (fbUser) {
+  firebaseUser.value = fbUser
+  if (fbUser) {
+    // Merge Firebase identity into local user profile
+    const list = readUsers()
+    let found = null
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].email === fbUser.email) {
+        found = list[i]
+        break
+      }
+    }
+    if (!found) {
+      found = {
+        email: fbUser.email,
+        displayName: fbUser.displayName || '',
+        photoURL: fbUser.photoURL || '',
+        emailOn: true,
+        wishlist: [],
+        sleep: []
+      }
+      list.push(found)
+      writeUsers(list)
+    }
+    user.value = found
+  } else {
+    user.value = null
+  }
+})
 
 function readUsers() {
   const raw = localStorage.getItem(USERS_KEY)
@@ -58,66 +90,11 @@ export function initSession() {
   if (!localStorage.getItem(USERS_KEY)) {
     seed()
   }
-  const email = localStorage.getItem(SESSION_KEY)
-  if (!email) {
-    user.value = null
-    return
-  }
-  const list = readUsers()
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].email === email) {
-      user.value = list[i]
-      return
-    }
-  }
-  user.value = null
-  localStorage.removeItem(SESSION_KEY)
-}
-
-export function signup(email, password) {
-  const clean = String(email || '').trim().toLowerCase()
-  if (!clean || !password) {
-    return 'Enter an email and a password.'
-  }
-  if (String(password).length < 6) {
-    return 'Use at least 6 characters.'
-  }
-  const list = readUsers()
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].email === clean) {
-      return 'That email already has an account.'
-    }
-  }
-  const next = {
-    email: clean,
-    password: password,
-    emailOn: true,
-    wishlist: [],
-    sleep: []
-  }
-  list.push(next)
-  writeUsers(list)
-  user.value = next
-  localStorage.setItem(SESSION_KEY, clean)
-  return ''
-}
-
-export function login(email, password) {
-  const clean = String(email || '').trim().toLowerCase()
-  const list = readUsers()
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].email === clean && list[i].password === password) {
-      user.value = list[i]
-      localStorage.setItem(SESSION_KEY, clean)
-      return ''
-    }
-  }
-  return 'Email or password is wrong.'
+  // Firebase auth state watcher (set up above) handles restoring user on reload
 }
 
 export function logout() {
   user.value = null
-  localStorage.removeItem(SESSION_KEY)
 }
 
 export function saveProduct(item) {
