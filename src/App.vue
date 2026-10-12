@@ -1,7 +1,8 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { user, logout } from './mock/session.js'
+import { user } from './mock/session.js'
+import { signOutUser } from './services/auth.js'
 import FdLogo from './components/FdLogo.vue'
 import FdIcon from './components/FdIcon.vue'
 import FdFooter from './components/FdFooter.vue'
@@ -79,8 +80,8 @@ function trapEntryFocus(event) {
   }
 }
 
-function onLogout() {
-  logout()
+async function onLogout() {
+  await signOutUser()
   router.push('/')
 }
 
