@@ -1,16 +1,27 @@
 import { ref } from 'vue'
 import { watchAuthState } from '../services/auth.js'
+import { createOrGetUser } from '../services/userApi.js'
 
 const USERS_KEY = 'fastdeal-users'
 
 export const user = ref(null)
 export const firebaseUser = ref(null)
 
-// Keep firebaseUser in sync with Firebase auth state
-watchAuthState(function (fbUser) {
+// Keep firebaseUser in sync with Firebase auth state.
+// On login: upsert user in MongoDB, then build local profile.
+// Wishlist/sleep stay in localStorage until MongoDB migration.
+watchAuthState(async function (fbUser) {
   firebaseUser.value = fbUser
   if (fbUser) {
-    // Merge Firebase identity into local user profile
+    let emailAlertsOn = true
+    try {
+      const dbUser = await createOrGetUser(fbUser.uid, fbUser.email)
+      emailAlertsOn = dbUser.emailAlertsOn
+      console.log('[FastDeal] MongoDB user synced:', dbUser)
+    } catch (err) {
+      console.warn('[FastDeal] Could not sync user with MongoDB:', err.message)
+    }
+
     const list = readUsers()
     let found = null
     for (let i = 0; i < list.length; i++) {
@@ -24,12 +35,14 @@ watchAuthState(function (fbUser) {
         email: fbUser.email,
         displayName: fbUser.displayName || '',
         photoURL: fbUser.photoURL || '',
-        emailOn: true,
+        emailOn: emailAlertsOn,
         wishlist: [],
         sleep: []
       }
       list.push(found)
       writeUsers(list)
+    } else {
+      found.emailOn = emailAlertsOn
     }
     user.value = found
   } else {
@@ -158,12 +171,19 @@ export function removeSaved(name) {
   persist()
 }
 
-export function toggleEmail() {
-  if (!user.value) {
+export async function toggleEmail() {
+  if (!user.value || !firebaseUser.value) {
     return
   }
   user.value.emailOn = !user.value.emailOn
   persist()
+  try {
+    const { updateUser } = await import('../services/userApi.js')
+    const updated = await updateUser(firebaseUser.value.uid, { emailAlertsOn: user.value.emailOn })
+    console.log('[FastDeal] emailAlertsOn updated in MongoDB:', updated)
+  } catch (err) {
+    console.warn('[FastDeal] Could not sync emailAlertsOn to MongoDB:', err.message)
+  }
 }
 
 export function sleepOn(name) {
