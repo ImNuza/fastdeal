@@ -9,7 +9,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:3000',
-      '/health': 'http://localhost:3000'
+      '/health': 'http://localhost:3000',
+      '/erd': 'http://localhost:3000'
     }
   }
 })
