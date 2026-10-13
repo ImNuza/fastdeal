@@ -2,7 +2,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { user } from './mock/session.js'
-import { signOutUser } from './services/auth.js'
 import FdLogo from './components/FdLogo.vue'
 import FdIcon from './components/FdIcon.vue'
 import FdFooter from './components/FdFooter.vue'
@@ -13,18 +12,24 @@ const ENTRY_CHOICE_KEY = 'fastdeal-entry-choice'
 const route = useRoute()
 const router = useRouter()
 
-// A guest who taps Wishlist or Sleep lands on /login?next=..., so keep the tapped icon highlighted.
-const GATED_PAGES = ['/wishlist', '/sleep']
+// A guest who taps a locked icon lands on /login?next=..., so the tapped icon stays yellow, not Log in.
+const GATED_PAGES = ['/wishlist', '/sleep', '/friends', '/notifications']
 const loginFor = computed(function () {
   const next = route.query.next
   return route.path === '/login' && GATED_PAGES.includes(next) ? next : ''
 })
 
+// Exactly one icon is yellow: the page you are on, or the locked page you tapped on its way to log in.
 function isNavActive(path) {
   if (path === '/login') {
     return route.path === '/login' && !loginFor.value
   }
-  return route.path === path || loginFor.value === path
+  // Sleep on it now lives inside Wishlist, so /sleep lights up the Wishlist icon.
+  const here = loginFor.value || route.path
+  if (path === '/wishlist') {
+    return here === '/wishlist' || here === '/sleep'
+  }
+  return here === path
 }
 const showEntryDialog = ref(false)
 const entryDialog = ref(null)
@@ -80,11 +85,6 @@ function trapEntryFocus(event) {
   }
 }
 
-async function onLogout() {
-  await signOutUser()
-  router.push('/')
-}
-
 // Keep --fd-nav-height equal to the real navbar height, so each page can fill exactly one screen below it.
 const navBar = ref(null)
 let navObserver = null
@@ -116,45 +116,43 @@ watch([() => route.path, user], maybeShowEntryDialog)
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="fdNav">
-        <ul class="navbar-nav me-auto">
+        <ul class="navbar-nav ms-auto align-items-lg-center fd-nav-right">
           <li class="nav-item">
-            <router-link class="nav-link" to="/search" exact-active-class="active">Search</router-link>
+            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/friends') }" active-class="" exact-active-class="" to="/friends">
+              <FdIcon name="friends" />
+              <span class="fd-icon-label">Friends</span>
+            </router-link>
           </li>
           <li class="nav-item">
-            <router-link class="nav-link" to="/trending" exact-active-class="active">Trending</router-link>
-          </li>
-        </ul>
-        <ul class="navbar-nav align-items-lg-center fd-nav-right">
-          <li class="nav-item">
-            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/wishlist') }" active-class="" exact-active-class="" to="/wishlist" title="Wishlist">
-              <FdIcon name="basket" />
+            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/wishlist') }" active-class="" exact-active-class="" to="/wishlist">
+              <FdIcon name="tag" />
               <span class="fd-icon-label">Wishlist</span>
             </router-link>
           </li>
           <li class="nav-item">
-            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/sleep') }" active-class="" exact-active-class="" to="/sleep" title="Sleep on it">
-              <FdIcon name="moon" />
-              <span class="fd-icon-label">Sleep</span>
+            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/notifications') }" active-class="" exact-active-class="" to="/notifications">
+              <FdIcon name="bell" />
+              <span class="fd-icon-label">Notifications</span>
             </router-link>
           </li>
-          <li v-if="user" class="nav-item">
-            <span class="fd-nav-email small">{{ user.email }}</span>
-          </li>
-          <li class="nav-item">
-            <router-link v-if="!user" class="nav-link fd-icon-link" :class="{ active: isNavActive('/login') }" active-class="" exact-active-class="" to="/login" title="Log in">
+          <li v-if="!user" class="nav-item">
+            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/login') }" active-class="" exact-active-class="" to="/login">
               <FdIcon name="account" />
-              <span class="fd-icon-label">Log in</span>
+              <span class="fd-icon-label">Account</span>
             </router-link>
-            <button v-else class="nav-link fd-icon-link" type="button" title="Log out" @click="onLogout">
-              <FdIcon name="logout" />
-              <span class="fd-icon-label">Log out</span>
-            </button>
+          </li>
+          <!-- Logged in: the same account icon goes to the Account page, which holds Log out. -->
+          <li v-else class="nav-item">
+            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/account') }" active-class="" exact-active-class="" to="/account">
+              <FdIcon name="account" />
+              <span class="fd-icon-label">Account</span>
+            </router-link>
           </li>
         </ul>
       </div>
     </div>
   </nav>
-  <main class="fd-main" :class="{ 'container py-4': !route.meta.fullBleed }">
+  <main class="fd-main" :class="{ 'container fd-page': !route.meta.fullBleed }">
     <router-view :key="$route.fullPath" />
   </main>
   <FdFooter />
