@@ -1,7 +1,7 @@
 <script setup>
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { signInWithGoogle, signInWithEmail } from '../services/auth.js'
+import { resetPassword, signInWithGoogle, signInWithEmail } from '../services/auth.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -53,13 +53,57 @@ async function onEmailSignIn() {
     loading.value = false
   }
 }
+
+// Forgot password: a pop-up on this page that emails a reset link.
+const showReset = ref(false)
+const resetEmail = ref('')
+const resetError = ref('')
+const resetSuccess = ref('')
+const resetLoading = ref(false)
+const resetInput = ref(null)
+const forgotLink = ref(null)
+
+function openReset() {
+  resetEmail.value = email.value
+  resetError.value = ''
+  resetSuccess.value = ''
+  showReset.value = true
+  nextTick(() => resetInput.value?.focus())
+}
+
+function closeReset() {
+  showReset.value = false
+  nextTick(() => forgotLink.value?.focus())
+}
+
+async function onResetSubmit() {
+  resetError.value = ''
+  resetSuccess.value = ''
+  if (!resetEmail.value) {
+    resetError.value = 'Enter your email address.'
+    return
+  }
+  resetLoading.value = true
+  try {
+    await resetPassword(resetEmail.value)
+    resetSuccess.value = 'Reset link sent. Check your inbox.'
+  } catch (err) {
+    if (err.code === 'auth/user-not-found') {
+      resetError.value = 'No account found with that email.'
+    } else {
+      resetError.value = err.message || 'Something went wrong. Try again.'
+    }
+  } finally {
+    resetLoading.value = false
+  }
+}
 </script>
 
 <template>
   <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
       <h1 class="fd-page-title">Log in</h1>
-      <p class="fd-page-subtitle">Search works without an account. Save, alerts, and Sleep on it need a login.</p>
+      <p class="fd-page-subtitle">Log in to save products to your wishlist, get alerts when prices drop, and see what your friends are eyeing!</p>
 
       <div class="card p-4">
         <p v-if="errorText" class="alert alert-danger mb-3">{{ errorText }}</p>
@@ -83,23 +127,23 @@ async function onEmailSignIn() {
             autocomplete="current-password"
           />
           <div class="text-end mb-3">
-            <router-link class="forgot-link" to="/forgot-password">Forgot Password</router-link>
+            <button ref="forgotLink" class="btn btn-link p-0 forgot-link" type="button" @click="openReset">Forgot password?</button>
           </div>
-          <button class="btn login-btn w-100 mb-4" type="submit" :disabled="loading">
-            {{ loading ? 'Signing in…' : 'Login' }}
+          <button class="btn btn-dark fd-btn-lg w-100 mb-4" type="submit" :disabled="loading">
+            {{ loading ? 'Signing in…' : 'Log in' }}
           </button>
         </form>
 
         <!-- Divider -->
         <div class="d-flex align-items-center mb-3 gap-2">
           <hr class="flex-grow-1 m-0" />
-          <span class="small text-secondary">Or login with</span>
+          <span class="small text-secondary">Or log in with</span>
           <hr class="flex-grow-1 m-0" />
         </div>
 
         <!-- Google only -->
         <button
-          class="btn google-btn w-100 d-flex align-items-center justify-content-center gap-2"
+          class="btn btn-outline-dark fd-btn-lg w-100 gap-2"
           type="button"
           :disabled="loading"
           @click="onGoogleSignIn"
@@ -113,57 +157,63 @@ async function onEmailSignIn() {
           {{ loading ? 'Signing in…' : 'Continue with Google' }}
         </button>
 
-        <p class="small text-center mt-4 mb-0">
-          Don't have an account?
-          <router-link :to="{ path: '/signup', query: route.query }">Sign Up</router-link>
+        <p class="fd-entry-signup">
+          New to FastDeal?
+          <router-link :to="{ path: '/signup', query: route.query }">Create an account</router-link>
         </p>
       </div>
     </div>
+  </div>
+
+  <!-- Forgot password pop-up. Uses the welcome prompt's dialog styles from app.css. -->
+  <div v-if="showReset" class="fd-entry-backdrop" @click.self="closeReset" @keydown.esc="closeReset">
+    <section class="fd-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-reset-title">
+      <h2 id="fd-reset-title" class="fd-page-title">Forgot password</h2>
+      <p class="fd-entry-description">Enter your email and we'll send you a link to reset your password.</p>
+
+      <form @submit.prevent="onResetSubmit">
+        <p v-if="resetError" class="alert alert-danger mb-3">{{ resetError }}</p>
+        <p v-if="resetSuccess" class="alert alert-success mb-3">{{ resetSuccess }}</p>
+
+        <label class="visually-hidden" for="reset-email">Email</label>
+        <input
+          id="reset-email"
+          ref="resetInput"
+          v-model="resetEmail"
+          class="form-control login-input mb-3"
+          type="email"
+          placeholder="Email"
+          autocomplete="email"
+        />
+        <div class="fd-entry-actions">
+          <button class="btn btn-dark fd-btn-lg" type="submit" :disabled="resetLoading">
+            {{ resetLoading ? 'Sending…' : 'Send reset link' }}
+          </button>
+          <button class="btn btn-outline-dark fd-btn-lg" type="button" @click="closeReset">
+            {{ resetSuccess ? 'Done' : 'Cancel' }}
+          </button>
+        </div>
+      </form>
+    </section>
   </div>
 </template>
 
 <style scoped>
 .login-input {
-  border-radius: 2rem;
+  /* Pill inputs; colours, border, and focus ring come from the shared .form-control styles. */
+  border-radius: 999px;
   padding: 0.75rem 1.25rem;
-  border: 1.5px solid #ddd;
-  background: #fff;
 }
-.login-input:focus {
-  border-color: var(--fd-blue);
-  box-shadow: none;
-}
+
 .forgot-link {
   color: var(--fd-blue);
-  font-size: 0.875rem;
+  font-size: var(--fd-small);
   text-decoration: none;
   font-weight: 500;
+  vertical-align: baseline;
 }
+
 .forgot-link:hover {
   text-decoration: underline;
-}
-.login-btn {
-  border-radius: 2rem;
-  background: #2a7a6f;
-  color: #fff;
-  font-weight: 600;
-  padding: 0.75rem;
-  font-size: 1rem;
-  border: none;
-}
-.login-btn:hover:not(:disabled) {
-  background: #236059;
-  color: #fff;
-}
-.google-btn {
-  border-radius: 0.75rem;
-  border: 1.5px solid #ddd;
-  background: #fff;
-  color: #333;
-  font-weight: 500;
-  padding: 0.65rem;
-}
-.google-btn:hover:not(:disabled) {
-  background: #f5f5f5;
 }
 </style>

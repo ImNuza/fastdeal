@@ -17,12 +17,10 @@ Replaced the old mock `session.js` login/signup with real Firebase Auth.
   - `watchAuthState(callback)` — listens to auth state changes
 
 **Updated files:**
-- `src/views/LoginView.vue` — Google button (primary) + email/password form + Forgot password link
+- `src/views/LoginView.vue` — Google button (primary) + email/password form + Forgot password pop-up (sends the reset email with `sendPasswordResetEmail`)
 - `src/views/SignupView.vue` — Google button (primary) + email/password form
-- `src/views/ForgotPasswordView.vue` — NEW: forgot password page using `sendPasswordResetEmail`
-- `src/router/index.js` — added `/forgot-password` route
 - `src/mock/session.js` — `watchAuthState` now syncs Firebase user into the existing `user` ref; wishlist/sleep helpers are untouched
-- `src/App.vue` — logout now calls `signOutUser()` from Firebase
+- `src/views/AccountView.vue` — Log out button calls `signOutUser()` from Firebase (the navbar account icon links here once logged in)
 - `src/main.js` — removed `initSession()` call (Firebase `onAuthStateChanged` handles session restore on reload)
 - `.env` — real Firebase project keys are filled in
 

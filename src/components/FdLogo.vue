@@ -1,14 +1,5 @@
-<script setup>
-defineProps({
-  tone: {
-    type: String,
-    default: 'on-dark'
-  }
-})
-</script>
-
 <template>
-  <span class="fd-logo" :class="'fd-logo--' + tone">
+  <span class="fd-logo">
     <span class="fd-logo-speed" aria-hidden="true">
       <span></span>
       <span></span>
@@ -54,6 +45,7 @@ defineProps({
 
 .fd-logo-word {
   display: inline-block;
+  color: var(--fd-beige);
   font-family: var(--fd-font-display);
   font-weight: 400;
   letter-spacing: 0.01em;
@@ -63,18 +55,6 @@ defineProps({
 
 .fd-logo-deal {
   margin-left: 0.08em;
-}
-
-.fd-logo--on-dark .fd-logo-word {
-  color: var(--fd-beige);
-}
-
-.fd-logo--on-dark .fd-logo-deal {
   color: var(--fd-vanilla);
-}
-
-.fd-logo--on-light .fd-logo-word,
-.fd-logo--on-light .fd-logo-deal {
-  color: var(--fd-blue);
 }
 </style>

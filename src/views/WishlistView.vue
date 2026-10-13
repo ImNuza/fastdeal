@@ -2,6 +2,7 @@
 import { useRouter } from 'vue-router'
 import { cheapestPrice, sgd } from '../mock/catalog.js'
 import { removeSaved, setTarget, toggleEmail, user } from '../mock/session.js'
+import SleepView from './SleepView.vue'
 
 const router = useRouter()
 
@@ -76,5 +77,9 @@ function onTarget(item, event) {
         </tbody>
       </table>
     </div>
+
+    <section class="mt-5">
+      <SleepView embedded />
+    </section>
   </div>
 </template>

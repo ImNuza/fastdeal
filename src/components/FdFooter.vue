@@ -90,9 +90,11 @@ const year = new Date().getFullYear()
   margin-bottom: 1rem;
   color: var(--fd-vanilla);
   font-family: var(--fd-font-display);
-  font-size: 1.125rem;
+  /* Same size as section titles such as "Trending products": 24px, 28px from 768px. */
+  font-size: var(--fd-section-title);
   font-weight: 400;
-  letter-spacing: 0.04em;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
   text-transform: uppercase;
 }
 
