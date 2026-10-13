@@ -61,7 +61,7 @@ async function onEmailSignUp() {
   <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
       <h1 class="fd-page-title">Sign up</h1>
-      <p class="fd-page-subtitle">Create an account to save products and set price alerts.</p>
+      <p class="fd-page-subtitle">Sign up to save products to your wishlist, get alerts when prices drop, and see what your friends are eyeing!</p>
 
       <div class="card p-4">
         <p v-if="errorText" class="alert alert-danger mb-3">{{ errorText }}</p>
@@ -84,7 +84,7 @@ async function onEmailSignUp() {
             placeholder="Password"
             autocomplete="new-password"
           />
-          <button class="btn login-btn w-100 mb-4" type="submit" :disabled="loading">
+          <button class="btn btn-dark fd-btn-lg w-100 mb-4" type="submit" :disabled="loading">
             {{ loading ? 'Creating account…' : 'Create account' }}
           </button>
         </form>
@@ -98,7 +98,7 @@ async function onEmailSignUp() {
 
         <!-- Google only -->
         <button
-          class="btn google-btn w-100 d-flex align-items-center justify-content-center gap-2"
+          class="btn btn-outline-dark fd-btn-lg w-100 gap-2"
           type="button"
           :disabled="loading"
           @click="onGoogleSignUp"
@@ -112,7 +112,7 @@ async function onEmailSignUp() {
           {{ loading ? 'Signing up…' : 'Continue with Google' }}
         </button>
 
-        <p class="small text-center mt-4 mb-0">
+        <p class="fd-entry-signup">
           Already have an account?
           <router-link :to="{ path: '/login', query: route.query }">Log in</router-link>
         </p>
@@ -123,37 +123,8 @@ async function onEmailSignUp() {
 
 <style scoped>
 .login-input {
-  border-radius: 2rem;
+  /* Pill inputs; colours, border, and focus ring come from the shared .form-control styles. */
+  border-radius: 999px;
   padding: 0.75rem 1.25rem;
-  border: 1.5px solid #ddd;
-  background: #fff;
-}
-.login-input:focus {
-  border-color: var(--fd-blue);
-  box-shadow: none;
-}
-.login-btn {
-  border-radius: 2rem;
-  background: #2a7a6f;
-  color: #fff;
-  font-weight: 600;
-  padding: 0.75rem;
-  font-size: 1rem;
-  border: none;
-}
-.login-btn:hover:not(:disabled) {
-  background: #236059;
-  color: #fff;
-}
-.google-btn {
-  border-radius: 0.75rem;
-  border: 1.5px solid #ddd;
-  background: #fff;
-  color: #333;
-  font-weight: 500;
-  padding: 0.65rem;
-}
-.google-btn:hover:not(:disabled) {
-  background: #f5f5f5;
 }
 </style>

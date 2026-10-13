@@ -4,6 +4,14 @@ import { useRouter } from 'vue-router'
 import { cheapestPrice, sgd } from '../mock/catalog.js'
 import { removeSleep, saveProduct, user } from '../mock/session.js'
 
+// Wishlist shows this page as a section, so its heading drops to h2 there.
+defineProps({
+  embedded: {
+    type: Boolean,
+    default: false
+  }
+})
+
 const router = useRouter()
 const now = ref(Date.now())
 
@@ -37,7 +45,8 @@ function keep(item) {
 
 <template>
   <div v-if="user">
-    <h1 class="fd-page-title">Sleep on it</h1>
+    <h2 v-if="embedded" class="fd-section-title">Sleep on it</h2>
+    <h1 v-else class="fd-page-title">Sleep on it</h1>
     <p class="fd-page-subtitle">A product stays here for 24 hours. When the hold ends, the row shows the latest price so you can decide.</p>
 
     <p v-if="!user.sleep.length" class="alert alert-secondary">No holds. Open a product and press Sleep on it.</p>
