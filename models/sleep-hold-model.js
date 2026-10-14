@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 
-// A 24-hour "Sleep on it" hold. status becomes "done" after the user answers "Still want it?".
+// A "Sleep on it" hold. The user picks endsAt and a reason.
+// status: waiting -> ended (timer is over and the notification went out) -> done (the user answered).
 const sleepHoldSchema = new mongoose.Schema(
   {
     firebaseUid: {
@@ -41,16 +42,37 @@ const sleepHoldSchema = new mongoose.Schema(
       required: true
     },
 
+    reason: {
+      type: String,
+      enum: ['better-price', 'wait-for-sale', 'not-sure-i-need-it', 'other'],
+      default: null
+    },
+
+    reasonNote: {
+      type: String,
+      trim: true,
+      default: null
+    },
+
     status: {
       type: String,
-      enum: ['waiting', 'done'],
+      enum: ['waiting', 'ended', 'done'],
       default: 'waiting'
+    },
+
+    decision: {
+      type: String,
+      enum: ['buy', 'skip'],
+      default: null
     }
   },
   {
     versionKey: false
   }
 )
+
+// The timer job finds waiting holds whose time is up.
+sleepHoldSchema.index({ status: 1, endsAt: 1 })
 
 const SleepHold = mongoose.model('SleepHold', sleepHoldSchema, 'sleepHolds')
 

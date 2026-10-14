@@ -29,6 +29,13 @@ const wishlistItemSchema = new mongoose.Schema(
       default: null
     },
 
+    // 1 = most important. null = not a priority.
+    priority: {
+      type: Number,
+      default: null,
+      min: 1
+    },
+
     latestPrice: {
       type: Number,
       default: null
@@ -73,6 +80,9 @@ const wishlistItemSchema = new mongoose.Schema(
 
 // Same user cannot save one product twice.
 wishlistItemSchema.index({ firebaseUid: 1, productKey: 1 }, { unique: true })
+
+// Sale alerts: every user who saved this product.
+wishlistItemSchema.index({ productKey: 1 })
 
 const WishlistItem = mongoose.model('WishlistItem', wishlistItemSchema, 'wishlistItems')
 

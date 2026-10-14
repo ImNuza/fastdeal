@@ -16,7 +16,7 @@ app.use(express.json())
 
 const PORT = process.env.PORT || 3000
 const proposalPath = path.join(__dirname, 'data', 'proposal.json')
-const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd-v2.html')
+const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd-v3.html')
 const erdPresentPath = path.join(__dirname, 'docs', 'fastdeal-erd-present.html')
 
 app.get('/health', (req, res) => {
