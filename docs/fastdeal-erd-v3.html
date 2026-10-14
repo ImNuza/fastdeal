@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FastDeal ERD v3</title>
+<style>
+  :root {
+    --bg: #f4ede3;
+    --paper: #fbf8f3;
+    --ink: #343b1b;
+    --muted: #585f3e;
+    --blue: #27508a;
+    --line: #e8d9ad;
+    --vanilla: #fae8a4;
+    --vanilla-soft: #fcf2cc;
+    --green-soft: #d8e4b4;
+    --red-soft: #f4d9cf;
+    --red: #a3301f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16191f;
+      --paper: #1f242c;
+      --ink: #e9e4da;
+      --muted: #b0aa9c;
+      --blue: #8fb3e8;
+      --line: #3a3f48;
+      --vanilla: #e6cf7a;
+      --vanilla-soft: #3a3420;
+      --green-soft: #2f3d22;
+      --red-soft: #4a2a24;
+      --red: #f0a493;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16191f;
+    --paper: #1f242c;
+    --ink: #e9e4da;
+    --muted: #b0aa9c;
+    --blue: #8fb3e8;
+    --line: #3a3f48;
+    --vanilla: #e6cf7a;
+    --vanilla-soft: #3a3420;
+    --green-soft: #2f3d22;
+    --red-soft: #4a2a24;
+    --red: #f0a493;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .page { max-width: 1040px; margin: 0 auto; padding: 28px 16px 64px; }
+  .kicker {
+    margin: 0 0 6px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
+  h2.section { margin: 40px 0 10px; font-size: 18px; }
+  .lead { margin: 0 0 16px; max-width: 72ch; color: var(--muted); }
+
+  .switch { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 999px; overflow: hidden; margin: 6px 0 14px; }
+  .switch button {
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    padding: 6px 16px;
+    cursor: pointer;
+  }
+  .switch button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+  .canvas { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .canvas svg { display: block; min-width: 900px; width: 100%; height: auto; }
+  .canvas svg line, .canvas svg polyline { stroke: var(--ink); stroke-width: 1.5; fill: none; }
+  .canvas svg .bus { stroke: var(--blue); }
+  .rel { font-size: 11px; fill: var(--muted); }
+  .rel.b { fill: var(--blue); }
+  [hidden] { display: none !important; }
+
+  .entity {
+    height: 100%;
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+    padding: 8px 10px 6px;
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .entity.ext { border-style: dashed; }
+  .entity.alone { border-color: var(--blue); }
+  .entity.concept { border-style: dashed; border-color: var(--blue); }
+  .entity.newbox { border-width: 2.5px; }
+  .entity h3 { margin: 0; font-size: 14px; font-weight: 700; }
+  .entity .coll {
+    margin: 0 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+    font: 11px/1.4 ui-monospace, Menlo, monospace;
+    color: var(--muted);
+  }
+  .entity ul { margin: 0; padding: 0; list-style: none; }
+  .entity li { font-size: 12.5px; line-height: 1.45; padding: 0 3px; border-radius: 3px; }
+  .entity li::before { content: ""; display: inline-block; width: 12px; font-weight: 700; }
+  .entity li.add { background: var(--green-soft); }
+  .entity li.add::before { content: "+"; }
+  .entity li.chg { background: var(--vanilla-soft); }
+  .entity li.chg::before { content: "~"; }
+  .entity .hint { margin: 4px 0 0; font-size: 11px; line-height: 1.35; color: var(--muted); }
+  .pk { font-weight: 700; text-decoration: underline; }
+  .fk { color: var(--blue); }
+  .dn {
+    display: inline-block;
+    min-width: 15px;
+    margin-left: 4px;
+    padding: 0 3px;
+    border-radius: 8px;
+    background: var(--blue);
+    color: var(--paper);
+    font-size: 10px;
+    line-height: 15px;
+    text-align: center;
+    text-decoration: none;
+    vertical-align: 1px;
+  }
+
+  .legend { font-size: 12px; line-height: 1.5; }
+  .legend h3 { font-size: 13px; margin: 0 0 6px; }
+  .legend p { margin: 0 0 3px; }
+  .sw { display: inline-block; width: 22px; height: 12px; margin-right: 6px; vertical-align: -1px; border-radius: 2px; }
+
+  .note { margin: 10px 0 0; max-width: 72ch; font-size: 13px; color: var(--muted); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; background: var(--paper); }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  code { font: 12.5px ui-monospace, Menlo, monospace; }
+
+  .summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+  .badge {
+    display: inline-block;
+    padding: 1px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .badge.must { background: var(--blue); color: var(--paper); }
+  .badge.should { background: var(--vanilla); color: #343b1b; }
+  .badge.nice { border: 1.5px solid var(--muted); color: var(--muted); }
+
+  .diff {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin: 0 0 14px;
+    scroll-margin-top: 16px;
+  }
+  .diff:target { outline: 2px solid var(--blue); }
+  .diff header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .diff header .num {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--blue); color: var(--paper);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+  }
+  .diff h3 { margin: 0; font-size: 16px; flex: 1 1 260px; }
+  .oldnew { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .oldnew div { padding: 8px 10px; border-radius: 6px; font-size: 13.5px; }
+  .oldnew .o { background: var(--red-soft); }
+  .oldnew .n { background: var(--green-soft); }
+  .oldnew b { display: block; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 2px; }
+  .diff h4 { margin: 10px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .diff ul { margin: 0; padding-left: 20px; }
+  .diff li { margin: 0 0 4px; }
+  .diff p { margin: 0; }
+  .plain { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; }
+  .plain ul { margin: 0; padding-left: 20px; }
+  .plain li { margin: 0 0 6px; }
+
+  @media (max-width: 640px) {
+    .oldnew { grid-template-columns: 1fr; }
+    h1 { font-size: 21px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="kicker">Logical model, not SQL. v3, agreed 14 Oct 2026</p>
+  <h1>FastDeal ERD v3</h1>
+  <p class="lead">v3 adds what the 13 Oct whiteboard jobs need from the database. Use the switch to change between v3 and the older v2. In v3, each new or changed field has a number. Click a number to read why it changed. Changes 8 (group orders) and 9 (Telegram) are agreed designs that are not built yet. They wait for the group order decision and the Telegram bot.</p>
+
+  <div class="switch" role="group" aria-label="Choose diagram">
+    <button type="button" data-show="new" aria-pressed="true">New (v3)</button>
+    <button type="button" data-show="old" aria-pressed="false">Old (v2)</button>
+  </div>
+
+  <!-- NEW ERD v3 -->
+  <div class="canvas" id="erd-new">
+    <svg viewBox="0 0 1000 950" role="img" aria-label="FastDeal ERD version 3">
+      <!-- Firebase to User -->
+      <line x1="210" y1="90" x2="250" y2="90"/>
+      <text class="rel" x="212" y="82">1 to 1</text>
+      <!-- User to Wishlist -->
+      <line x1="470" y1="90" x2="510" y2="90"/>
+      <text class="rel" x="474" y="82">1 to n</text>
+      <!-- User to Sleep -->
+      <line x1="360" y1="262" x2="360" y2="300"/>
+      <text class="rel" x="367" y="286">1 to n</text>
+      <!-- User bus to Friendship, Notification, Group order -->
+      <polyline class="bus" points="440,30 440,14 765,14 765,700 780,700"/>
+      <line class="bus" x1="765" y1="110" x2="780" y2="110"/>
+      <line class="bus" x1="765" y1="380" x2="780" y2="380"/>
+      <text class="rel b" x="480" y="10">User to Friendship (2 links), Notification and Group order: 1 to many each</text>
+      <!-- Wishlist to Product key -->
+      <line x1="630" y1="356" x2="630" y2="400"/>
+      <text class="rel" x="637" y="382">n to 1</text>
+      <!-- Sleep to Product key -->
+      <line x1="470" y1="455" x2="510" y2="455"/>
+      <text class="rel" x="474" y="447">n to 1</text>
+      <!-- Product key to Price day -->
+      <line x1="630" y1="510" x2="630" y2="580"/>
+      <text class="rel" x="637" y="550">1 to n</text>
+      <!-- Search log to Product key -->
+      <polyline points="470,710 490,710 490,490 510,490"/>
+      <text class="rel" x="495" y="540">n to 1</text>
+      <!-- Session to Search log -->
+      <line x1="210" y1="710" x2="250" y2="710"/>
+      <text class="rel" x="214" y="702">1 to n</text>
+
+      <foreignObject x="10" y="30" width="200" height="120">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity ext">
+          <h3>Firebase Auth</h3>
+          <p class="coll">not in Mongo</p>
+          <ul>
+            <li class="pk">uid</li>
+            <li>email</li>
+            <li>password (hashed)</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="250" y="30" width="220" height="232">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>User</h3>
+          <p class="coll">users</p>
+          <ul>
+            <li class="pk fk">firebaseUid</li>
+            <li>email</li>
+            <li class="add">username<a class="dn" href="#d1">1</a></li>
+            <li>emailAlertsOn</li>
+            <li class="add">recentSearches [max 10]<a class="dn" href="#d7">7</a></li>
+            <li class="add">telegramUsername<a class="dn" href="#d9">9</a></li>
+            <li>createdAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="510" y="30" width="240" height="326">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Wishlist item</h3>
+          <p class="coll">wishlistItems</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">firebaseUid</li>
+            <li>productName</li>
+            <li class="fk">productKey</li>
+            <li>savedPrice</li>
+            <li>targetPrice (can be empty)</li>
+            <li class="add">priority (can be empty)<a class="dn" href="#d5">5</a></li>
+            <li>latestPrice</li>
+            <li>latestStore</li>
+            <li>latestLink</li>
+            <li>flag: none / drop / target</li>
+            <li>lastCheckedAt</li>
+            <li>lastEmailAt</li>
+            <li>savedAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="780" y="30" width="215" height="226">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity newbox">
+          <h3>Friendship<a class="dn" href="#d2">2</a></h3>
+          <p class="coll">friendships (new)</p>
+          <ul>
+            <li class="pk add">_id</li>
+            <li class="fk add">requesterUid</li>
+            <li class="fk add">addresseeUid</li>
+            <li class="add">pairKey</li>
+            <li class="add">status: pending / accepted / blocked</li>
+            <li class="add">createdAt</li>
+            <li class="add">respondedAt</li>
+            <li class="fk add">blockedByUid (can be empty)</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="780" y="260" width="215" height="294">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity newbox">
+          <h3>Notification<a class="dn" href="#d3">3</a></h3>
+          <p class="coll">notifications (new)</p>
+          <ul>
+            <li class="pk add">_id</li>
+            <li class="fk add">firebaseUid</li>
+            <li class="add">type</li>
+            <li class="add">title</li>
+            <li class="add">body</li>
+            <li class="add">link</li>
+            <li class="fk add">productKey (can be empty)</li>
+            <li class="fk add">fromUid (can be empty)</li>
+            <li class="add">readAt (can be empty)</li>
+            <li class="add">emailedAt (can be empty)</li>
+            <li class="add">createdAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="10" y="250" width="200" height="236">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity legend" style="border-style: dotted;">
+          <h3>Legend</h3>
+          <p><span class="sw" style="background: var(--green-soft);"></span>+ new field</p>
+          <p><span class="sw" style="background: var(--vanilla-soft);"></span>~ changed field</p>
+          <p><b>Thick box</b> = new collection</p>
+          <p><span class="pk">underlined</span> = key</p>
+          <p><span class="fk">blue</span> = link to a box</p>
+          <p>Dashed box = not a Mongo collection</p>
+          <p>n = many</p>
+          <p><span class="dn" style="margin-left:0">1</span> = see change below</p>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="250" y="300" width="220" height="306">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Sleep hold</h3>
+          <p class="coll">sleepHolds</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">firebaseUid</li>
+            <li>productName</li>
+            <li class="fk">productKey</li>
+            <li>priceAtStart</li>
+            <li>latestPrice</li>
+            <li>startedAt</li>
+            <li>endsAt (user picks)</li>
+            <li class="add">reason<a class="dn" href="#d4">4</a></li>
+            <li class="add">reasonNote<a class="dn" href="#d4">4</a></li>
+            <li class="chg">status: waiting / ended / done<a class="dn" href="#d4">4</a></li>
+            <li class="add">decision: buy / skip<a class="dn" href="#d4">4</a></li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="510" y="400" width="240" height="110">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity concept">
+          <h3>Product key</h3>
+          <p class="coll">a rule, not a collection</p>
+          <ul>
+            <li class="pk">productKey</li>
+          </ul>
+          <p class="hint">productName in lowercase, trimmed, single spaces.</p>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="510" y="580" width="240" height="166">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Price day</h3>
+          <p class="coll">priceDays</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">productKey</li>
+            <li>day</li>
+            <li>price</li>
+            <li>store</li>
+            <li class="add">oldPrice (can be empty)<a class="dn" href="#d6">6</a></li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="780" y="556" width="215" height="300">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity newbox">
+          <h3>Group order<a class="dn" href="#d8">8</a></h3>
+          <p class="coll">groupOrders (new)</p>
+          <ul>
+            <li class="pk add">_id</li>
+            <li class="fk add">initiatorUid</li>
+            <li class="fk add">sleepHoldId (can be empty)</li>
+            <li class="fk add">productKey</li>
+            <li class="add">productName</li>
+            <li class="add">price</li>
+            <li class="add">store</li>
+            <li class="add">link</li>
+            <li class="fk add">invitedUids []</li>
+            <li class="fk add">joinedUids []</li>
+            <li class="add">status: open / closed</li>
+            <li class="add">createdAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="10" y="650" width="200" height="120">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity ext">
+          <h3>Session</h3>
+          <p class="coll">not in Mongo (browser only)</p>
+          <ul>
+            <li class="pk">sessionId</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="250" y="630" width="220" height="166">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Search log</h3>
+          <p class="coll">searchLogs</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">sessionId</li>
+            <li>query</li>
+            <li>productName</li>
+            <li class="fk">productKey</li>
+            <li>searchedAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="10" y="800" width="200" height="140">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity alone">
+          <h3>Search cache</h3>
+          <p class="coll">searchCache</p>
+          <ul>
+            <li class="pk">queryKey</li>
+            <li>listings</li>
+            <li>fetchedAt</li>
+            <li>expiresAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+    </svg>
+  </div>
+
+  <!-- OLD ERD v2, as agreed on 12 Oct, without change markers -->
+  <div class="canvas" id="erd-old" hidden>
+    <svg viewBox="0 0 1000 720" role="img" aria-label="FastDeal ERD version 2">
+      <line x1="190" y1="80" x2="240" y2="80"/>
+      <text class="rel" x="196" y="72">1 to 1</text>
+      <line x1="450" y1="80" x2="510" y2="80"/>
+      <text class="rel" x="455" y="72">1 to many</text>
+      <line x1="345" y1="160" x2="345" y2="250"/>
+      <text class="rel" x="352" y="210">1 to many</text>
+      <line x1="630" y1="316" x2="630" y2="380"/>
+      <text class="rel" x="637" y="352">many to 1</text>
+      <line x1="450" y1="430" x2="510" y2="430"/>
+      <text class="rel" x="453" y="422">many to 1</text>
+      <line x1="750" y1="430" x2="810" y2="430"/>
+      <text class="rel" x="754" y="422">1 to many</text>
+      <line x1="630" y1="490" x2="630" y2="530"/>
+      <text class="rel" x="637" y="515">many to 1</text>
+      <line x1="450" y1="600" x2="510" y2="600"/>
+      <text class="rel" x="453" y="592">1 to many</text>
+
+      <foreignObject x="10" y="24" width="180" height="120">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity ext">
+          <h3>Firebase Auth</h3>
+          <p class="coll">not in Mongo</p>
+          <ul><li class="pk">uid</li><li>email</li><li>password (hashed)</li></ul>
+        </div>
+      </foreignObject>
+      <foreignObject x="240" y="20" width="210" height="140">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>User</h3>
+          <p class="coll">users</p>
+          <ul><li class="pk fk">firebaseUid</li><li>email</li><li>emailAlertsOn</li><li>createdAt</li></ul>
+        </div>
+      </foreignObject>
+      <foreignObject x="510" y="10" width="240" height="306">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Wishlist item</h3>
+          <p class="coll">wishlistItems</p>
+          <ul><li class="pk">_id</li><li class="fk">firebaseUid</li><li>productName</li><li class="fk">productKey</li><li>savedPrice</li><li>targetPrice (can be empty)</li><li>latestPrice</li><li>latestStore</li><li>latestLink</li><li>flag: none / drop / target</li><li>lastCheckedAt</li><li>lastEmailAt</li><li>savedAt</li></ul>
+        </div>
+      </foreignObject>
+      <foreignObject x="240" y="250" width="210" height="232">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Sleep hold</h3>
+          <p class="coll">sleepHolds</p>
+          <ul><li class="pk">_id</li><li class="fk">firebaseUid</li><li>productName</li><li class="fk">productKey</li><li>priceAtStart</li><li>latestPrice</li><li>startedAt</li><li>endsAt</li><li>status: waiting / done</li></ul>
+        </div>
+      </foreignObject>
+      <foreignObject x="510" y="380" width="240" height="110">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity concept">
+          <h3>Product key</h3>
+          <p class="coll">a rule, not a collection</p>
+          <ul><li class="pk">productKey</li></ul>
+          <p class="hint">productName in lowercase, trimmed, single spaces.</p>
+        </div>
+      </foreignObject>
+      <foreignObject x="810" y="360" width="180" height="160">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Price day</h3>
+          <p class="coll">priceDays</p>
+          <ul><li class="pk">_id</li><li class="fk">productKey</li><li>day</li><li>price</li><li>store</li></ul>
+        </div>
+      </foreignObject>
+      <foreignObject x="240" y="540" width="210" height="100">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity ext">
+          <h3>Session</h3>
+          <p class="coll">not in Mongo (browser only)</p>
+          <ul><li class="pk">sessionId</li></ul>
+        </div>
+      </foreignObject>
+      <foreignObject x="510" y="530" width="240" height="166">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Search log</h3>
+          <p class="coll">searchLogs</p>
+          <ul><li class="pk">_id</li><li class="fk">sessionId</li><li>query</li><li>productName</li><li class="fk">productKey</li><li>searchedAt</li></ul>
+        </div>
+      </foreignObject>
+      <foreignObject x="810" y="560" width="180" height="140">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity alone">
+          <h3>Search cache</h3>
+          <p class="coll">searchCache</p>
+          <ul><li class="pk">queryKey</li><li>listings</li><li>fetchedAt</li><li>expiresAt</li></ul>
+        </div>
+      </foreignObject>
+    </svg>
+  </div>
+
+  <p class="note" id="note-new">The blue line along the top is one line from User to the three new boxes on the right. Friendship has two links to User: the user who sends the request and the user who gets it. Lines from Notification, Group order and Sleep hold to Product key, and from Group order to Sleep hold, are left out so the diagram stays readable. The links table lists them all.</p>
+  <p class="note" id="note-old" hidden>v2 as agreed on 12 Oct 2026, without the change markers. 6 collections.</p>
+
+  <h2 class="section">At a glance</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th></th><th>v2 (now)</th><th>v3 (proposed)</th></tr></thead>
+      <tbody>
+        <tr><td>Collections</td><td>6</td><td>9 (adds friendships, notifications, groupOrders)</td></tr>
+        <tr><td>Changed collections</td><td></td><td>users, wishlistItems, sleepHolds, priceDays</td></tr>
+        <tr><td>Unchanged</td><td></td><td>searchLogs, searchCache</td></tr>
+        <tr><td>Fields removed</td><td></td><td>none. Every v2 field stays, so no current code breaks.</td></tr>
+        <tr><td>Indexes</td><td>8</td><td>15 built now (7 new). 17 if group orders are built.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="section">Links in v3</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>From</th><th>To</th><th>Link</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td>Firebase Auth</td><td>User</td><td>1 to 1</td><td>Same as v2.</td></tr>
+        <tr><td>User</td><td>Wishlist item, Sleep hold</td><td>1 to many</td><td>Same as v2.</td></tr>
+        <tr><td>User</td><td>Friendship</td><td>1 to many, twice</td><td>A user can be the requester or the addressee. One row per pair of users, whoever asked first.</td></tr>
+        <tr><td>User</td><td>Notification</td><td>1 to many</td><td>The user who receives it. <code>fromUid</code> is the user who caused it, for example the friend who started a group order. It is empty for system alerts.</td></tr>
+        <tr><td>User</td><td>Group order</td><td>1 to many</td><td>The user who starts it. Invited and joined friends are kept as lists of uids in the same row.</td></tr>
+        <tr><td>Sleep hold</td><td>Group order</td><td>1 to 0 or 1</td><td>A group order can start from an ended hold. <code>sleepHoldId</code> is empty if it started elsewhere.</td></tr>
+        <tr><td>Product key</td><td>Wishlist item, Sleep hold, Price day, Search log</td><td>1 to many</td><td>Same as v2.</td></tr>
+        <tr><td>Product key</td><td>Notification, Group order</td><td>1 to many</td><td>New. Same lowercase rule. "Which friends want this item" matches wishlistItems by productKey.</td></tr>
+        <tr><td>Session</td><td>Search log</td><td>1 to many</td><td>Same as v2. Search logs stay anonymous.</td></tr>
+        <tr><td>Search cache</td><td>none</td><td>none</td><td>Same as v2.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="section">What changed and why</h2>
+  <div class="summary">
+    <span>9 changes:</span>
+    <span class="badge must">6 Must</span>
+    <span class="badge should">2 Should</span>
+    <span class="badge nice">1 Nice</span>
+  </div>
+  <p class="lead">Must = a job on the 13 Oct board cannot be built without it. Should = needed for a feature that is not settled yet. Nice = only for an extra. The owner and task id refer to the 13 Oct to-do page.</p>
+
+  <article class="diff" id="d1">
+    <header><span class="num">1</span><h3>User gets a unique username</h3><span class="badge must">Must</span></header>
+    <div class="oldnew">
+      <div class="o"><b>Old</b>A user has only <code>email</code>. The tape at 52:47 says "right now, the username is the email".</div>
+      <div class="n"><b>New</b><code>username</code>: lowercase, 3 to 20 letters, digits, dots or underscores. Unique. Empty until the user picks one.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>Friends add each other by username (tape 49:47). Searching friends by email shows a stranger's email address, so a username is safer.</li>
+      <li>The unique index uses a partial filter: it checks only users who have a username. Old users with no username do not clash. A plain unique index would fail on the second empty value.</li>
+    </ul>
+    <h4>How necessary</h4>
+    <p><span class="badge must">Must</span> Friends (t-19) needs it. Owner: Marvel (t-18).</p>
+  </article>
+
+  <article class="diff" id="d2">
+    <header><span class="num">2</span><h3>Friends get their own collection, not a list inside User</h3><span class="badge must">Must</span></header>
+    <div class="oldnew">
+      <div class="o"><b>Board</b><code>friends: []</code> inside the user box. Not in v2.</div>
+      <div class="n"><b>New</b><code>friendships</code>: one row per pair, with <code>requesterUid</code>, <code>addresseeUid</code>, <code>status</code> and a unique <code>pairKey</code>.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>A friend request has a state. It starts as pending and becomes accepted or blocked (tape 35:23: add, remove, block). A plain list of uids cannot store "pending".</li>
+      <li>With a list in each user, adding a friend means two writes: Zoe's list and Marvel's list. If one write fails, Zoe sees Marvel but Marvel does not see Zoe. One row per pair cannot get out of step.</li>
+      <li><code>pairKey</code> is the two uids in sorted order, for example <code>uidA|uidB</code>. Its unique index stops a second request when the other person already asked.</li>
+      <li>Remove = delete the row. Block = set status to <code>blocked</code> and <code>blockedByUid</code> to the user who blocked. The blocked user cannot ask again, and only the user who blocked can unblock.</li>
+    </ul>
+    <h4>How necessary</h4>
+    <p><span class="badge must">Must</span> The friends list (t-19) and the group order (t-17) need it. Owner: Marvel.</p>
+  </article>
+
+  <article class="diff" id="d3">
+    <header><span class="num">3</span><h3>Notifications get their own collection</h3><span class="badge must">Must</span></header>
+    <div class="oldnew">
+      <div class="o"><b>Board</b><code>notif: []</code> inside the user box. Not in v2.</div>
+      <div class="n"><b>New</b><code>notifications</code>: one row per alert, with <code>type</code>, <code>title</code>, <code>body</code>, <code>link</code>, <code>readAt</code> and <code>emailedAt</code>.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>A notification list grows with no limit. Each new alert would rewrite the whole user document, and every page that reads the user would load every old alert too.</li>
+      <li>One collection serves every sender: price drop and target (Jayden), Sleep on it ended (Jayden), group order (Jayden), friend request (Marvel), sale soon (Dewa). Bernard's page reads one place.</li>
+      <li><code>type</code> has fixed values: <code>price-drop</code>, <code>target-hit</code>, <code>sleep-ended</code>, <code>group-order</code>, <code>friend-request</code>, <code>friend-accepted</code>, <code>sale-soon</code>. Same reason as the v2 flag values: one spelling for everyone.</li>
+      <li><code>readAt</code> empty = unread. The navbar count is "rows for this user where readAt is empty". <code>emailedAt</code> shows if an email also went out, so the email job does not send twice.</li>
+      <li><code>link</code> is the page to open, for example <code>/sleep</code>. The Notifications page does not need to know each type.</li>
+    </ul>
+    <h4>How necessary</h4>
+    <p><span class="badge must">Must</span> The Notifications page (t-9) shows nothing without it. Owner: Bernard. Writers: Jayden, Marvel, Dewa.</p>
+  </article>
+
+  <article class="diff" id="d4">
+    <header><span class="num">4</span><h3>Sleep hold keeps the reason and the answer</h3><span class="badge must">Must</span></header>
+    <div class="oldnew">
+      <div class="o"><b>Old</b>Fixed 24-hour hold. <code>status</code> is waiting or done.</div>
+      <div class="n"><b>New</b>The user picks <code>endsAt</code>. Adds <code>reason</code>, <code>reasonNote</code> and <code>decision</code>. <code>status</code> adds <code>ended</code>.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>Jayden's verdict answers the user's own reason: "you waited for a better price, and it dropped 15%" (feature tape 01:37). The reason must be saved to do that.</li>
+      <li><code>reason</code> has fixed values: <code>better-price</code>, <code>wait-for-sale</code>, <code>not-sure-i-need-it</code>, <code>other</code>. <code>reasonNote</code> is optional free text.</li>
+      <li><code>ended</code> means the timer is over and the notification went out, but the user has not answered yet. The timer job looks for <code>waiting</code> holds past <code>endsAt</code>, so it never alerts twice.</li>
+      <li><code>decision</code> (buy or skip) lets the app count how often Sleep on it stops a purchase. That is a good number for the final talk.</li>
+      <li>No duration field. The duration is <code>endsAt</code> minus <code>startedAt</code>.</li>
+    </ul>
+    <h4>How necessary</h4>
+    <p><span class="badge must">Must</span> Smart Sleep on it (t-16) needs the reason and the ended state. Owner: Jayden.</p>
+  </article>
+
+  <article class="diff" id="d5">
+    <header><span class="num">5</span><h3>Wishlist item gets a priority rank</h3><span class="badge must">Must</span></header>
+    <div class="oldnew">
+      <div class="o"><b>Old</b>No way to mark an item as important.</div>
+      <div class="n"><b>New</b><code>priority</code>: a number, 1 = most important. Empty = no priority.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>The board says the user "highlights which of their products are of priority". The tape at 39:14 says "one is the most important". A rank number stores both facts: if it is a priority, and its order.</li>
+      <li>The best-combination feature (t-15) reads the rank to pick items first when the budget is small.</li>
+      <li>The budget itself is not stored. It is a slider on the page (tape 41:30).</li>
+    </ul>
+    <h4>How necessary</h4>
+    <p><span class="badge must">Must</span> Priority tags (t-14) and the best combination (t-15) need it. Owner: Zoe.</p>
+  </article>
+
+  <article class="diff" id="d6">
+    <header><span class="num">6</span><h3>Price day keeps the "was" price</h3><span class="badge must">Must</span></header>
+    <div class="oldnew">
+      <div class="o"><b>Old</b>Price day stores <code>price</code> and <code>store</code> only.</div>
+      <div class="n"><b>New</b>Adds <code>oldPrice</code>: the crossed-out price the store showed that day. Empty when there is none.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>SerpApi gives this value as <code>extracted_old_price</code> on some listings. Our sample file has one: price $132.72, "Usually $116".</li>
+      <li>A gimmick is a "was" price that shows on most days for months (feature tape 02:20). To see "most days", each day's old price must be saved. Today's search alone cannot show it.</li>
+      <li>The check: if <code>oldPrice</code> shows on most days and <code>price</code> never reached it, the label is "Probably a gimmick". If the price really was at <code>oldPrice</code> recently, the label is "Real discount". With less than about 30 days of rows, the label is "Not enough history yet". The team sets the exact numbers.</li>
+    </ul>
+    <h4>How necessary</h4>
+    <p><span class="badge must">Must</span> The discount check (t-2) has no evidence without it. Owner: Dewa.</p>
+  </article>
+
+  <article class="diff" id="d7">
+    <header><span class="num">7</span><h3>User keeps the last 10 searches</h3><span class="badge should">Should</span></header>
+    <div class="oldnew">
+      <div class="o"><b>Board</b>A second box with <code>user: str</code> and <code>hist: []</code>. Not in v2.</div>
+      <div class="n"><b>New</b><code>recentSearches</code> inside the user: a list of <code>{ query, productKey, searchedAt }</code>, never more than 10.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>The tape at 54:35 to 54:45 sets a limit of ten, newest on top. A list with a fixed limit is safe to keep inside the user. Mongo can add the new search and cut the list to 10 in one write.</li>
+      <li>Compare change 3. Notifications have no limit, so they get their own collection. Recent searches have a limit, so they stay inside the user.</li>
+      <li><code>searchLogs</code> stays anonymous. Tape 54:23: "it's anonymous. You don't put it here." This list is only for the user's own page and is never shown to others.</li>
+    </ul>
+    <h4>How necessary</h4>
+    <p><span class="badge should">Should</span> Recent searches (t-7) is a later task. Owner: Ronald.</p>
+  </article>
+
+  <article class="diff" id="d8">
+    <header><span class="num">8</span><h3>Group orders get their own collection</h3><span class="badge should">Should</span></header>
+    <div class="oldnew">
+      <div class="o"><b>Old</b>No group order in v2. The board steps 1 to 4 describe one.</div>
+      <div class="n"><b>New</b><code>groupOrders</code>: who started it, the product and deal, who was invited, who joined, and open or closed.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>Board step 4: the user starts a group order and the chosen friends get an alert. The app must remember who was invited and who said yes. That state belongs to the order, not to any one user.</li>
+      <li>The invited and joined lists are inside the row because a group order has only a few friends. That is the same rule as change 7.</li>
+      <li>Price, store and link are copied in, so all friends see the same deal even if the price changes later.</li>
+    </ul>
+    <h4>How necessary</h4>
+    <p><span class="badge should">Should</span> Only if the team keeps the group order as drawn. If it becomes the smaller "Buy together" from the 13 Oct meeting notes (send friends the deal link), the notifications from change 3 are enough and this collection is not needed. Owner: Jayden (t-17).</p>
+  </article>
+
+  <article class="diff" id="d9">
+    <header><span class="num">9</span><h3>User can store a Telegram username</h3><span class="badge nice">Nice</span></header>
+    <div class="oldnew">
+      <div class="o"><b>Old</b>No Telegram.</div>
+      <div class="n"><b>New</b><code>telegramUsername</code>, empty by default.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>The tape at 52:43 asks for "notification and Telegram". The bot needs to know where to send the alert.</li>
+      <li>One empty field costs nothing. Add it only when someone starts the bot.</li>
+    </ul>
+    <h4>How necessary</h4>
+    <p><span class="badge nice">Nice</span> The Telegram bot is an extra (tape 31:49). Owner: Bernard (t-12).</p>
+  </article>
+
+  <h2 class="section">From the board, not added</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Board wrote</th><th>v3 does</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td><code>friends: []</code> in user</td><td>friendships collection</td><td>See change 2.</td></tr>
+        <tr><td><code>notif: []</code> in user</td><td>notifications collection</td><td>See change 3.</td></tr>
+        <tr><td><code>hist: []</code></td><td>recentSearches, max 10</td><td>See change 7.</td></tr>
+        <tr><td><code>role: str</code></td><td>not added</td><td>No feature on either board reads a role. There is no admin page. Add it when a feature needs it.</td></tr>
+        <tr><td>Annual discount alerts</td><td>a file, not a collection</td><td>Sale dates (9.9, 10.10, 11.11, Black Friday, 12.12, Christmas) are few and fixed. Keep them in <code>data/sale-calendar.json</code>. The alert itself is a notification row.</td></tr>
+        <tr><td>Purchase reminder</td><td>not added</td><td>No owner on the board. Design it if someone takes it.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="section">Not changed</h2>
+  <div class="plain">
+    <ul>
+      <li><b>searchLogs:</b> the same. Bernard's trending counts by productKey. The "similar products" idea from the prof can group by sessionId. Both work with the v2 indexes.</li>
+      <li><b>searchCache:</b> the same schema. <code>listings</code> is a plain list, so Ronald's filter can mark each listing as product or accessory inside it. The "Goes well with" section can then read the accessories from the same cache row, with no extra SerpApi call.</li>
+      <li><b>Product key rule:</b> the same. Notifications and group orders use it too.</li>
+      <li><b>Every v2 field stays.</b> Nothing is renamed or removed, so the current user routes and the seed keep working.</li>
+    </ul>
+  </div>
+
+  <h2 class="section">Not an ERD change, but it protects the data</h2>
+  <div class="plain">
+    <ul>
+      <li>On main, <code>GET /api/users/:uid</code> and <code>PUT /api/users/:uid</code> take the uid from the URL. Anyone who knows a uid can read or change that user.</li>
+      <li>v3 makes this worse if it stays: friends and notifications hold more personal data. The server must take the uid from a verified Firebase ID token. This is Marvel's task t-20, and it only needs the project ID.</li>
+    </ul>
+  </div>
+
+  <h2 class="section">Indexes to create in Atlas</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Collection</th><th>Index</th><th>Why</th><th>v3</th></tr></thead>
+      <tbody>
+        <tr><td><code>users</code></td><td>firebaseUid, unique</td><td>One profile per Firebase account.</td><td>kept</td></tr>
+        <tr><td><code>users</code></td><td>username, unique, partial: only where username is a string</td><td>No two users with one username. Users with no username do not clash.</td><td><b>new</b></td></tr>
+        <tr><td><code>wishlistItems</code></td><td>firebaseUid + productKey, unique</td><td>Same user cannot save one product twice. Also serves "which of my friends want this", because that query gives both fields.</td><td>kept</td></tr>
+        <tr><td><code>wishlistItems</code></td><td>productKey</td><td>Sale alerts: find every user who wants this product.</td><td><b>new</b></td></tr>
+        <tr><td><code>priceDays</code></td><td>productKey + day, unique</td><td>One row per product per day.</td><td>kept</td></tr>
+        <tr><td><code>sleepHolds</code></td><td>firebaseUid</td><td>Fast "my holds" page.</td><td>kept</td></tr>
+        <tr><td><code>sleepHolds</code></td><td>status + endsAt</td><td>The timer job finds waiting holds whose time is up.</td><td><b>new</b></td></tr>
+        <tr><td><code>searchLogs</code></td><td>sessionId, and productKey</td><td>Searched together, and trending.</td><td>kept</td></tr>
+        <tr><td><code>searchCache</code></td><td>queryKey, unique. expiresAt, TTL with 0 seconds</td><td>One cache row per query, deleted after it expires.</td><td>kept</td></tr>
+        <tr><td><code>friendships</code></td><td>pairKey, unique</td><td>One row per pair of users.</td><td><b>new</b></td></tr>
+        <tr><td><code>friendships</code></td><td>addresseeUid + status, and requesterUid + status</td><td>"Requests sent to me" and "my friends" pages.</td><td><b>new</b> (2)</td></tr>
+        <tr><td><code>notifications</code></td><td>firebaseUid + createdAt (newest first)</td><td>The Notifications page and the unread count.</td><td><b>new</b></td></tr>
+        <tr><td><code>groupOrders</code></td><td>initiatorUid, and invitedUids</td><td>"Orders I started" and "orders I am invited to". Only if change 8 is kept.</td><td><b>new</b> (2)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Change 8 is not built yet, so Atlas has 15 indexes now, not 17.</p>
+
+  <h2 class="section">Code in v3</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>File</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr><td><code>models/user-model.js</code></td><td>Adds <code>username</code> (no default) and <code>recentSearches</code>, and the partial unique index on username. <code>telegramUsername</code> waits for the bot.</td></tr>
+        <tr><td><code>models/friendship-model.js</code></td><td>New. Collection <code>friendships</code>. <code>models/pair-key.js</code> builds the pairKey.</td></tr>
+        <tr><td><code>models/notification-model.js</code></td><td>New. Collection <code>notifications</code>.</td></tr>
+        <tr><td><code>models/group-order-model.js</code></td><td>Not built yet. Waits for the group order decision.</td></tr>
+        <tr><td><code>models/sleep-hold-model.js</code></td><td>Adds <code>reason</code>, <code>reasonNote</code>, <code>decision</code>, the <code>ended</code> status, and the status + endsAt index.</td></tr>
+        <tr><td><code>models/wishlist-item-model.js</code></td><td>Adds <code>priority</code> and the productKey index.</td></tr>
+        <tr><td><code>models/price-day-model.js</code></td><td>Adds <code>oldPrice</code>.</td></tr>
+        <tr><td><code>data/sale-calendar.json</code></td><td>Not built yet. Part of the annual sale alerts task.</td></tr>
+        <tr><td><code>data/seed.js</code></td><td>3 demo friends (database rows only, no Firebase login): 2 accepted, 1 request waiting. Friends share wishlist items with the demo user. 5 notifications. 90 days of price history: Bose always shows "was $599" (a gimmick), Sony shows a real "was $489".</td></tr>
+        <tr><td><code>docs/fastdeal-erd-v3.html</code></td><td>This page. <code>/erd</code> shows it. The v2 page stays in <code>docs/</code> for the record.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var buttons = document.querySelectorAll('.switch button');
+    var views = {
+      new: [document.getElementById('erd-new'), document.getElementById('note-new')],
+      old: [document.getElementById('erd-old'), document.getElementById('note-old')]
+    };
+    function show(which) {
+      Object.keys(views).forEach(function (key) {
+        views[key].forEach(function (el) { el.hidden = key !== which; });
+      });
+      buttons.forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.getAttribute('data-show') === which));
+      });
+    }
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () { show(b.getAttribute('data-show')); });
+    });
+    document.querySelectorAll('#erd-new .dn').forEach(function (a) {
+      a.addEventListener('click', function () { show('new'); });
+    });
+  })();
+</script>
+</body>
+</html>
