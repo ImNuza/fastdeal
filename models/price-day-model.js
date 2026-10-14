@@ -22,6 +22,12 @@ const priceDaySchema = new mongoose.Schema(
     store: {
       type: String,
       default: null
+    },
+
+    // The crossed-out "was" price the store showed that day (SerpApi extracted_old_price). null if none.
+    oldPrice: {
+      type: Number,
+      default: null
     }
   },
   {

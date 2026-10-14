@@ -10,7 +10,7 @@ Setup
 1. Copy .env.example to .env
 2. Put API keys in .env. Do not commit .env
 3. npm install
-4. npm run seed (adds the demo account data, price history and Trending searches to MongoDB. Safe to run again.)
+4. npm run seed (adds the demo account, its demo friends and notifications, 90 days of price history and Trending searches to MongoDB. Safe to run again.)
 
 Run locally
 - npm run dev
@@ -26,9 +26,10 @@ Deploy (Render)
 - A push to main is the deploy if the service is already tied to this repo.
 
 Database (MongoDB Atlas)
-- Models: models/ (one file per collection: users, wishlistItems, priceDays, sleepHolds, searchLogs, searchCache)
+- Models: models/ (one file per collection: users, wishlistItems, priceDays, sleepHolds, searchLogs, searchCache, friendships, notifications)
 - productKey = product name in lowercase, trimmed, single spaces. Use toProductKey in models/product-key.js.
-- ERD and the reason for each field: /erd in the app (https://fastdeal-iqzg.onrender.com/erd), file docs/fastdeal-erd-v2.html
+- pairKey = the two friends' uids sorted and joined with "|". Use toPairKey in models/pair-key.js. One friendships row per pair.
+- ERD and the reason for each field: /erd in the app (https://fastdeal-iqzg.onrender.com/erd), file docs/fastdeal-erd-v3.html (v2 kept for the record)
 - Seed: data/seed.js. The demo login itself is a Firebase user. Its UID goes in DEMO_FIREBASE_UID.
 
 Test
