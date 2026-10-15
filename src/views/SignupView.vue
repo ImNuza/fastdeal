@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { signInWithGoogle, signUpWithEmail } from '../services/auth.js'
 import { createOrGetUser } from '../services/userApi.js'
+import { startSignup, endSignup, applyDbUser } from '../mock/session.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,14 +16,21 @@ const loading = ref(false)
 
 const USERNAME_RE = /^[a-z0-9_.]{3,20}$/
 
+// Show a banner if redirected here from the login page because the account wasn't found.
+if (route.query.error === 'not-registered') {
+  errorText.value = "You don't have an account yet. Sign up below!"
+}
+
 // After Google auth: if this is a new user (no username in DB yet), send them to /set-username.
 // Returning Google users land on the next page as normal.
 async function onGoogleSignUp() {
   errorText.value = ''
   loading.value = true
+  startSignup() // tell watchAuthState to skip the DB check — we handle it below
   try {
     const fbUser = await signInWithGoogle()
     const dbUser = await createOrGetUser(fbUser.uid, fbUser.email)
+    applyDbUser(dbUser, fbUser) // populate user.value immediately
     if (!dbUser.username) {
       router.push('/set-username')
     } else {
@@ -32,6 +40,7 @@ async function onGoogleSignUp() {
   } catch (err) {
     errorText.value = err.message || 'Google sign-in failed.'
   } finally {
+    endSignup()
     loading.value = false
   }
 }
@@ -52,10 +61,11 @@ async function onEmailSignUp() {
     return
   }
   loading.value = true
+  startSignup() // tell watchAuthState to skip the DB check — we handle it below
   try {
     const fbUser = await signUpWithEmail(email.value, password.value)
-    // Pass username so it's saved in MongoDB on first insert.
-    await createOrGetUser(fbUser.uid, fbUser.email, u)
+    const dbUser = await createOrGetUser(fbUser.uid, fbUser.email, u)
+    applyDbUser(dbUser, fbUser) // populate user.value immediately
     const next = route.query.next
     router.push(typeof next === 'string' && next.startsWith('/') ? next : '/wishlist')
   } catch (err) {
@@ -69,6 +79,7 @@ async function onEmailSignUp() {
       errorText.value = err.message || 'Sign up failed.'
     }
   } finally {
+    endSignup()
     loading.value = false
   }
 }
@@ -81,7 +92,7 @@ async function onEmailSignUp() {
       <p class="fd-page-subtitle">Sign up to save products to your wishlist, get alerts when prices drop, and see what your friends are eyeing!</p>
 
       <div class="card p-4">
-        <p v-if="errorText" class="alert alert-danger mb-3">{{ errorText }}</p>
+        <p v-if="errorText" :class="['alert mb-3', route.query.error === 'not-registered' ? 'alert-warning' : 'alert-danger']">{{ errorText }}</p>
 
         <!-- Username + Email + Password -->
         <form @submit.prevent="onEmailSignUp">

@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
-import { watchAuthState } from '../services/auth.js'
-import { createOrGetUser } from '../services/userApi.js'
+import { watchAuthState, signOutUser } from '../services/auth.js'
+import { getUser } from '../services/userApi.js'
 
 const USERS_KEY = 'fastdeal-users'
 
@@ -8,52 +8,51 @@ export const user = ref(null)
 export const firebaseUser = ref(null)
 
 // True when the logged-in user hasn't set a username yet.
-// Views watch this to redirect to /set-username when needed.
 export const needsUsername = computed(() => !!(user.value && !user.value.username))
 
-// Keep firebaseUser in sync with Firebase auth state.
-// On login: upsert user in MongoDB, then build local profile including username.
-// Wishlist/sleep stay in localStorage until MongoDB migration.
+// Set true before any signup Firebase call so watchAuthState skips the DB check.
+// The signup view handles DB creation itself, then calls applyDbUser.
+let _signupInProgress = false
+export function startSignup() { _signupInProgress = true }
+export function endSignup()   { _signupInProgress = false }
+
+// Manually populate user.value from a DB user object (called by signup views after createOrGetUser).
+export function applyDbUser(dbUser, fbUser) {
+  const list = readUsers()
+  let found = null
+  for (let i = 0; i < list.length; i++) {
+    if (list[i].email === fbUser.email) { found = list[i]; break }
+  }
+  if (!found) {
+    found = { email: fbUser.email, displayName: fbUser.displayName || '', photoURL: fbUser.photoURL || '', username: dbUser.username || '', emailOn: dbUser.emailAlertsOn, wishlist: [], sleep: [] }
+    list.push(found)
+    writeUsers(list)
+  } else {
+    found.username = dbUser.username || ''
+    found.emailOn = dbUser.emailAlertsOn
+  }
+  user.value = found
+  console.log('[FastDeal] user applied from DB:', dbUser)
+}
+
+// On every Firebase auth state change (login, logout, page reload):
+// - Signup flow: skip — the view handles DB creation and calls applyDbUser.
+// - Login / page reload: call getUser (read-only). If 404 → not registered → sign out.
 watchAuthState(async function (fbUser) {
   firebaseUser.value = fbUser
-  if (fbUser) {
-    let emailAlertsOn = true
-    let username = ''
-    try {
-      const dbUser = await createOrGetUser(fbUser.uid, fbUser.email)
-      emailAlertsOn = dbUser.emailAlertsOn
-      username = dbUser.username || ''
-      console.log('[FastDeal] MongoDB user synced:', dbUser)
-    } catch (err) {
-      console.warn('[FastDeal] Could not sync user with MongoDB:', err.message)
-    }
+  if (!fbUser) { user.value = null; return }
+  if (_signupInProgress) return // signup view is handling this
 
-    const list = readUsers()
-    let found = null
-    for (let i = 0; i < list.length; i++) {
-      if (list[i].email === fbUser.email) {
-        found = list[i]
-        break
-      }
-    }
-    if (!found) {
-      found = {
-        email: fbUser.email,
-        displayName: fbUser.displayName || '',
-        photoURL: fbUser.photoURL || '',
-        username,
-        emailOn: emailAlertsOn,
-        wishlist: [],
-        sleep: []
-      }
-      list.push(found)
-      writeUsers(list)
+  try {
+    const dbUser = await getUser(fbUser.uid)
+    applyDbUser(dbUser, fbUser)
+  } catch (err) {
+    if (err.response?.status === 404) {
+      console.warn('[FastDeal] Firebase user not in DB — signing out')
+      await signOutUser()
     } else {
-      found.emailOn = emailAlertsOn
-      found.username = username
+      console.warn('[FastDeal] DB check failed:', err.message)
     }
-    user.value = found
-  } else {
     user.value = null
   }
 })
