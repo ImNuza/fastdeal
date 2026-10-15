@@ -5,7 +5,6 @@ import TrendingView from '../views/TrendingView.vue'
 import LoginView from '../views/LoginView.vue'
 import SignupView from '../views/SignupView.vue'
 import WishlistView from '../views/WishlistView.vue'
-import SleepView from '../views/SleepView.vue'
 import FriendsView from '../views/FriendsView.vue'
 import NotificationsView from '../views/NotificationsView.vue'
 import AccountView from '../views/AccountView.vue'
@@ -24,8 +23,7 @@ const router = createRouter({
     { path: '/login', component: LoginView },
     { path: '/signup', component: SignupView },
     { path: '/set-username', component: SetUsernameView },
-    { path: '/wishlist', component: WishlistView },
-    { path: '/sleep', component: SleepView }
+    { path: '/wishlist', component: WishlistView }
   ]
 })
 

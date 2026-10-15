@@ -33,7 +33,7 @@ Database (MongoDB Atlas)
 - Seed: data/seed.js. The demo login itself is a Firebase user. Its UID goes in DEMO_FIREBASE_UID.
 
 Test
-No automated tests. Open /, /compare?q=Sony%20WH-1000XM5, /trending, /login, /wishlist, and /sleep.
+No automated tests. Open /, /compare?q=Sony%20WH-1000XM5, /trending, /login, and /wishlist.
 On first visit, choose Log in or Continue as guest. Log in opens inside the welcome popup without changing pages. The choice is remembered in this browser.
 
 AI / LLM
