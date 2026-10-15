@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { user, firebaseUser } from '../mock/session.js'
+import { user, firebaseUser, authReady } from '../mock/session.js'
 import {
   getFriends,
   getIncomingRequests,
@@ -14,9 +14,11 @@ import FdIcon from '../components/FdIcon.vue'
 
 const router = useRouter()
 
-if (!user.value) {
-  router.replace('/login?next=/friends')
-}
+// Wait for Firebase to finish restoring session before deciding to redirect.
+// Immediate: true means this runs right away AND again when authReady flips to true.
+watch(authReady, (ready) => {
+  if (ready && !user.value) router.replace('/login?next=/friends')
+}, { immediate: true })
 
 const friends = ref([])
 const requests = ref([])

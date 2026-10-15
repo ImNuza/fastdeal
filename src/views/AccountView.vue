@@ -1,13 +1,15 @@
 <script setup>
+import { watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { toggleEmail, user } from '../mock/session.js'
+import { toggleEmail, user, authReady } from '../mock/session.js'
 import { signOutUser } from '../services/auth.js'
 
 const router = useRouter()
 
-if (!user.value) {
-  router.replace('/login?next=/account')
-}
+// Wait for Firebase to restore session before redirecting unauthenticated users.
+watch(authReady, (ready) => {
+  if (ready && !user.value) router.replace('/login?next=/account')
+}, { immediate: true })
 
 async function onLogout() {
   await signOutUser()
