@@ -108,6 +108,21 @@ onMounted(() => router.isReady().then(maybeShowEntryDialog))
 watch([() => route.path, user], maybeShowEntryDialog)
 </script>
 
+<style scoped>
+.nav-username {
+  color: var(--fd-beige);
+  font-family: var(--fd-font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>
+
 <template>
   <nav ref="navBar" class="navbar navbar-expand-lg navbar-dark fd-nav sticky-top">
     <div class="container">
@@ -141,10 +156,11 @@ watch([() => route.path, user], maybeShowEntryDialog)
               <span class="fd-icon-label">Account</span>
             </router-link>
           </li>
-          <!-- Logged in: the same account icon goes to the Account page, which holds Log out. -->
+          <!-- Logged in: show username next to account icon, links to Account page. -->
           <li v-else class="nav-item">
             <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/account') }" active-class="" exact-active-class="" to="/account">
               <FdIcon name="account" />
+              <span v-if="user.username" class="nav-username">{{ user.username }}</span>
               <span class="fd-icon-label">Account</span>
             </router-link>
           </li>

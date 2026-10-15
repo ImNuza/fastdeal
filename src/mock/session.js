@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { watchAuthState } from '../services/auth.js'
 import { createOrGetUser } from '../services/userApi.js'
 
@@ -7,16 +7,22 @@ const USERS_KEY = 'fastdeal-users'
 export const user = ref(null)
 export const firebaseUser = ref(null)
 
+// True when the logged-in user hasn't set a username yet.
+// Views watch this to redirect to /set-username when needed.
+export const needsUsername = computed(() => !!(user.value && !user.value.username))
+
 // Keep firebaseUser in sync with Firebase auth state.
-// On login: upsert user in MongoDB, then build local profile.
+// On login: upsert user in MongoDB, then build local profile including username.
 // Wishlist/sleep stay in localStorage until MongoDB migration.
 watchAuthState(async function (fbUser) {
   firebaseUser.value = fbUser
   if (fbUser) {
     let emailAlertsOn = true
+    let username = ''
     try {
       const dbUser = await createOrGetUser(fbUser.uid, fbUser.email)
       emailAlertsOn = dbUser.emailAlertsOn
+      username = dbUser.username || ''
       console.log('[FastDeal] MongoDB user synced:', dbUser)
     } catch (err) {
       console.warn('[FastDeal] Could not sync user with MongoDB:', err.message)
@@ -35,6 +41,7 @@ watchAuthState(async function (fbUser) {
         email: fbUser.email,
         displayName: fbUser.displayName || '',
         photoURL: fbUser.photoURL || '',
+        username,
         emailOn: emailAlertsOn,
         wishlist: [],
         sleep: []
@@ -43,6 +50,7 @@ watchAuthState(async function (fbUser) {
       writeUsers(list)
     } else {
       found.emailOn = emailAlertsOn
+      found.username = username
     }
     user.value = found
   } else {

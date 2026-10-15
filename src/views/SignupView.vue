@@ -2,26 +2,33 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { signInWithGoogle, signUpWithEmail } from '../services/auth.js'
+import { createOrGetUser } from '../services/userApi.js'
 
 const route = useRoute()
 const router = useRouter()
 
+const username = ref('')
 const email = ref('')
 const password = ref('')
 const errorText = ref('')
 const loading = ref(false)
 
-function goNext() {
-  const next = route.query.next
-  router.push(typeof next === 'string' && next.startsWith('/') ? next : '/wishlist')
-}
+const USERNAME_RE = /^[a-z0-9_.]{3,20}$/
 
+// After Google auth: if this is a new user (no username in DB yet), send them to /set-username.
+// Returning Google users land on the next page as normal.
 async function onGoogleSignUp() {
   errorText.value = ''
   loading.value = true
   try {
-    await signInWithGoogle()
-    goNext()
+    const fbUser = await signInWithGoogle()
+    const dbUser = await createOrGetUser(fbUser.uid, fbUser.email)
+    if (!dbUser.username) {
+      router.push('/set-username')
+    } else {
+      const next = route.query.next
+      router.push(typeof next === 'string' && next.startsWith('/') ? next : '/wishlist')
+    }
   } catch (err) {
     errorText.value = err.message || 'Google sign-in failed.'
   } finally {
@@ -31,23 +38,33 @@ async function onGoogleSignUp() {
 
 async function onEmailSignUp() {
   errorText.value = ''
-  if (!email.value || !password.value) {
-    errorText.value = 'Enter an email and a password.'
+  const u = username.value.toLowerCase().trim()
+  if (!u || !email.value || !password.value) {
+    errorText.value = 'Fill in all three fields.'
+    return
+  }
+  if (!USERNAME_RE.test(u)) {
+    errorText.value = 'Username: 3–20 characters, letters, numbers, _ or . only.'
     return
   }
   if (password.value.length < 6) {
-    errorText.value = 'Use at least 6 characters.'
+    errorText.value = 'Password must be at least 6 characters.'
     return
   }
   loading.value = true
   try {
-    await signUpWithEmail(email.value, password.value)
-    goNext()
+    const fbUser = await signUpWithEmail(email.value, password.value)
+    // Pass username so it's saved in MongoDB on first insert.
+    await createOrGetUser(fbUser.uid, fbUser.email, u)
+    const next = route.query.next
+    router.push(typeof next === 'string' && next.startsWith('/') ? next : '/wishlist')
   } catch (err) {
     if (err.code === 'auth/email-already-in-use') {
       errorText.value = 'That email already has an account.'
+    } else if (err.response?.status === 409) {
+      errorText.value = 'That username is already taken.'
     } else if (err.code === 'auth/weak-password') {
-      errorText.value = 'Use at least 6 characters.'
+      errorText.value = 'Password must be at least 6 characters.'
     } else {
       errorText.value = err.message || 'Sign up failed.'
     }
@@ -66,8 +83,16 @@ async function onEmailSignUp() {
       <div class="card p-4">
         <p v-if="errorText" class="alert alert-danger mb-3">{{ errorText }}</p>
 
-        <!-- Email + Password first -->
+        <!-- Username + Email + Password -->
         <form @submit.prevent="onEmailSignUp">
+          <input
+            id="username"
+            v-model="username"
+            class="form-control login-input mb-3"
+            type="text"
+            placeholder="Username (e.g. marvel.t)"
+            autocomplete="username"
+          />
           <input
             id="email"
             v-model="email"
@@ -81,7 +106,7 @@ async function onEmailSignUp() {
             v-model="password"
             class="form-control login-input mb-3"
             type="password"
-            placeholder="Password"
+            placeholder="Password (min 6 characters)"
             autocomplete="new-password"
           />
           <button class="btn btn-dark fd-btn-lg w-100 mb-4" type="submit" :disabled="loading">
