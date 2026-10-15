@@ -10,6 +10,7 @@ import {
   acceptRequest,
   declineOrRemove
 } from '../services/friendsApi.js'
+import FdIcon from '../components/FdIcon.vue'
 
 const router = useRouter()
 
@@ -170,7 +171,7 @@ function initials(f) {
           <div v-if="loadingFriends" class="text-secondary small">Loading…</div>
 
           <div v-else-if="friends.length === 0" class="empty-state">
-            <div class="empty-icon">👥</div>
+            <FdIcon name="friends" class="empty-icon" />
             <p class="empty-text">No friends yet. Search for someone by username.</p>
           </div>
 
@@ -182,12 +183,14 @@ function initials(f) {
                 <div class="friend-email">{{ f.email }}</div>
               </div>
               <button
-                class="btn btn-sm btn-outline-dark remove-btn"
+                class="btn btn-sm btn-outline-danger fd-icon-btn flex-shrink-0"
+                type="button"
                 :disabled="actionLoading[f.pairKey]"
-                @click="onRemove(f)"
+                :aria-label="'Remove ' + (f.username || f.email) + ' as a friend'"
                 title="Remove friend"
+                @click="onRemove(f)"
               >
-                ✕
+                <FdIcon name="trash" />
               </button>
             </div>
           </div>
@@ -202,7 +205,7 @@ function initials(f) {
             <div class="search-row">
               <input
                 v-model="searchQuery"
-                class="form-control form-control-sm"
+                class="form-control"
                 type="text"
                 placeholder="Type a username…"
               />
@@ -220,16 +223,19 @@ function initials(f) {
                   <span v-if="r.friendshipStatus === 'accepted'" class="badge-friends">Friends</span>
                   <span v-else-if="r.friendshipStatus === 'pending' && r.iRequested" class="badge-pending">Pending</span>
                   <div v-else-if="r.friendshipStatus === 'pending' && !r.iRequested" class="d-flex gap-1">
-                    <button class="btn btn-dark btn-sm" :disabled="actionLoading[r.pairKey]" @click="onAccept(r)">Accept</button>
-                    <button class="btn btn-outline-dark btn-sm" :disabled="actionLoading[r.pairKey]" @click="onDecline(r)">✕</button>
+                    <button class="btn btn-dark btn-sm" type="button" :disabled="actionLoading[r.pairKey]" @click="onAccept(r)">Accept</button>
+                    <button class="btn btn-outline-dark btn-sm fd-icon-btn" type="button" :disabled="actionLoading[r.pairKey]" :aria-label="'Decline ' + r.username" title="Decline" @click="onDecline(r)">
+                      <FdIcon name="x" />
+                    </button>
                   </div>
                   <button
                     v-else
                     class="btn btn-dark btn-sm"
+                    type="button"
                     :disabled="actionLoading[r.pairKey]"
                     @click="onSendRequest(r)"
                   >
-                    + Add
+                    Add friend
                   </button>
                 </div>
               </div>
@@ -252,14 +258,20 @@ function initials(f) {
                   <div class="d-flex gap-1 flex-shrink-0">
                     <button
                       class="btn btn-dark btn-sm"
+                      type="button"
                       :disabled="actionLoading[req.pairKey]"
                       @click="onAccept(req)"
-                    >✓</button>
+                    >Accept</button>
                     <button
-                      class="btn btn-outline-dark btn-sm"
+                      class="btn btn-outline-dark btn-sm fd-icon-btn"
+                      type="button"
                       :disabled="actionLoading[req.pairKey]"
+                      :aria-label="'Decline ' + (req.username || req.email)"
+                      title="Decline"
                       @click="onDecline(req)"
-                    >✕</button>
+                    >
+                      <FdIcon name="x" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -347,11 +359,6 @@ function initials(f) {
   text-overflow: ellipsis;
 }
 
-.remove-btn {
-  flex-shrink: 0;
-  padding: 0.2rem 0.6rem;
-}
-
 /* Empty state */
 .empty-state {
   text-align: center;
@@ -360,8 +367,10 @@ function initials(f) {
 }
 
 .empty-icon {
-  font-size: 2.5rem;
-  margin-bottom: 0.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0 auto 0.75rem;
+  color: var(--fd-blue);
 }
 
 .empty-text {

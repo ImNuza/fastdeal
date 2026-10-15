@@ -65,6 +65,46 @@ export const catalog = [
       { store: 'Shopee', price: 579, rating: 4.1, reviews: 90, freeShipping: false, onSale: true },
       { store: 'Challenger', price: 599, rating: 4.2, reviews: 40, freeShipping: false, onSale: false }
     ]
+  },
+  {
+    name: 'Dyson V15 Detect',
+    // Not "dyson" on its own, so a search for Dyson Supersonic does not land here.
+    aliases: ['v15', 'dyson v15', 'vacuum'],
+    related: ['Kindle Paperwhite', 'Samsung Galaxy Watch 7'],
+    history: [1199, 1189, 1169, 1149, 1129, 1099, 1129, 1149, 1139, 1119, 1099, 1089, 1109, 1079],
+    listings: [
+      { store: 'Lazada', price: 1079, rating: 4.6, reviews: 1240, freeShipping: true, onSale: true },
+      { store: 'Shopee', price: 1099, rating: 4.5, reviews: 980, freeShipping: true, onSale: true },
+      { store: 'Courts', price: 1149, rating: 4.7, reviews: 260, freeShipping: true, onSale: false },
+      { store: 'Best Denki', price: 1169, rating: 4.5, reviews: 120, freeShipping: true, onSale: false },
+      { store: 'Amazon.sg', price: 1189, rating: 4.4, reviews: 410, freeShipping: true, onSale: false }
+    ]
+  },
+  {
+    name: 'iPad Air (M2)',
+    aliases: ['ipad', 'ipad air'],
+    related: ['Kindle Paperwhite', 'Apple AirPods Pro 2'],
+    history: [929, 919, 899, 889, 879, 869, 889, 899, 879, 869, 859, 869, 879, 859],
+    listings: [
+      { store: 'Amazon.sg', price: 859, rating: 4.8, reviews: 2300, freeShipping: true, onSale: true },
+      { store: 'Shopee', price: 869, rating: 4.6, reviews: 1500, freeShipping: true, onSale: true },
+      { store: 'Lazada', price: 879, rating: 4.5, reviews: 900, freeShipping: false, onSale: false },
+      { store: 'Challenger', price: 899, rating: 4.6, reviews: 340, freeShipping: true, onSale: false },
+      { store: 'iShopChangi', price: 909, rating: 4.7, reviews: 120, freeShipping: true, onSale: false }
+    ]
+  },
+  {
+    name: 'Samsung Galaxy Watch 7',
+    aliases: ['galaxy watch', 'watch 7', 'samsung watch'],
+    related: ['Apple AirPods Pro 2', 'Sony WH-1000XM5'],
+    history: [469, 459, 449, 439, 429, 399, 419, 429, 419, 409, 399, 409, 405, 399],
+    listings: [
+      { store: 'Shopee', price: 399, rating: 4.4, reviews: 1700, freeShipping: true, onSale: true },
+      { store: 'Qoo10', price: 409, rating: 4.3, reviews: 620, freeShipping: true, onSale: true },
+      { store: 'Lazada', price: 415, rating: 4.4, reviews: 1100, freeShipping: false, onSale: true },
+      { store: 'Courts', price: 439, rating: 4.5, reviews: 180, freeShipping: true, onSale: false },
+      { store: 'Challenger', price: 449, rating: 4.3, reviews: 75, freeShipping: false, onSale: false }
+    ]
   }
 ]
 
@@ -160,14 +200,42 @@ export function buildResult(query) {
 }
 
 export function cheapestPrice(query) {
+  return cheapestListing(query).price
+}
+
+// The store with the lowest price right now, as { store, price }.
+export function cheapestListing(query) {
   const result = buildResult(query)
-  let low = result.listings[0].price
+  let best = result.listings[0]
   for (let i = 1; i < result.listings.length; i++) {
-    if (result.listings[i].price < low) {
-      low = result.listings[i].price
+    if (result.listings[i].price < best.price) {
+      best = result.listings[i]
     }
   }
-  return low
+  return { store: best.store, price: best.price }
+}
+
+// Sample data has no product pages, so each store links to its own search for the product name.
+const storeSearch = {
+  'Shopee': 'https://shopee.sg/search?keyword=',
+  'Lazada': 'https://www.lazada.sg/catalog/?q=',
+  'Amazon.sg': 'https://www.amazon.sg/s?k=',
+  'Courts': 'https://www.courts.com.sg/catalogsearch/result/?q=',
+  'Best Denki': 'https://www.bestdenki.com.sg/catalogsearch/result/?q=',
+  'Challenger': 'https://www.challenger.sg/search?q=',
+  'Qoo10': 'https://www.qoo10.sg/s/?keyword=',
+  'iShopChangi': 'https://www.ishopchangi.com/en/search?q='
+}
+
+// A product's photo, if the catalogue has one. Add an image: '/images/...' or a full URL to a product to show it.
+export function productImage(name) {
+  const product = findProduct(name)
+  return product && product.image ? product.image : ''
+}
+
+export function storeLink(store, name) {
+  const base = storeSearch[store]
+  return base ? base + encodeURIComponent(name) : ''
 }
 
 export function verdictFor(result) {

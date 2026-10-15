@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { watchAuthState, signOutUser } from '../services/auth.js'
 import { getUser } from '../services/userApi.js'
+import { cheapestListing } from './catalog.js'
 
 const USERS_KEY = 'fastdeal-users'
 
@@ -28,7 +29,7 @@ export function applyDbUser(dbUser, fbUser) {
     if (list[i].email === fbUser.email) { found = list[i]; break }
   }
   if (!found) {
-    found = { email: fbUser.email, displayName: fbUser.displayName || '', photoURL: fbUser.photoURL || '', username: dbUser.username || '', emailOn: dbUser.emailAlertsOn, wishlist: [], sleep: [] }
+    found = { email: fbUser.email, displayName: fbUser.displayName || '', photoURL: fbUser.photoURL || '', username: dbUser.username || '', emailOn: dbUser.emailAlertsOn, wishlist: [] }
     list.push(found)
     writeUsers(list)
   } else {
@@ -42,6 +43,7 @@ export function applyDbUser(dbUser, fbUser) {
 // On every Firebase auth state change (login, logout, page reload):
 // - Signup flow: skip — the view handles DB creation and calls applyDbUser.
 // - Login / page reload: call getUser (read-only). If 404 → not registered → sign out.
+
 watchAuthState(async function (fbUser) {
   firebaseUser.value = fbUser
 
@@ -135,37 +137,95 @@ export function logout() {
   user.value = null
 }
 
-export function saveProduct(item) {
+// Saves the product with the store it came from. With no listing given, that is today's cheapest store.
+// Saving an already saved product from a different store switches it to that store and price.
+export function saveProduct(name, listing) {
   if (!user.value) {
     return
   }
-  const list = user.value.wishlist
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].name === item.name) {
-      return
+  const from = listing || cheapestListing(name)
+  const saved = findSaved(name)
+  if (saved) {
+    if (listing && saved.savedStore !== listing.store) {
+      saved.savedStore = listing.store
+      saved.savedPrice = listing.price
+      saved.savedAt = Date.now()
+      persist()
     }
+    return
   }
-  const saved = Number(item.savedPrice)
-  list.push({
-    name: item.name,
-    savedPrice: saved,
-    targetPrice: Math.round(saved * 0.9 * 100) / 100,
-    savedAt: Date.now()
+  user.value.wishlist.push({
+    name: name,
+    savedPrice: from.price,
+    savedStore: from.store,
+    targetPrice: Math.round(from.price * 0.9 * 100) / 100,
+    savedAt: Date.now(),
+    sleepUntil: 0
   })
   persist()
 }
 
-export function isSaved(name) {
+// Sample wishlist for trying the page: a mix of price drops, reached targets, and items on hold.
+const SAMPLE_WISHLIST = [
+  { name: 'Sony WH-1000XM5', savedPrice: 499, savedStore: 'Amazon.sg', targetPrice: 430, holdHours: 0 },
+  { name: 'Apple AirPods Pro 2', savedPrice: 319, savedStore: 'Shopee', targetPrice: 290, holdHours: 0 },
+  { name: 'Nintendo Switch OLED', savedPrice: 439, savedStore: 'Qoo10', targetPrice: 400, holdHours: 0 },
+  { name: 'Kindle Paperwhite', savedPrice: 199, savedStore: 'Shopee', targetPrice: 189, holdHours: 0 },
+  { name: 'Bose QuietComfort Ultra', savedPrice: 549, savedStore: 'Courts', targetPrice: 499, holdHours: 24 },
+  { name: 'Dyson V15 Detect', savedPrice: 1149, savedStore: 'Courts', targetPrice: 1050, holdHours: 0 },
+  { name: 'iPad Air (M2)', savedPrice: 859, savedStore: 'Amazon.sg', targetPrice: 799, holdHours: 3 },
+  { name: 'Samsung Galaxy Watch 7', savedPrice: 415, savedStore: 'Lazada', targetPrice: 399, holdHours: 0 }
+]
+
+export function missingSamples() {
+  return SAMPLE_WISHLIST.filter(function (item) {
+    return !findSaved(item.name)
+  }).length
+}
+
+// Adds whichever sample products are not already saved; products already saved are left alone.
+export function addSampleWishlist() {
   if (!user.value) {
-    return false
+    return
+  }
+  const now = Date.now()
+  SAMPLE_WISHLIST.forEach(function (item, i) {
+    if (findSaved(item.name)) {
+      return
+    }
+    user.value.wishlist.push({
+      name: item.name,
+      savedPrice: item.savedPrice,
+      savedStore: item.savedStore,
+      targetPrice: item.targetPrice,
+      savedAt: now - (i + 1) * 86400000,
+      sleepUntil: item.holdHours ? now + item.holdHours * 3600000 : 0
+    })
+  })
+  persist()
+}
+
+// The store a saved product was saved from, or '' if it is not saved or the store was not recorded.
+export function savedFrom(name) {
+  const saved = findSaved(name)
+  return saved && saved.savedStore ? saved.savedStore : ''
+}
+
+function findSaved(name) {
+  if (!user.value) {
+    return null
   }
   const list = user.value.wishlist
   for (let i = 0; i < list.length; i++) {
     if (list[i].name === name) {
-      return true
+      return list[i]
     }
   }
-  return false
+  return null
+}
+
+export function isSaved(name) {
+  return Boolean(findSaved(name))
 }
 
 export function setTarget(name, price) {
@@ -211,47 +271,17 @@ export async function toggleEmail() {
   }
 }
 
-export function sleepOn(name) {
+// Sleep on it: the wishlist item is greyed out until the hold ends. Saves it first if needed.
+export function sleepOn(name, hours) {
   if (!user.value) {
     return
   }
-  const list = user.value.sleep
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].name === name) {
-      return
-    }
-  }
-  list.push({
-    name: name,
-    endsAt: Date.now() + 24 * 3600000
-  })
+  saveProduct(name)
+  findSaved(name).sleepUntil = Date.now() + hours * 3600000
   persist()
 }
 
-export function isAsleep(name) {
-  if (!user.value) {
-    return false
-  }
-  const list = user.value.sleep
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].name === name) {
-      return true
-    }
-  }
-  return false
-}
-
-export function removeSleep(name) {
-  if (!user.value) {
-    return
-  }
-  const next = []
-  const list = user.value.sleep
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].name !== name) {
-      next.push(list[i])
-    }
-  }
-  user.value.sleep = next
-  persist()
+export function isAsleep(name, now) {
+  const item = findSaved(name)
+  return Boolean(item && item.sleepUntil > (now || Date.now()))
 }
