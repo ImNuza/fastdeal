@@ -44,8 +44,19 @@ export function applyDbUser(dbUser, fbUser) {
 // - Login / page reload: call getUser (read-only). If 404 → not registered → sign out.
 watchAuthState(async function (fbUser) {
   firebaseUser.value = fbUser
-  if (!fbUser) { user.value = null; return }
-  if (_signupInProgress) return // signup view is handling this
+
+  // No Firebase session — mark auth resolved immediately so views can redirect.
+  if (!fbUser) {
+    user.value = null
+    authReady.value = true
+    return
+  }
+
+  // Signup view is handling DB creation — just signal ready and let it finish.
+  if (_signupInProgress) {
+    authReady.value = true
+    return
+  }
 
   try {
     const dbUser = await getUser(fbUser.uid)
