@@ -1,8 +1,8 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { cheapestListing, productImage, sgd, storeLink } from '../mock/catalog.js'
-import { addSampleWishlist, isAsleep, missingSamples, removeSaved, setTarget, sleepOn, user } from '../mock/session.js'
+import {addSampleWishlist, isAsleep, missingSamples, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user} from '../mock/session.js'
 import FdIcon from '../components/FdIcon.vue'
 import { planBudget } from '../mock/budget.js'
 
@@ -211,9 +211,140 @@ function confirmSleep() {
   if (!holdMs.value) {
     return
   }
-  sleepOn(sleepItem.value.name, holdMs.value / 3600000)
+
+  // NEW: Capture the product's price when Sleep On It begins
+  const priceAtStart = Number(best(sleepItem.value)?.price)
+
+  sleepOn(
+    sleepItem.value.name,
+    holdMs.value / 3600000,
+    priceAtStart
+  )
+
   closeSleep()
 }
+
+// =====================================
+// SLEEP ON IT - PURCHASE VERDICT
+// =====================================
+
+// Which product's verdict is currently displayed?
+const verdictItem = ref(null)
+const verdictDialog = ref(null)
+
+// Check whether the Sleep On It timer has expired
+function hasFinishedSleep(item) {
+  return Boolean(
+    item.sleepUntil &&
+    item.sleepUntil <= now.value &&
+    Number.isFinite(item.sleepPriceAtStart) &&
+    item.sleepPriceAtStart > 0
+  )
+}
+
+// Calculate the percentage change and purchase verdict
+function verdictData(item) {
+  const start = item.sleepPriceAtStart
+  const latest = Number(best(item)?.price)
+
+  // Cannot calculate a verdict without valid prices
+  if (!Number.isFinite(latest) || latest < 0) {
+    return null
+  }
+
+  // Percentage change formula
+  const percent = ((latest - start) / start) * 100
+
+  // Absolute price difference
+  const difference = latest - start
+
+  let title = ''
+  let message = ''
+
+  if (percent <= -10) {
+    title = 'A more favourable price — worth considering'
+    message =
+      'The price has dropped by at least 10% since you started waiting. ' +
+      'If you still need this product, now may be a better time to buy.'
+
+  } else if (percent < 0) {
+    title = 'A small saving since you waited'
+    message =
+      'The price has decreased slightly. Consider whether the savings ' +
+      'make the purchase worthwhile.'
+
+  } else if (percent === 0) {
+    title = 'No price advantage yet'
+    message =
+      'The price has not changed since you started waiting. ' +
+      'There is no price-based reason to rush your decision.'
+
+  } else {
+    title = 'The price has increased — consider waiting'
+    message =
+      'The product now costs more than when you started waiting. ' +
+      'Consider comparing alternatives or waiting for a better offer.'
+  }
+
+  return {
+    start,
+    latest,
+    percent,
+    difference,
+    title,
+    message
+  }
+}
+
+// Automatically calculate the currently displayed verdict
+const activeVerdict = computed(() => {
+  return verdictItem.value
+    ? verdictData(verdictItem.value)
+    : null
+})
+
+// Open the Purchase Verdict pop-up
+function openVerdict(item) {
+  verdictItem.value = item
+
+  nextTick(() => {
+    verdictDialog.value?.querySelector('button')?.focus()
+  })
+}
+
+// Close the pop-up and mark the verdict as viewed
+function closeVerdict() {
+  if (verdictItem.value) {
+    markSleepVerdictSeen(verdictItem.value.name)
+  }
+
+  verdictItem.value = null
+}
+
+// Watch for expired timers
+watch(
+  [now, () => user.value?.wishlist],
+  function () {
+    if (verdictItem.value || sleepItem.value || !user.value) {
+      return
+    }
+
+    // Find the first expired timer that has not been viewed
+    const newlyFinished = user.value.wishlist.find(item =>
+      hasFinishedSleep(item) && !item.sleepVerdictSeen
+    )
+
+    if (newlyFinished) {
+      openVerdict(newlyFinished)
+    }
+  },
+  {
+    immediate: true,
+    deep: true
+  }
+)
+
+
 // Plan a budget pop-up: tick must haves, enter a budget, then see the best mix at today's best prices.
 // Items on hold are left out, since they are still being slept on.
 const showBudget = ref(false)
@@ -424,14 +555,28 @@ function cheapestPlannable() {
                   </span>
                 </div>
               </div>
-              <div class="fd-wish-cell" role="cell">
-                <div class="fd-wish-actions">
-                  <button class="btn btn-outline-dark btn-sm fd-icon-btn" type="button" :aria-label="'Sleep on ' + item.name" title="Sleep on it" @click="openSleep(item, $event)">
-                    <FdIcon name="moon" />
+              <div class="fd-wish-cell fd-wish-action-cell" role="cell">
+               <div class="fd-wish-action-group">
+
+                  <!-- Moon and trash buttons -->
+                  <div class="fd-wish-actions">
+                    <button class="btn btn-outline-dark btn-sm fd-icon-btn" type="button"
+                      :aria-label="'Sleep on ' + item.name" title="Sleep on it" @click="openSleep(item, $event)">
+                      <FdIcon name="moon" />
+                    </button>
+
+                    <button class="btn btn-outline-danger btn-sm fd-icon-btn" type="button"
+                      :aria-label="'Remove ' + item.name" @click="removeSaved(item.name)">
+                      <FdIcon name="trash" />
+                    </button>
+                  </div>
+
+                  <!-- Verdict link directly below the icons -->
+                  <button v-if="hasFinishedSleep(item)" class="fd-verdict-link" type="button"
+                    @click="openVerdict(item)">
+                    View purchase verdict
                   </button>
-                  <button class="btn btn-outline-danger btn-sm fd-icon-btn" type="button" :aria-label="'Remove ' + item.name" @click="removeSaved(item.name)">
-                    <FdIcon name="trash" />
-                  </button>
+
                 </div>
               </div>
             </template>
@@ -548,6 +693,106 @@ function cheapestPlannable() {
     </section>
   </div>
 
+<!-- Purchase Verdict pop-up -->
+<div
+  v-if="verdictItem"
+  class="fd-entry-backdrop"
+  @click.self="closeVerdict"
+  @keydown.esc="closeVerdict"
+>
+  <section
+    ref="verdictDialog"
+    class="fd-entry-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="fd-verdict-title"
+  >
+    <h2 id="fd-verdict-title" class="fd-page-title">
+      SLEEP ON IT — VERDICT
+    </h2>
+
+    <p class="fd-entry-description">
+      Your waiting period for
+      <strong>{{ verdictItem.name }}</strong>
+      has ended.
+    </p>
+
+    <template v-if="activeVerdict">
+
+      <!-- Price comparison -->
+      <div class="fd-verdict-prices">
+
+        <div>
+          <span>Price when sleep started</span>
+          <strong>{{ sgd(activeVerdict.start) }}</strong>
+        </div>
+
+        <div>
+          <span>Latest listed price</span>
+          <strong>{{ sgd(activeVerdict.latest) }}</strong>
+        </div>
+
+      </div>
+
+      <!-- Percentage price change -->
+      <div
+        class="fd-verdict-change"
+        :class="{
+          'is-lower': activeVerdict.percent < 0,
+          'is-higher': activeVerdict.percent > 0
+        }"
+      >
+        <strong>
+          {{ activeVerdict.percent > 0 ? '+' : '' }}
+          {{ activeVerdict.percent.toFixed(1) }}%
+        </strong>
+
+        <span v-if="activeVerdict.difference < 0">
+          Price decreased by
+          {{ sgd(-activeVerdict.difference) }}
+        </span>
+
+        <span v-else-if="activeVerdict.difference > 0">
+          Price increased by
+          {{ sgd(activeVerdict.difference) }}
+        </span>
+
+        <span v-else>
+          Price unchanged
+        </span>
+      </div>
+
+      <!-- Purchase verdict -->
+      <h3 class="fd-verdict-title">
+        {{ activeVerdict.title }}
+      </h3>
+
+      <p>{{ activeVerdict.message }}</p>
+
+    </template>
+
+    <p v-else class="alert alert-secondary">
+      Latest price unavailable.
+      We cannot calculate a verdict yet.
+    </p>
+
+    <p class="small text-secondary">
+      Currently based on FastDeal's demo catalogue.
+      This verdict reflects price movement only.
+    </p>
+
+    <button
+      class="btn btn-dark fd-btn-lg w-100"
+      type="button"
+      @click="closeVerdict"
+    >
+      Got it
+    </button>
+
+  </section>
+</div>
+
+
   <!-- Sleep on it pop-up. Uses the welcome prompt's dialog styles from app.css. -->
   <div v-if="sleepItem" class="fd-entry-backdrop" @click.self="closeSleep" @keydown.esc="closeSleep">
     <section ref="sleepDialog" class="fd-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-sleep-title">
@@ -589,8 +834,78 @@ function cheapestPlannable() {
   </div>
 </template>
 
+
 <style scoped>
-/* Search box and sort menu side by side, wrapping onto two lines on phones. */
+
+/* ===================================
+   SLEEP ON IT - PURCHASE VERDICT
+=================================== */
+
+.fd-verdict-prices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+.fd-verdict-prices > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid var(--fd-vanilla-line);
+  border-radius: 1rem;
+}
+
+.fd-verdict-prices span {
+  color: var(--fd-text-muted);
+  font-size: 0.85rem;
+}
+
+.fd-verdict-prices strong {
+  color: var(--fd-blue);
+  font-size: 1.4rem;
+}
+
+.fd-verdict-change {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  background: #f4f0e8;
+  padding: 1rem;
+  border-radius: 1rem;
+}
+
+.fd-verdict-change strong {
+  font-size: 2rem;
+}
+
+.fd-verdict-change.is-lower {
+  color: #187447;
+}
+
+.fd-verdict-change.is-higher {
+  color: #a24432;
+}
+
+.fd-verdict-title {
+  margin: 1.25rem 0 0.5rem;
+  color: var(--fd-blue);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+@media (max-width: 460px) {
+  .fd-verdict-prices {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===================================
+   WISHLIST SEARCH AND SORT
+=================================== */
+
 .fd-wish-tools {
   display: flex;
   flex-wrap: wrap;
@@ -598,8 +913,6 @@ function cheapestPlannable() {
   margin-bottom: 1.5rem;
 }
 
-/* Search bar: a paper pill with the search icon inside, like the Home search bar, 48px tall.
-   It sits on the page rather than floating, so it has the 2px input border instead of Home's shadow. */
 .fd-wish-search {
   display: flex;
   flex: 1 1 16rem;
@@ -612,7 +925,6 @@ function cheapestPlannable() {
   background: var(--fd-paper);
 }
 
-/* Same blue focus ring as every other input. */
 .fd-wish-search:focus-within {
   border-color: var(--fd-blue);
   box-shadow: 0 0 0 0.25rem rgb(39 80 138 / 35%);
@@ -624,7 +936,6 @@ function cheapestPlannable() {
   border: 0;
   background: transparent;
   color: var(--fd-text);
-  /* 16px like every input, so phones do not zoom in when it is tapped. */
   font-size: var(--fd-body);
   outline: none;
 }
@@ -633,7 +944,6 @@ function cheapestPlannable() {
   color: var(--fd-text-muted);
 }
 
-/* The icon only marks this as search: the list filters as you type, so there is nothing to press. */
 .fd-wish-search-icon {
   display: inline-flex;
   align-items: center;
@@ -643,7 +953,6 @@ function cheapestPlannable() {
   color: var(--fd-blue);
 }
 
-/* "Sort by" in front of the menu, so it is clear what the menu does. */
 .fd-wish-sort {
   display: flex;
   flex: 0 1 22rem;
@@ -658,9 +967,6 @@ function cheapestPlannable() {
   font-weight: 700;
 }
 
-/* Wide screens: the search row uses the table's columns, so "Sort by" starts in line with
-   the Target price alert heading. The search bar spans the first three columns and the sort
-   menu the last two; both stretch out past the column padding to the row's edges. */
 @media (min-width: 992px) {
   .fd-wish-tools {
     display: grid;
@@ -681,7 +987,6 @@ function cheapestPlannable() {
   }
 }
 
-/* Sort menu: the same 48px pill height as the search bar. */
 .fd-wish-tools .form-select {
   flex: 1 1 auto;
   min-height: var(--fd-control);
@@ -691,10 +996,10 @@ function cheapestPlannable() {
   font-size: var(--fd-body);
 }
 
-/* The search row, header, and product cards share one set of columns, so they line up.
-   Product up to 22rem, Saved price and Best now just wide enough for a price and store name,
-   Target price alert for its heading on one line, then the two round buttons.
-   Spare room goes into even gaps between the columns rather than into any one column. */
+/* ===================================
+   WISHLIST LAYOUT
+=================================== */
+
 .fd-wish-tools,
 .fd-wish-head,
 .fd-wish-row {
@@ -711,9 +1016,6 @@ function cheapestPlannable() {
   padding: 0.75rem 1.25rem;
 }
 
-/* The line under the search row, the header pill, and the beige strip behind them stay
-   under the navbar together while scrolling, so cards slide out of sight behind them
-   instead of showing round the pill's ends. */
 .fd-wish-headbar {
   position: sticky;
   top: var(--fd-nav-height);
@@ -723,7 +1025,6 @@ function cheapestPlannable() {
   background: var(--fd-beige);
 }
 
-/* The header pill: blue with beige text (7:1 contrast), in the same type as every table header. */
 .fd-wish-head {
   white-space: nowrap;
   border-radius: 999px;
@@ -740,7 +1041,6 @@ function cheapestPlannable() {
   gap: 0.75rem;
 }
 
-/* Each product is its own card. */
 .fd-wish-row {
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: var(--fd-radius);
@@ -751,17 +1051,49 @@ function cheapestPlannable() {
   min-width: 0;
 }
 
-/* Column names inside each card, only shown on smaller screens where the header is hidden. */
 .fd-wish-label {
   display: none;
 }
 
-/* Photo and name together, both linking to Compare. */
+/* ===================================
+   PRODUCT NAME AND VERDICT LINK
+=================================== */
+
+.fd-wish-cell-product {
+  position: relative;
+}
+
 .fd-wish-product {
   display: flex;
   align-items: center;
   gap: 1rem;
   text-decoration: none;
+}
+
+.fd-wish-product-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.fd-wish-cell-product .fd-verdict-link {
+  display: block;
+  width: fit-content;
+  margin: 0.5rem 0 0 7rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fd-blue);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.fd-wish-cell-product .fd-verdict-link:hover {
+  opacity: 0.8;
 }
 
 .fd-wish-image {
@@ -784,8 +1116,10 @@ function cheapestPlannable() {
   object-fit: cover;
 }
 
-/* On hold: the whole card turns grey until the timer ends, a slightly grey card
-   with the photo and name faded and the countdown in grey. */
+/* ===================================
+   SLEEPING WISHLIST ITEMS
+=================================== */
+
 .fd-wish-row.is-asleep {
   border-color: var(--fd-grey-line);
   background: var(--fd-grey-soft);
@@ -796,7 +1130,6 @@ function cheapestPlannable() {
   filter: grayscale(1);
 }
 
-/* The countdown runs across the Saved price, Best now, Target, and button columns. */
 .fd-wish-countdown {
   display: flex;
   align-items: center;
@@ -810,8 +1143,10 @@ function cheapestPlannable() {
   color: var(--fd-grey-text) !important;
 }
 
-/* Price drop: a small tea green chip on the same line as the best price, so prices line up
-   from card to card whether or not they dropped. */
+/* ===================================
+   PRICE DROP AND TARGET ALERT
+=================================== */
+
 .fd-drop {
   display: inline-block;
   margin-left: 0.375rem;
@@ -824,7 +1159,6 @@ function cheapestPlannable() {
   vertical-align: 0.0625rem;
 }
 
-/* Marks the first result in Plan a budget: same tea green chip as the price drop. */
 .fd-best {
   display: inline-block;
   padding: 0.0625rem 0.625rem;
@@ -835,7 +1169,6 @@ function cheapestPlannable() {
   font-weight: 700;
 }
 
-/* Target box with the Target reached check beside it, on one line. */
 .fd-target-row {
   display: flex;
   align-items: center;
@@ -847,7 +1180,6 @@ function cheapestPlannable() {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  /* Same size as the round moon and trash buttons. */
   width: var(--fd-control-sm);
   height: var(--fd-control-sm);
   border-radius: 50%;
@@ -860,7 +1192,6 @@ function cheapestPlannable() {
   height: 1.125rem;
 }
 
-/* "S$" sits in front of the number, in the same border as the box. */
 .fd-target-input {
   width: 9rem;
 }
@@ -873,28 +1204,61 @@ function cheapestPlannable() {
   font-weight: 700;
 }
 
-/* Moon and trash, pushed to the far end of the card. */
-.fd-wish-actions {
+/* ACTION BUTTONS */
+/* Keep the action group at the far right of the card */
+.fd-wish-action-cell {
   display: flex;
   justify-content: flex-end;
+  min-width: 0;
+}
+
+/* Stack the buttons above the verdict link */
+.fd-wish-action-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.85rem;
+  width: max-content;
+}
+
+/* Moon and trash buttons stay side by side */
+.fd-wish-actions {
+  display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
-  white-space: nowrap;
 }
 
-.fd-wish-actions .btn {
-  gap: 0.375rem;
+/* Right-align the verdict text */
+.fd-verdict-link {
+  display: block;
+  width: max-content;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: var(--fd-blue);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: right;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
-/* Too narrow for five columns: hide the header and lay each card out on its own.
-   Photo and name on top, then Saved price, Best now, and Target side by side with their labels,
-   then the buttons. */
+.fd-verdict-link:hover {
+  opacity: 0.8;
+}
+
+
+/* ===================================
+   RESPONSIVE LAYOUT
+=================================== */
+
 @media (max-width: 991.98px) {
   .fd-wish-headbar {
     display: none;
   }
 
-  /* The header is hidden, so the line moves onto the top of the cards. */
   .fd-wish-rows {
     padding-top: 1.5rem;
     border-top: var(--fd-border) solid var(--fd-vanilla-line);
@@ -930,7 +1294,6 @@ function cheapestPlannable() {
   }
 }
 
-/* Phones: a smaller photo, and the three prices stack. */
 @media (max-width: 767.98px) {
   .fd-wish-row {
     grid-template-columns: minmax(0, 1fr);
@@ -941,9 +1304,16 @@ function cheapestPlannable() {
     height: 4.5rem;
     font-size: 1.5rem;
   }
+
+  .fd-wish-cell-product .fd-verdict-link {
+    margin-left: 5.5rem;
+  }
 }
 
-/* Sticks to the bottom of the screen while scrolling, then stops at the end of the page, above the footer. */
+/* ===================================
+   BUDGET BAR AND MODAL
+=================================== */
+
 .fd-budget-bar {
   position: sticky;
   bottom: 0;
@@ -958,14 +1328,12 @@ function cheapestPlannable() {
   background: var(--fd-beige);
 }
 
-/* The product total, at the right end of the bar. */
 .fd-budget-count {
   margin: 0;
   color: var(--fd-text-muted);
   font-size: var(--fd-small);
 }
 
-/* Budget pop-up: wider than the other pop-ups, and scrolls inside itself on short screens. */
 .fd-budget-dialog {
   width: min(100%, 38rem);
   max-height: calc(100svh - 2rem);
@@ -976,7 +1344,6 @@ function cheapestPlannable() {
   max-width: 14rem;
 }
 
-/* A faint example amount, so it does not read as an amount already typed in. */
 .fd-budget-input .form-control::placeholder {
   color: var(--fd-text-muted);
   opacity: 0.45;
@@ -1012,13 +1379,11 @@ function cheapestPlannable() {
   margin: 0;
 }
 
-/* Priority number beside a ticked must have. */
 .fd-rank {
   flex-shrink: 0;
   width: 4.5rem;
 }
 
-/* The whole row is the tap target for its checkbox. */
 .fd-budget-item-label {
   display: flex;
   flex: 1;
@@ -1034,7 +1399,7 @@ function cheapestPlannable() {
 .fd-budget-result {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: var(--fd-border) solid var(--fd-vanilla-line);
+  border-top: 1px solid var(--fd-vanilla-line);
 }
 
 .fd-budget-pick li {
@@ -1066,7 +1431,10 @@ function cheapestPlannable() {
   vertical-align: baseline;
 }
 
-/* Same size as the rest of the pop-up text, bold so it reads as the heading for the picker. */
+/* ===================================
+   SLEEP ON IT TIMER
+=================================== */
+
 .fd-hold-legend {
   margin-bottom: 1rem;
   color: var(--fd-text);
@@ -1075,7 +1443,6 @@ function cheapestPlannable() {
   text-align: center;
 }
 
-/* Days : hours : minutes picker, each number with an up arrow above and a down arrow below. */
 .fd-hold-picker {
   display: flex;
   align-items: center;
@@ -1129,7 +1496,6 @@ function cheapestPlannable() {
   -moz-appearance: textfield;
 }
 
-/* Hide the browser's own number spinners; the arrows above and below do that job. */
 .fd-hold-value::-webkit-outer-spin-button,
 .fd-hold-value::-webkit-inner-spin-button {
   margin: 0;
@@ -1157,4 +1523,5 @@ function cheapestPlannable() {
 .fd-hold-end strong {
   color: var(--fd-blue);
 }
+
 </style>
