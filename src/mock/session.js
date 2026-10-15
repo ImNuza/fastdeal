@@ -8,6 +8,10 @@ const USERS_KEY = 'fastdeal-users'
 export const user = ref(null)
 export const firebaseUser = ref(null)
 
+// Becomes true after the first onAuthStateChanged callback fires.
+// Views watch this before redirecting so a refresh doesn't immediately boot the user.
+export const authReady = ref(false)
+
 // True when the logged-in user hasn't set a username yet.
 export const needsUsername = computed(() => !!(user.value && !user.value.username))
 
@@ -42,8 +46,19 @@ export function applyDbUser(dbUser, fbUser) {
 
 watchAuthState(async function (fbUser) {
   firebaseUser.value = fbUser
-  if (!fbUser) { user.value = null; return }
-  if (_signupInProgress) return // signup view is handling this
+
+  // No Firebase session — mark auth resolved immediately so views can redirect.
+  if (!fbUser) {
+    user.value = null
+    authReady.value = true
+    return
+  }
+
+  // Signup view is handling DB creation — just signal ready and let it finish.
+  if (_signupInProgress) {
+    authReady.value = true
+    return
+  }
 
   try {
     const dbUser = await getUser(fbUser.uid)
@@ -56,6 +71,9 @@ watchAuthState(async function (fbUser) {
       console.warn('[FastDeal] DB check failed:', err.message)
     }
     user.value = null
+  } finally {
+    // Signal to all views that Firebase has resolved — safe to check auth state now.
+    authReady.value = true
   }
 })
 
