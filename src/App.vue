@@ -2,6 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { user } from './mock/session.js'
+
+// Computed so the navbar username updates reactively whenever user logs in, out, or sets a username.
+const username = computed(() => user.value?.username || '')
 import FdLogo from './components/FdLogo.vue'
 import FdIcon from './components/FdIcon.vue'
 import FdFooter from './components/FdFooter.vue'
@@ -160,7 +163,7 @@ watch([() => route.path, user], maybeShowEntryDialog)
           <li v-else class="nav-item">
             <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/account') }" active-class="" exact-active-class="" to="/account">
               <FdIcon name="account" />
-              <span v-if="user.username" class="nav-username">{{ user.username }}</span>
+              <span v-if="username" class="nav-username">{{ username }}</span>
               <span class="fd-icon-label">Account</span>
             </router-link>
           </li>
