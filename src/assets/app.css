@@ -76,10 +76,10 @@ small {
   min-height: calc(100svh - var(--fd-nav-height));
 }
 
-/* Standard page container: the same gap under the navbar on every page that is not full bleed. */
+/* Standard page container: the same gap under the navbar and above the footer on every page that is not full bleed. */
 .fd-page {
   padding-top: 2.5rem;
-  padding-bottom: 1.5rem;
+  padding-bottom: 4rem;
 }
 
 /* Navbar */
@@ -195,10 +195,12 @@ small {
 
 .table thead th {
   background: var(--fd-vanilla-soft);
-  font-family: var(--fd-font-display);
-  font-size: 1rem;
-  font-weight: 400;
-  letter-spacing: 0.04em;
+  /* Bold capitals in DM Sans, 14px like the buttons. */
+  color: var(--fd-text);
+  font-family: var(--fd-font-body);
+  font-size: var(--fd-table-header);
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -280,12 +282,36 @@ tr.cheapest td {
   --bs-btn-padding-x: 0.875rem;
 }
 
-.fd-btn-lg {
+/* One height for every button: 48px, or 36px with btn-sm. Text links (btn-link) are left alone. */
+.btn:not(.btn-link) {
+  --bs-btn-padding-y: 0.5rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 52px;
-  padding: 0.75rem 1.5rem;
+  min-height: var(--fd-control);
+}
+
+.btn-sm:not(.btn-link) {
+  --bs-btn-padding-y: 0.25rem;
+  min-height: var(--fd-control-sm);
+}
+
+/* Icons inside small buttons sit at text size, not the 26px navbar size. */
+.btn-sm svg.fd-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* Icon-only small button, such as Remove or Decline: a circle as tall as any btn-sm. Give it an aria-label. */
+.fd-icon-btn {
+  width: var(--fd-control-sm);
+  height: var(--fd-control-sm);
+  padding: 0;
+}
+
+/* Same 48px height as every button, just more room either side of the text. */
+.fd-btn-lg {
+  --bs-btn-padding-x: 1.5rem;
 }
 
 .btn-dark {

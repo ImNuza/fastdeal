@@ -42,9 +42,30 @@ defineProps({
       <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" />
       <circle cx="12" cy="13" r="3" />
     </template>
+    <template v-else-if="name === 'chevron-up'">
+      <path d="m18 15-6-6-6 6" />
+    </template>
+    <template v-else-if="name === 'chevron-down'">
+      <path d="m6 9 6 6 6-6" />
+    </template>
     <template v-else-if="name === 'tag'">
       <path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4Z" />
       <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />
+    </template>
+    <template v-else-if="name === 'trash'">
+      <path d="M3 6h18" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </template>
+    <template v-else-if="name === 'check'">
+      <path d="M20 6 9 17l-5-5" />
+    </template>
+    <template v-else-if="name === 'x'">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </template>
+    <template v-else-if="name === 'moon'">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
     </template>
   </svg>
 </template>

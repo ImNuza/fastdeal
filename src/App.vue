@@ -13,7 +13,7 @@ const route = useRoute()
 const router = useRouter()
 
 // A guest who taps a locked icon lands on /login?next=..., so the tapped icon stays yellow, not Log in.
-const GATED_PAGES = ['/wishlist', '/sleep', '/friends', '/notifications']
+const GATED_PAGES = ['/wishlist', '/friends', '/notifications']
 const loginFor = computed(function () {
   const next = route.query.next
   return route.path === '/login' && GATED_PAGES.includes(next) ? next : ''
@@ -24,11 +24,7 @@ function isNavActive(path) {
   if (path === '/login') {
     return route.path === '/login' && !loginFor.value
   }
-  // Sleep on it now lives inside Wishlist, so /sleep lights up the Wishlist icon.
   const here = loginFor.value || route.path
-  if (path === '/wishlist') {
-    return here === '/wishlist' || here === '/sleep'
-  }
   return here === path
 }
 const showEntryDialog = ref(false)

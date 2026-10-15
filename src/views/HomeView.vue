@@ -450,8 +450,8 @@ onBeforeUnmount(function () {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  min-height: 4rem;
-  padding: 0.375rem 0.5rem 0.375rem 1.75rem;
+  min-height: var(--fd-control);
+  padding: 0.25rem 0.25rem 0.25rem 1.5rem;
   border-radius: 999px;
   background: var(--fd-paper);
   box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 0.18);
@@ -481,8 +481,8 @@ onBeforeUnmount(function () {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 3rem;
-  height: 3rem;
+  width: 2.5rem;
+  height: 2.5rem;
   margin: 0;
   padding: 0;
   border: 0;

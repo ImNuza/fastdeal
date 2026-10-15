@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { buildResult, dayLabel, sgd, verdictFor } from '../mock/catalog.js'
-import { isAsleep, isSaved, saveProduct, sleepOn, user } from '../mock/session.js'
+import { isAsleep, isSaved, savedFrom, saveProduct, sleepOn, user } from '../mock/session.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -111,8 +111,18 @@ function onSave() {
     loginNext()
     return
   }
-  saveProduct({ name: result.value.name, savedPrice: verdict.value.cheapest })
-  note.value = 'Saved to wishlist.'
+  saveProduct(result.value.name)
+  note.value = 'Saved to wishlist from ' + savedFrom(result.value.name) + '.'
+}
+
+// Save from one specific store row in the listings table.
+function onSaveFrom(row) {
+  if (!user.value) {
+    loginNext()
+    return
+  }
+  saveProduct(result.value.name, { store: row.store, price: row.price })
+  note.value = 'Saved to wishlist from ' + row.store + '.'
 }
 
 function onSleep() {
@@ -120,8 +130,12 @@ function onSleep() {
     loginNext()
     return
   }
-  sleepOn(result.value.name)
-  note.value = 'Held for 24 hours.'
+  // Already on hold: leave its timer alone.
+  if (isAsleep(result.value.name)) {
+    return
+  }
+  sleepOn(result.value.name, 24)
+  note.value = 'Saved to wishlist and on hold for 1 day.'
 }
 
 onMounted(function () {
@@ -241,6 +255,7 @@ onMounted(function () {
             <th>Reviews</th>
             <th>Shipping</th>
             <th>Sale</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -254,6 +269,14 @@ onMounted(function () {
             <td>{{ row.reviews }}</td>
             <td>{{ row.freeShipping ? 'Free' : 'Paid' }}</td>
             <td>{{ row.onSale ? 'Yes' : 'No' }}</td>
+            <td>
+              <button
+                class="btn btn-sm btn-outline-dark"
+                type="button"
+                :disabled="savedFrom(result.name) === row.store"
+                @click="onSaveFrom(row)"
+              >{{ savedFrom(result.name) === row.store ? 'Saved' : isSaved(result.name) ? 'Save from here instead' : 'Save from here' }}</button>
+            </td>
           </tr>
         </tbody>
       </table>

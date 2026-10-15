@@ -24,6 +24,11 @@
   --fd-green-soft: #d8e4b4;
   --fd-red: #edb0a2;
 
+  /* On hold: Sleep on it cards */
+  --fd-grey-soft: #ebe9e5;
+  --fd-grey-line: #d4d1cb;
+  --fd-grey-text: #5c5c5c;
+
   /* Text */
   --fd-ink: #343b1b;
   --fd-text: var(--fd-ink);
@@ -41,12 +46,17 @@
   --fd-body: 1rem;
   --fd-small: 0.875rem;
   --fd-eyebrow: 0.875rem;
-  --fd-button: 1rem;
+  --fd-table-header: 0.875rem;
+  --fd-button: 0.875rem;
   --fd-button-sm: 0.875rem;
 
   /* Shape */
   --fd-radius: 1rem;
   --fd-border: 2px;
+
+  /* Control heights: every button and search bar is one of these two */
+  --fd-control: 3rem;
+  --fd-control-sm: 2.25rem;
 
   /* Layout: fallback only, App.vue overwrites this with the measured navbar height */
   --fd-nav-height: 71px;
