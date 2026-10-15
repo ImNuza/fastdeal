@@ -2,11 +2,13 @@
 import { nextTick, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { resetPassword, signInWithGoogle, signInWithEmail } from '../services/auth.js'
+import { lookupByUsername } from '../services/userApi.js'
 
 const route = useRoute()
 const router = useRouter()
 
-const email = ref('')
+// Single field that accepts either an email address or a username.
+const loginInput = ref('')
 const password = ref('')
 const errorText = ref('')
 const loading = ref(false)
@@ -33,19 +35,31 @@ async function onGoogleSignIn() {
   }
 }
 
-async function onEmailSignIn() {
+async function onSignIn() {
   errorText.value = ''
-  if (!email.value || !password.value) {
-    errorText.value = 'Enter your email and password.'
+  if (!loginInput.value || !password.value) {
+    errorText.value = 'Enter your username or email, and your password.'
     return
   }
   loading.value = true
   try {
-    await signInWithEmail(email.value, password.value)
+    // If the input looks like an email, use it directly.
+    // Otherwise, look up the email from MongoDB by username first.
+    let emailToUse = loginInput.value.trim()
+    if (!emailToUse.includes('@')) {
+      try {
+        const found = await lookupByUsername(emailToUse)
+        emailToUse = found.email
+      } catch {
+        errorText.value = 'No account found with that username.'
+        return
+      }
+    }
+    await signInWithEmail(emailToUse, password.value)
     goNext()
   } catch (err) {
     if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-      errorText.value = 'Email or password is wrong.'
+      errorText.value = 'Username/email or password is wrong.'
     } else {
       errorText.value = err.message || 'Login failed.'
     }
@@ -108,15 +122,15 @@ async function onResetSubmit() {
       <div class="card p-4">
         <p v-if="errorText" class="alert alert-danger mb-3">{{ errorText }}</p>
 
-        <!-- Email + Password first -->
-        <form @submit.prevent="onEmailSignIn">
+        <!-- Username or Email + Password -->
+        <form @submit.prevent="onSignIn">
           <input
-            id="email"
-            v-model="email"
+            id="login-input"
+            v-model="loginInput"
             class="form-control login-input mb-3"
-            type="email"
-            placeholder="Email"
-            autocomplete="email"
+            type="text"
+            placeholder="Username or Email"
+            autocomplete="username"
           />
           <input
             id="password"
@@ -133,6 +147,7 @@ async function onResetSubmit() {
             {{ loading ? 'Signing in…' : 'Log in' }}
           </button>
         </form>
+
 
         <!-- Divider -->
         <div class="d-flex align-items-center mb-3 gap-2">

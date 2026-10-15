@@ -9,6 +9,7 @@ import SleepView from '../views/SleepView.vue'
 import FriendsView from '../views/FriendsView.vue'
 import NotificationsView from '../views/NotificationsView.vue'
 import AccountView from '../views/AccountView.vue'
+import SetUsernameView from '../views/SetUsernameView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -22,6 +23,7 @@ const router = createRouter({
     { path: '/account', component: AccountView },
     { path: '/login', component: LoginView },
     { path: '/signup', component: SignupView },
+    { path: '/set-username', component: SetUsernameView },
     { path: '/wishlist', component: WishlistView },
     { path: '/sleep', component: SleepView }
   ]

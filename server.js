@@ -5,6 +5,8 @@ import mongoose from 'mongoose'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import User from './models/user-model.js'
+import Friendship from './models/friendship-model.js'
+import { toPairKey } from './models/pair-key.js'
 
 dotenv.config()
 
@@ -24,22 +26,77 @@ app.get('/health', (req, res) => {
 })
 
 // --- User routes ---
+// IMPORTANT: literal paths (/search, /lookup) must come before parameterised (:uid)
+// so Express does not swallow them as uid values.
 
-// Create or return existing user (called after Firebase signup/Google login)
+// Search users by username (partial, case-insensitive). Returns each result
+// with the friendship status between that user and myUid.
+// Must be defined BEFORE /api/users/:uid so Express doesn't treat 'search' as a uid value.
+app.get('/api/users/search', async (req, res) => {
+  const { q, myUid } = req.query
+  if (!q || !myUid) return res.status(400).json({ error: 'q and myUid required' })
+  try {
+    const users = await User.find({
+      username: { $regex: q.trim(), $options: 'i' },
+      firebaseUid: { $ne: myUid }
+    }).select('firebaseUid username email').limit(20)
+
+    const pairKeys = users.map(u => toPairKey(myUid, u.firebaseUid))
+    const friendships = await Friendship.find({ pairKey: { $in: pairKeys } })
+    const fMap = {}
+    for (const f of friendships) fMap[f.pairKey] = f
+
+    const results = users.map(u => {
+      const pk = toPairKey(myUid, u.firebaseUid)
+      const f = fMap[pk]
+      return {
+        firebaseUid: u.firebaseUid,
+        username: u.username,
+        email: u.email,
+        pairKey: pk,
+        friendshipStatus: f ? f.status : null,
+        iRequested: f ? f.requesterUid === myUid : null
+      }
+    })
+    res.json(results)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Look up a user's email by username — used by the login page so people can sign in
+// with username instead of email (Firebase needs the email to authenticate).
+app.get('/api/users/lookup', async (req, res) => {
+  const { username } = req.query
+  if (!username) return res.status(400).json({ error: 'username required' })
+  try {
+    const user = await User.findOne({ username: username.toLowerCase().trim() }).select('email firebaseUid username')
+    if (!user) return res.status(404).json({ error: 'No user with that username' })
+    res.json(user)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Create or return existing user (called after Firebase signup/Google login).
+// Pass username only on first signup with email — Google users set it separately via /set-username.
 app.post('/api/users', async (req, res) => {
-  const { firebaseUid, email } = req.body
+  const { firebaseUid, email, username } = req.body
   if (!firebaseUid || !email) {
     return res.status(400).json({ error: 'firebaseUid and email are required' })
   }
+  const setOnInsert = { emailAlertsOn: true }
+  if (username) setOnInsert.username = username.toLowerCase().trim()
   try {
     const user = await User.findOneAndUpdate(
       { firebaseUid },
-      { $set: { email }, $setOnInsert: { emailAlertsOn: true } },
+      { $set: { email }, $setOnInsert: setOnInsert },
       { upsert: true, new: true }
     )
-    console.log('[POST /api/users] upserted:', user.email, '| uid:', user.firebaseUid)
+    console.log('[POST /api/users] upserted:', user.email, '| username:', user.username)
     res.json(user)
   } catch (err) {
+    if (err.code === 11000) return res.status(409).json({ error: 'Username already taken' })
     res.status(500).json({ error: err.message })
   }
 })
@@ -55,13 +112,19 @@ app.get('/api/users/:uid', async (req, res) => {
   }
 })
 
-// Update user (e.g. toggle email alerts)
+// Update user — allows emailAlertsOn and username.
+// Username must match /^[a-z0-9_.]{3,20}$/ and be unique.
 app.put('/api/users/:uid', async (req, res) => {
-  const allowed = ['emailAlertsOn']
   const patch = {}
-  for (const key of allowed) {
-    if (key in req.body) patch[key] = req.body[key]
+  if ('emailAlertsOn' in req.body) patch.emailAlertsOn = req.body.emailAlertsOn
+  if ('username' in req.body) {
+    const u = req.body.username.toLowerCase().trim()
+    if (!/^[a-z0-9_.]{3,20}$/.test(u)) {
+      return res.status(400).json({ error: 'Username must be 3–20 chars: letters, numbers, _ or .' })
+    }
+    patch.username = u
   }
+  if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' })
   try {
     const user = await User.findOneAndUpdate(
       { firebaseUid: req.params.uid },
@@ -71,6 +134,106 @@ app.put('/api/users/:uid', async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' })
     console.log('[PUT /api/users] updated:', user.email, '| patch:', patch)
     res.json(user)
+  } catch (err) {
+    if (err.code === 11000) return res.status(409).json({ error: 'Username already taken' })
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// --- Friendship routes ---
+// All routes take ?myUid=<firebaseUid> so the server knows who is acting.
+
+
+// Get accepted friends list with profile info
+app.get('/api/friends', async (req, res) => {
+  const { myUid } = req.query
+  if (!myUid) return res.status(400).json({ error: 'myUid required' })
+  try {
+    const rows = await Friendship.find({
+      $or: [{ requesterUid: myUid }, { addresseeUid: myUid }],
+      status: 'accepted'
+    })
+    const otherUids = rows.map(r => r.requesterUid === myUid ? r.addresseeUid : r.requesterUid)
+    const users = await User.find({ firebaseUid: { $in: otherUids } }).select('firebaseUid username email')
+    const uMap = {}
+    for (const u of users) uMap[u.firebaseUid] = u
+    const friends = rows.map(r => {
+      const otherUid = r.requesterUid === myUid ? r.addresseeUid : r.requesterUid
+      const u = uMap[otherUid] || {}
+      return { pairKey: r.pairKey, firebaseUid: otherUid, username: u.username, email: u.email }
+    })
+    res.json(friends)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Get pending incoming requests (others who sent to me)
+app.get('/api/friends/requests', async (req, res) => {
+  const { myUid } = req.query
+  if (!myUid) return res.status(400).json({ error: 'myUid required' })
+  try {
+    const rows = await Friendship.find({ addresseeUid: myUid, status: 'pending' })
+    const requesterUids = rows.map(r => r.requesterUid)
+    const users = await User.find({ firebaseUid: { $in: requesterUids } }).select('firebaseUid username email')
+    const uMap = {}
+    for (const u of users) uMap[u.firebaseUid] = u
+    const requests = rows.map(r => {
+      const u = uMap[r.requesterUid] || {}
+      return { pairKey: r.pairKey, firebaseUid: r.requesterUid, username: u.username, email: u.email }
+    })
+    res.json(requests)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Send a friend request
+app.post('/api/friends/request', async (req, res) => {
+  const { myUid, addresseeUid } = req.body
+  if (!myUid || !addresseeUid) return res.status(400).json({ error: 'myUid and addresseeUid required' })
+  const pairKey = toPairKey(myUid, addresseeUid)
+  try {
+    const existing = await Friendship.findOne({ pairKey })
+    if (existing) return res.status(409).json({ error: 'Friendship already exists', status: existing.status })
+    const f = await Friendship.create({ requesterUid: myUid, addresseeUid, pairKey })
+    console.log('[POST /api/friends/request]', myUid, '→', addresseeUid)
+    res.status(201).json(f)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Accept a pending request
+app.put('/api/friends/:pairKey/accept', async (req, res) => {
+  const { myUid } = req.body
+  if (!myUid) return res.status(400).json({ error: 'myUid required' })
+  try {
+    const f = await Friendship.findOneAndUpdate(
+      { pairKey: req.params.pairKey, addresseeUid: myUid, status: 'pending' },
+      { $set: { status: 'accepted', respondedAt: new Date() } },
+      { new: true }
+    )
+    if (!f) return res.status(404).json({ error: 'Request not found' })
+    console.log('[PUT /api/friends/accept]', req.params.pairKey)
+    res.json(f)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Decline or cancel/remove a friendship (delete the row)
+app.delete('/api/friends/:pairKey', async (req, res) => {
+  const { myUid } = req.body
+  if (!myUid) return res.status(400).json({ error: 'myUid required' })
+  try {
+    const f = await Friendship.findOneAndDelete({
+      pairKey: req.params.pairKey,
+      $or: [{ requesterUid: myUid }, { addresseeUid: myUid }]
+    })
+    if (!f) return res.status(404).json({ error: 'Friendship not found' })
+    console.log('[DELETE /api/friends]', req.params.pairKey)
+    res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
