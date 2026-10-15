@@ -1,8 +1,8 @@
 <script setup>
 import { nextTick, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { resetPassword, signInWithGoogle, signInWithEmail } from '../services/auth.js'
-import { lookupByUsername } from '../services/userApi.js'
+import { resetPassword, signInWithGoogle, signInWithEmail, signOutUser } from '../services/auth.js'
+import { lookupByUsername, getUser } from '../services/userApi.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,7 +26,25 @@ async function onGoogleSignIn() {
   errorText.value = ''
   loading.value = true
   try {
-    await signInWithGoogle()
+    const fbUser = await signInWithGoogle()
+    let dbUser
+    try {
+      dbUser = await getUser(fbUser.uid)
+    } catch (dbErr) {
+      await signOutUser()
+      if (dbErr.response?.status === 404) {
+        router.push('/signup?error=not-registered')
+      } else {
+        errorText.value = 'Could not reach the server. Make sure the backend is running.'
+      }
+      return
+    }
+    // Users without a username never completed signup (or were created by old buggy code).
+    if (!dbUser.username) {
+      await signOutUser()
+      router.push('/signup?error=not-registered')
+      return
+    }
     goNext()
   } catch (err) {
     errorText.value = err.message || 'Google sign-in failed.'
@@ -55,7 +73,25 @@ async function onSignIn() {
         return
       }
     }
-    await signInWithEmail(emailToUse, password.value)
+    const fbUser = await signInWithEmail(emailToUse, password.value)
+    let dbUser
+    try {
+      dbUser = await getUser(fbUser.uid)
+    } catch (dbErr) {
+      await signOutUser()
+      if (dbErr.response?.status === 404) {
+        router.push('/signup?error=not-registered')
+      } else {
+        errorText.value = 'Could not reach the server. Make sure the backend is running.'
+      }
+      return
+    }
+    // Users without a username never completed signup (or were created by old buggy code).
+    if (!dbUser.username) {
+      await signOutUser()
+      router.push('/signup?error=not-registered')
+      return
+    }
     goNext()
   } catch (err) {
     if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
@@ -78,7 +114,7 @@ const resetInput = ref(null)
 const forgotLink = ref(null)
 
 function openReset() {
-  resetEmail.value = email.value
+  resetEmail.value = loginInput.value.includes('@') ? loginInput.value : ''
   resetError.value = ''
   resetSuccess.value = ''
   showReset.value = true
