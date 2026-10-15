@@ -214,11 +214,11 @@ function confirmSleep() {
   sleepOn(sleepItem.value.name, holdMs.value / 3600000)
   closeSleep()
 }
-// Plan a budget pop-up: tick must haves, enter a budget, then see the best mix at today's best prices.
+// Plan a budget pop-up: enter a budget, tick and rank the items to include, then see the best mix at today's best prices.
 // Items on hold are left out, since they are still being slept on.
 const showBudget = ref(false)
 const budget = ref('')
-const mustHaves = ref([])
+const included = ref([])
 const plan = ref(null)
 const planIndex = ref(0)
 const budgetInput = ref(null)
@@ -238,7 +238,7 @@ function openBudget(event) {
   budgetOpener = event.currentTarget
   plan.value = null
   budgetError.value = ''
-  mustHaves.value = mustHaves.value.filter(function (name) {
+  included.value = included.value.filter(function (name) {
     return plannable.value.some(function (item) { return item.name === name })
   })
   showBudget.value = true
@@ -250,7 +250,7 @@ function closeBudget() {
   nextTick(() => budgetOpener?.focus())
 }
 
-// Any change to the budget or must haves clears the old answer, so it never shows a stale mix.
+// Any change to the budget or the ticked items clears the old answer, so it never shows a stale mix.
 function clearPlan() {
   plan.value = null
   budgetError.value = ''
@@ -263,7 +263,7 @@ function findPlan() {
     plan.value = null
     return
   }
-  if (!mustHaves.value.length) {
+  if (!included.value.length) {
     budgetError.value = 'Tick at least one item you want.'
     plan.value = null
     return
@@ -273,7 +273,7 @@ function findPlan() {
     return rankOf(item.name) > 0
   }).map(function (item) {
     const now = best(item)
-    return { name: item.name, price: now.price, store: now.store, rank: mustHaves.value.indexOf(item.name) + 1 }
+    return { name: item.name, price: now.price, store: now.store, rank: included.value.indexOf(item.name) + 1 }
   })
   plan.value = planBudget(items, amount, 5)
   planIndex.value = 0
@@ -287,35 +287,35 @@ const option = computed(function () {
   return plan.value && plan.value.options.length ? plan.value.options[planIndex.value] : null
 })
 
-// Must haves are ranked by their place in mustHaves: ticking one adds it at the bottom,
+// Ticked items are ranked by their place in included: ticking one adds it at the bottom,
 // and picking a number moves it to that place, so no two share a rank.
 function rankOf(name) {
-  return mustHaves.value.indexOf(name) + 1
+  return included.value.indexOf(name) + 1
 }
 
 function setRank(name, event) {
-  const list = mustHaves.value.filter(function (other) { return other !== name })
+  const list = included.value.filter(function (other) { return other !== name })
   list.splice(Number(event.target.value) - 1, 0, name)
-  mustHaves.value = list
+  included.value = list
   clearPlan()
 }
 
-// The picked items with must haves first, in priority order, then the rest.
+// The picked items in priority order. Only ticked items are planned, so every one has a rank.
 const pickedItems = computed(function () {
   if (!option.value) {
     return []
   }
   return option.value.items.slice().sort(function (a, b) {
-    return (a.rank || Infinity) - (b.rank || Infinity)
+    return a.rank - b.rank
   })
 })
 
 // Ticked items that did not make it into this option, when they could not all fit together.
-const missedMustHaves = computed(function () {
+const missedItems = computed(function () {
   if (!option.value) {
     return []
   }
-  return mustHaves.value.filter(function (name) {
+  return included.value.filter(function (name) {
     return !option.value.items.some(function (item) { return item.name === name })
   })
 })
@@ -484,14 +484,14 @@ function cheapestPlannable() {
           <ul class="fd-budget-items">
             <li v-for="item in plannable" :key="item.name">
               <input
-                :id="'must-' + item.name"
-                v-model="mustHaves"
+                :id="'include-' + item.name"
+                v-model="included"
                 class="form-check-input"
                 type="checkbox"
                 :value="item.name"
                 @change="clearPlan"
               />
-              <label class="fd-budget-item-label" :for="'must-' + item.name">
+              <label class="fd-budget-item-label" :for="'include-' + item.name">
                 <span>{{ item.name }}</span>
               </label>
               <select
@@ -501,7 +501,7 @@ function cheapestPlannable() {
                 :aria-label="'Priority for ' + item.name + ', 1 is highest'"
                 @change="setRank(item.name, $event)"
               >
-                <option v-for="n in mustHaves.length" :key="n" :value="n">{{ n }}</option>
+                <option v-for="n in included.length" :key="n" :value="n">{{ n }}</option>
               </select>
             </li>
           </ul>
@@ -519,7 +519,7 @@ function cheapestPlannable() {
         <template v-if="option">
           <p v-if="!plan.mustFits" class="alert alert-secondary mb-3">
             Your ticked items come to {{ sgd(plan.mustTotal) }}, which is over your budget, so not all of them fit.
-            <template v-if="missedMustHaves.length">This mix leaves out {{ missedMustHaves.join(', ') }}.</template>
+            <template v-if="missedItems.length">This mix leaves out {{ missedItems.join(', ') }}.</template>
           </p>
           <p v-if="planIndex === 0" class="mb-2"><span class="fd-best">Best combination</span></p>
           <ul class="fd-budget-pick">
@@ -1012,7 +1012,7 @@ function cheapestPlannable() {
   margin: 0;
 }
 
-/* Priority number beside a ticked must have. */
+/* Priority number beside a ticked item. */
 .fd-rank {
   flex-shrink: 0;
   width: 4.5rem;
