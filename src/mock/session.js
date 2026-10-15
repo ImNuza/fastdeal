@@ -271,17 +271,48 @@ export async function toggleEmail() {
   }
 }
 
-// Sleep on it: the wishlist item is greyed out until the hold ends. Saves it first if needed.
-export function sleepOn(name, hours) {
+// Sleep on it: save the starting price and expiry time.
+export function sleepOn(name, hours, priceAtStart) {
   if (!user.value) {
     return
   }
+
   saveProduct(name)
-  findSaved(name).sleepUntil = Date.now() + hours * 3600000
+
+  const item = findSaved(name)
+
+  // Existing countdown functionality
+  item.sleepUntil = Date.now() + hours * 3600000
+
+  // NEW: Record the price when the user starts sleeping on it
+  item.sleepPriceAtStart =
+    Number.isFinite(priceAtStart) && priceAtStart > 0
+      ? priceAtStart
+      : null
+
+  // NEW: Reset whether the user has viewed the verdict
+  item.sleepVerdictSeen = false
+
   persist()
 }
 
-export function isAsleep(name, now) {
+// NEW: Remember when a user closes the verdict
+export function markSleepVerdictSeen(name) {
   const item = findSaved(name)
-  return Boolean(item && item.sleepUntil > (now || Date.now()))
+
+  if (!item) return
+
+  item.sleepVerdictSeen = true
+  persist()
+}
+
+// Check whether a product is still sleeping
+export function isAsleep(name, now = Date.now()) {
+  const item = findSaved(name)
+
+  if (!item) {
+    return false
+  }
+
+  return Boolean(item.sleepUntil && item.sleepUntil > now)
 }
