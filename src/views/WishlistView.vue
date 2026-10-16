@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { fetchCheapestLiveListing } from '../services/livePriceService.js'
 import { cheapestListing, productImage, sgd, storeLink } from '../mock/catalog.js'
 import { addSampleWishlist, isAsleep, missingSamples, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user } from '../mock/session.js'
 import FdIcon from '../components/FdIcon.vue'
@@ -144,6 +145,8 @@ const units = [
   { key: 'minutes', label: 'Minutes', size: 1, more: 'One more minute', less: 'One less minute' }
 ]
 const sleepItem = ref(null)
+const sleepLoading = ref(false)
+const sleepError = ref('')
 const holdTotal = ref(1440)
 const sleepDialog = ref(null)
 let sleepOpener = null
@@ -207,22 +210,46 @@ function closeSleep() {
   nextTick(() => sleepOpener?.focus())
 }
 
-function confirmSleep() {
-  if (!holdMs.value) {
+
+async function confirmSleep() {
+  if (!sleepItem.value || !holdMs.value || sleepLoading.value) {
     return
   }
 
-  // NEW: Capture the product's price when Sleep On It begins
-  const priceAtStart = Number(best(sleepItem.value)?.price)
+  sleepLoading.value = true
+  sleepError.value = ''
 
-  sleepOn(
-    sleepItem.value.name,
-    holdMs.value / 3600000,
-    priceAtStart
-  )
+  try {
+    const productName = sleepItem.value.name
 
-  closeSleep()
+    // Retrieve the cheapest comparable listing from SerpApi
+    const listing = await fetchCheapestLiveListing(productName)
+
+    // Record the live starting price
+    const priceAtStart = listing.price
+
+    // Start the countdown using the real price
+    sleepOn(
+      productName,
+      holdMs.value / 3600000,
+      priceAtStart
+    )
+
+    console.log('[Sleep On It] Live starting price:', {
+      product: productName,
+      store: listing.store,
+      price: priceAtStart
+    })
+
+    closeSleep()
+  } catch (error) {
+    sleepError.value = error.message || 'Could not retrieve live prices'
+    console.error('[Sleep On It]', error)
+  } finally {
+    sleepLoading.value = false
+  }
 }
+
 
 // =====================================
 // SLEEP ON IT - PURCHASE VERDICT
@@ -231,6 +258,12 @@ function confirmSleep() {
 // Which product's verdict is currently displayed?
 const verdictItem = ref(null)
 const verdictDialog = ref(null)
+const verdictLatestPrice = ref(null)
+const verdictLoading = ref(false)
+const verdictError = ref('')
+
+// Prevent an older API response from changing a newer verdict.
+let verdictRequestId = 0
 
 // Check whether the Sleep On It timer has expired
 function hasFinishedSleep(item) {
@@ -244,11 +277,15 @@ function hasFinishedSleep(item) {
 
 // Calculate the percentage change and purchase verdict
 function verdictData(item) {
-  const start = item.sleepPriceAtStart
-  const latest = Number(best(item)?.price)
+  const start = Number(item.sleepPriceAtStart)
+  const latest = verdictLatestPrice.value
 
-  // Cannot calculate a verdict without valid prices
-  if (!Number.isFinite(latest) || latest < 0) {
+  if (
+    !Number.isFinite(start) ||
+    start <= 0 ||
+    !Number.isFinite(latest) ||
+    latest <= 0
+  ) {
     return null
   }
 
@@ -304,21 +341,61 @@ const activeVerdict = computed(() => {
 })
 
 // Open the Purchase Verdict pop-up
-function openVerdict(item) {
+
+async function openVerdict(item) {
+  const requestId = ++verdictRequestId
+
   verdictItem.value = item
+  verdictLatestPrice.value = null
+  verdictLoading.value = true
+  verdictError.value = ''
 
   nextTick(() => {
     verdictDialog.value?.querySelector('button')?.focus()
   })
+
+  try {
+    // Get the cheapest comparable price from SerpApi
+    const listing = await fetchCheapestLiveListing(item.name)
+
+    // Ignore outdated responses if the dialog has changed
+    if (requestId !== verdictRequestId) return
+
+    verdictLatestPrice.value = listing.price
+
+    console.log('[Sleep On It] Live ending price:', {
+      product: item.name,
+      store: listing.store,
+      price: listing.price
+    })
+  } catch (error) {
+    if (requestId !== verdictRequestId) return
+
+    verdictError.value =
+      error.message || 'Unable to retrieve the latest product price'
+
+    console.error('[Sleep On It] Verdict price lookup failed:', error)
+  } finally {
+    if (requestId === verdictRequestId) {
+      verdictLoading.value = false
+    }
+  }
 }
+
 
 // Close the pop-up and mark the verdict as viewed
 function closeVerdict() {
+  // Invalidate any pending API response
+  verdictRequestId++
+
   if (verdictItem.value) {
     markSleepVerdictSeen(verdictItem.value.name)
   }
 
   verdictItem.value = null
+  verdictLatestPrice.value = null
+  verdictLoading.value = false
+  verdictError.value = ''
 }
 
 // Watch for expired timers
@@ -689,12 +766,23 @@ function cheapestPlannable() {
       </h2>
 
       <p class="fd-entry-description">
-        Your waiting period for
+       Your waiting period for
         <strong>{{ verdictItem.name }}</strong>
         has ended.
       </p>
 
-      <template v-if="activeVerdict">
+      <p v-if="verdictLoading" class="alert alert-secondary" role="status">
+        Checking the latest price from SerpApi...
+      </p>
+
+      <p v-else-if="verdictError" class="alert alert-danger" role="alert">
+        {{ verdictError }}
+        <button class="btn btn-outline-dark btn-sm d-block mt-2" type="button" @click="openVerdict(verdictItem)">
+          Try again
+        </button>
+      </p>
+
+      <template v-else-if="activeVerdict">
 
         <!-- Price comparison -->
         <div class="fd-verdict-prices">
@@ -749,12 +837,6 @@ function cheapestPlannable() {
         Latest price unavailable.
         We cannot calculate a verdict yet.
       </p>
-
-      <p class="small text-secondary">
-        Currently based on FastDeal's demo catalogue.
-        This verdict reflects price movement only.
-      </p>
-
       <button class="btn btn-dark fd-btn-lg w-100" type="button" @click="closeVerdict">
         Got it
       </button>
@@ -772,7 +854,10 @@ function cheapestPlannable() {
         head.
       </p>
 
-      <form @submit.prevent="confirmSleep">
+    <form @submit.prevent="confirmSleep">
+        <p v-if="sleepError" class="alert alert-danger" role="alert">
+          {{ sleepError }}
+        </p>
         <fieldset class="mb-4">
           <legend class="fd-hold-legend">Lock it for</legend>
           <div class="fd-hold-picker">
@@ -799,8 +884,10 @@ function cheapestPlannable() {
           </p>
         </fieldset>
 
-        <div class="fd-entry-actions">
-          <button class="btn btn-dark fd-btn-lg" type="submit" :disabled="!holdMs">Proceed</button>
+      <div class="fd-entry-actions">
+          <button class="btn btn-dark fd-btn-lg" type="submit" :disabled="!holdMs || sleepLoading">
+            {{ sleepLoading ? 'Checking live prices...' : 'Proceed' }}
+          </button>
           <button class="btn btn-outline-dark fd-btn-lg" type="button" @click="closeSleep">Cancel</button>
         </div>
       </form>
