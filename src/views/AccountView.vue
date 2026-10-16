@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { toggleEmail, user, authReady } from '../mock/session.js'
 import { signOutUser } from '../services/auth.js'
 
-
 const router = useRouter()
 
 // Wait for Firebase to restore session before redirecting unauthenticated users.
