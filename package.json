@@ -15,6 +15,7 @@
     "express": "^4.21.2",
     "firebase": "^13.0.0",
     "mongoose": "^8.19.2",
+    "multer": "^2.4.0",
     "nodemailer": "^10.1.0",
     "serpapi": "2.1.0",
     "vue": "^3.4.38",

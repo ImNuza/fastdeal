@@ -4,12 +4,13 @@ import 'dotenv/config'
 import express from 'express'
 import fs from 'fs'
 import mongoose from 'mongoose'
+import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import User from './models/user-model.js'
 import Friendship from './models/friendship-model.js'
 import { toPairKey } from './models/pair-key.js'
-import { search } from './models/shoppingapimodel.js'
+import { search,identifyImage } from './models/shoppingapimodel.js'
 
 
 
@@ -23,6 +24,7 @@ const PORT = process.env.PORT || 3000
 const proposalPath = path.join(__dirname, 'data', 'proposal.json')
 const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd-v3.html')
 const erdPresentPath = path.join(__dirname, 'docs', 'fastdeal-erd-present.html')
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } })
 
 app.get('/health', (req, res) => {
   res.json({ ok: true })
@@ -252,6 +254,16 @@ app.get('/api/search', async (req, res) => {
   try {
     const result = await search(req.query.q)
     res.json(result)
+  } catch (error) {
+    res.status(400).json({ error: error.message })
+  }
+})
+
+app.post('/api/identify-image', upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'photo required' })
+    const name = await identifyImage(req.file.buffer.toString('base64'), req.file.mimetype)
+    res.json({ name })
   } catch (error) {
     res.status(400).json({ error: error.message })
   }

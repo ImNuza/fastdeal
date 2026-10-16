@@ -7,6 +7,8 @@ import FdIcon from '../components/FdIcon.vue'
 const router = useRouter()
 const query = ref('')
 const photoName = ref('')
+const photoError = ref('')
+const photoBusy = ref(false)
 
 function go(name) {
   const q = String(name || '').trim()
@@ -72,15 +74,30 @@ function onQueryKey(event) {
   }
 }
 
-function onPhoto(event) {
+async function onPhoto(event) {
   const file = event.target.files[0]
   if (!file) {
     return
   }
-  const name = nameFromFile(file.name)
-  photoName.value = name
-  router.push({ path: '/compare', query: { q: name, from: 'photo' } })
+  photoError.value = ''
+  photoName.value = ''
+  photoBusy.value = true
+  try{
+    const form=new FormData()
+    form.append('photo', file)
+    const res = await fetch('/api/identify-image', { method: 'POST', body: form })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Could not identify the photo')
+    photoName.value = data.name
+    router.push({ path: '/compare', query: { q: data.name, from: 'photo' } })
+  } catch (e) {
+    photoError.value = e.message
+  } finally {
+    photoBusy.value = false
+    event.target.value = ''
+  }
 }
+
 
 // Hero
 
@@ -403,6 +420,8 @@ onBeforeUnmount(function () {
           </li>
         </ul>
       </form>
+      <p v-if="photoBusy" class="fd-search-text small mt-3 mb-0 text-center">Processing your photo…</p>
+      <p v-if="photoError" class="fd-search-text small mt-3 mb-0 text-center">{{ photoError }}</p>
       <p v-if="photoName" class="fd-search-text small mt-3 mb-0 text-center">Identified as {{ photoName }}</p>
 
       <!-- Search history: placeholder, not built yet. -->
