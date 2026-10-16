@@ -1,4 +1,6 @@
-import dotenv from 'dotenv'
+// import dotenv from 'dotenv'
+// dotenv.config()
+import 'dotenv/config'
 import express from 'express'
 import fs from 'fs'
 import mongoose from 'mongoose'
@@ -7,8 +9,9 @@ import { fileURLToPath } from 'url'
 import User from './models/user-model.js'
 import Friendship from './models/friendship-model.js'
 import { toPairKey } from './models/pair-key.js'
+import { search } from './models/shoppingapimodel.js'
 
-dotenv.config()
+
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -242,6 +245,28 @@ app.delete('/api/friends/:pairKey', async (req, res) => {
 app.get('/api/proposal', (req, res) => {
   const raw = fs.readFileSync(proposalPath, 'utf8')
   res.json(JSON.parse(raw))
+})
+
+// Run a Google Shopping search, store it to src/mock/last-search.json, return it.
+app.get('/api/search', async (req, res) => {
+  try {
+    const result = await search(req.query.q)
+    res.json(result)
+  } catch (error) {
+    res.status(400).json({ error: error.message })
+  }
+})
+
+// Serve the raw SerpAPI response written by the last search. CompareView fetches
+// this (not /mock/tempitem.json, which the Vite dev server rewrites to index.html).
+app.get('/api/tempitem', (req, res) => {
+  const tempItemPath = path.join(__dirname, 'src', 'mock', 'tempitem.json')
+  try {
+    const raw = fs.readFileSync(tempItemPath, 'utf8')
+    res.type('application/json').send(raw)
+  } catch (error) {
+    res.status(404).json({ error: 'No search result yet' })
+  }
 })
 
 // Database ERD for the team and graders

@@ -18,6 +18,28 @@ const freeOnly = ref(false)
 const saleOnly = ref(false)
 const sortBy = ref('price')
 const note = ref('')
+// Image URLs that failed to load, so those cards show the placeholder instead.
+const brokenImages = ref({})
+
+// Unique per card. store + price alone collides when one store lists the same
+// price twice (it does in tempitem.json), so live rows carry SerpAPI's product id.
+function rowKey(row) {
+  return row.id || row.store + row.price
+}
+
+function onImgError(row) {
+  brokenImages.value = Object.assign({}, brokenImages.value, { [rowKey(row)]: true })
+}
+
+function hasImage(row) {
+  return !!row.image && !brokenImages.value[rowKey(row)]
+}
+
+// First letter of the store name, for the placeholder tile.
+function storeInitial(row) {
+  const s = String(row.store || '').trim()
+  return s ? s.charAt(0).toUpperCase() : '?'
+}
 
 const verdict = computed(function () {
   if (!result.value) {
@@ -138,7 +160,87 @@ function onSleep() {
   note.value = 'Saved to wishlist and on hold for 1 day.'
 }
 
-onMounted(function () {
+// Map one raw SerpAPI shopping_results item into the row shape the cards use
+// (name, image, store, price, rating, reviews, freeShipping, onSale).
+function toRow(item, index) {
+  const price = Number(item.extracted_price)
+  const rating = Number(item.rating)
+  const reviews = Number(item.reviews)
+  const delivery = String(item.delivery || '').toLowerCase()
+  return {
+    id: String(item.product_id || '') + '-' + (item.position || index),
+    name: item.title || '',
+    image: item.thumbnail || '',
+    store: item.source || 'Unknown',
+    price: Number.isFinite(price) ? price : 0,
+    rating: Number.isFinite(rating) ? rating : 0,
+    reviews: Number.isFinite(reviews) ? reviews : 0,
+    freeShipping: delivery.indexOf('free') !== -1,
+    onSale: item.old_price != null
+  }
+}
+
+// Seed the price-range filter from whatever listings ended up on the result.
+function seedPriceRange(listings) {
+  if (!listings.length) {
+    minPrice.value = 0
+    maxPrice.value = 0
+    return
+  }
+  let low = listings[0].price
+  let high = listings[0].price
+  for (let i = 1; i < listings.length; i++) {
+    if (listings[i].price < low) {
+      low = listings[i].price
+    }
+    if (listings[i].price > high) {
+      high = listings[i].price
+    }
+  }
+  minPrice.value = low
+  maxPrice.value = high
+}
+
+// Title-case the search query for the product heading, since SerpAPI's per-item
+// titles are each a different variant (e.g. "...Pro", "...Pro XL").
+function titleCase(text) {
+  return String(text || '').replace(/\b\w/g, function (c) { return c.toUpperCase() })
+}
+
+// Run the live SerpAPI search on the server, then read src/mock/tempitem.json
+// (the raw response Vite serves as a static asset). Returns { name, listings }
+// built from the first 10 usable results, or null if nothing usable came back.
+async function loadLive(q) {
+  try {
+    // Server calls SerpAPI and writes src/mock/tempitem.json before responding.
+    // If that call fails, still read whatever tempitem.json already holds.
+    await fetch('/api/search?q=' + encodeURIComponent(q)).catch(function () {})
+    // Read the raw response via the Express route (the Vite dev server rewrites
+    // a direct /mock/tempitem.json request to index.html, so we can't fetch that).
+    const res = await fetch('/api/tempitem?t=' + Date.now())
+    if (!res.ok) {
+      return null
+    }
+    const raw = await res.json()
+    const results = Array.isArray(raw.shopping_results) ? raw.shopping_results : []
+    const rowsOut = []
+    for (let i = 0; i < results.length && rowsOut.length < 10; i++) {
+      const row = toRow(results[i], i)
+      if (row.price > 0) {
+        rowsOut.push(row)
+      }
+    }
+    if (!rowsOut.length) {
+      return null
+    }
+    const q2 = raw.search_parameters && raw.search_parameters.q
+    return { name: titleCase(q2 || q), listings: rowsOut }
+  } catch (err) {
+    return null
+  }
+}
+
+onMounted(async function () {
   const q = String(route.query.q || '').trim()
   if (!q) {
     loading.value = false
@@ -146,29 +248,26 @@ onMounted(function () {
     return
   }
   if (q.toLowerCase() === 'fail') {
-    setTimeout(function () {
-      loading.value = false
-      failed.value = true
-    }, 700)
+    loading.value = false
+    failed.value = true
     return
   }
-  setTimeout(function () {
-    const built = buildResult(q)
-    result.value = built
-    let low = built.listings[0].price
-    let high = built.listings[0].price
-    for (let i = 1; i < built.listings.length; i++) {
-      if (built.listings[i].price < low) {
-        low = built.listings[i].price
-      }
-      if (built.listings[i].price > high) {
-        high = built.listings[i].price
-      }
-    }
-    minPrice.value = low
-    maxPrice.value = high
-    loading.value = false
-  }, 700)
+
+  // Mock supplies the 14-day price history and related items (SerpAPI returns
+  // neither). The product name, the listings table and the verdict all come
+  // from the live tempitem.json when it has usable results; otherwise the whole
+  // result falls back to mock so the demo never breaks.
+  const built = buildResult(q)
+  const live = await loadLive(q)
+  if (live) {
+    built.name = live.name
+    built.listings = live.listings
+    // verdict is a computed over result.listings + result.history, so it now
+    // reflects the live listings while history/related stay from the mock.
+  }
+  result.value = built
+  seedPriceRange(built.listings)
+  loading.value = false
 })
 </script>
 
@@ -245,42 +344,47 @@ onMounted(function () {
 
     <p v-if="!rows.length" class="alert alert-warning">No listings match these filters.</p>
 
-    <div v-else class="table-responsive mb-4">
-      <table class="table table-bordered align-middle">
-        <thead>
-          <tr>
-            <th>Price</th>
-            <th>Store</th>
-            <th>Rating</th>
-            <th>Reviews</th>
-            <th>Shipping</th>
-            <th>Sale</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in rows" :key="row.store + row.price" :class="{ cheapest: row.price === lowInView }">
-            <td>
+    <ul v-else class="fd-card-grid" role="list">
+      <li v-for="row in rows" :key="rowKey(row)">
+        <article class="fd-listing-card" :class="{ cheapest: row.price === lowInView }">
+          <div class="fd-listing-media">
+            <img
+              v-if="hasImage(row)"
+              :src="row.image"
+              :alt="row.name || result.name"
+              class="fd-listing-img"
+              loading="lazy"
+              @error="onImgError(row)"
+            />
+            <div v-else class="fd-listing-ph" aria-hidden="true">{{ storeInitial(row) }}</div>
+            <span v-if="row.price === lowInView" class="badge text-bg-success fd-listing-badge">
+              Cheapest
+            </span>
+          </div>
+
+          <div class="fd-listing-body">
+            <h3 class="fd-listing-name" :title="row.name || result.name">{{ row.name || result.name }}</h3>
+            <p class="fd-listing-price">
               {{ sgd(row.price) }}
-              <span v-if="row.price === lowInView" class="badge text-bg-success ms-1">Cheapest</span>
-            </td>
-            <td>{{ row.store }}</td>
-            <td>{{ row.rating.toFixed(1) }}</td>
-            <td>{{ row.reviews }}</td>
-            <td>{{ row.freeShipping ? 'Free' : 'Paid' }}</td>
-            <td>{{ row.onSale ? 'Yes' : 'No' }}</td>
-            <td>
-              <button
-                class="btn btn-sm btn-outline-dark"
-                type="button"
-                :disabled="savedFrom(result.name) === row.store"
-                @click="onSaveFrom(row)"
-              >{{ savedFrom(result.name) === row.store ? 'Saved' : isSaved(result.name) ? 'Save from here instead' : 'Save from here' }}</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+              <span v-if="row.price === lowInView" class="visually-hidden">(cheapest listing)</span>
+            </p>
+            <p class="fd-listing-store">{{ row.store }}</p>
+            <p class="fd-listing-meta">
+              <span :aria-label="'Rating ' + row.rating.toFixed(1) + ' out of 5'">★ {{ row.rating.toFixed(1) }}</span>
+              <span aria-hidden="true"> · </span>
+              <span>{{ row.reviews }} reviews</span>
+            </p>
+          </div>
+
+          <button
+            class="btn btn-sm btn-outline-dark fd-listing-save"
+            type="button"
+            :disabled="savedFrom(result.name) === row.store"
+            @click="onSaveFrom(row)"
+          >{{ savedFrom(result.name) === row.store ? 'Saved' : isSaved(result.name) ? 'Save from here instead' : 'Save from here' }}</button>
+        </article>
+      </li>
+    </ul>
 
     <h2 class="fd-section-title">Price history</h2>
     <p class="small text-secondary">Last 14 days. Taller bar means a higher price.</p>
@@ -305,3 +409,125 @@ onMounted(function () {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Listings as a responsive card grid: 4 per row on wide screens, down to 1 on phones. */
+.fd-card-grid {
+  display: grid;
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 576px) {
+  .fd-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .fd-card-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1200px) {
+  .fd-card-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.fd-listing-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0.75rem;
+  border: var(--fd-border, 1px) solid var(--fd-vanilla-line, #e4ddcf);
+  border-radius: 1rem;
+  background: var(--fd-paper, #fff);
+  color: var(--fd-text, #1a1a1a);
+}
+
+/* The cheapest listing is highlighted, mirroring the old table row. */
+.fd-listing-card.cheapest {
+  border-color: var(--fd-green, #2f6b47);
+  box-shadow: 0 0 0 2px var(--fd-green, #2f6b47);
+}
+
+.fd-listing-media {
+  position: relative;
+  margin-bottom: 0.75rem;
+}
+
+.fd-listing-img,
+.fd-listing-ph {
+  display: block;
+  width: 100%;
+  height: 150px;
+  border-radius: 0.75rem;
+  background: var(--fd-beige, #f3ede1);
+}
+
+.fd-listing-img {
+  object-fit: contain;
+}
+
+/* Placeholder tile when a listing has no image or it fails to load. */
+.fd-listing-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fd-text-muted, #6b6b6b);
+  font-family: var(--fd-font-display, inherit);
+  font-size: 2.5rem;
+}
+
+.fd-listing-badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+}
+
+.fd-listing-body {
+  flex: 1;
+}
+
+.fd-listing-name {
+  margin: 0 0 0.25rem;
+  font-size: var(--fd-body, 1rem);
+  font-weight: 600;
+  line-height: 1.3;
+  /* Clamp long titles to two lines so cards stay even height. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.fd-listing-price {
+  margin: 0 0 0.125rem;
+  color: var(--fd-blue, #1f4fd8);
+  font-family: var(--fd-font-display, inherit);
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.fd-listing-store {
+  margin: 0 0 0.125rem;
+  color: var(--fd-text, #1a1a1a);
+  font-size: var(--fd-small, 0.875rem);
+}
+
+.fd-listing-meta {
+  margin: 0;
+  color: var(--fd-text-muted, #6b6b6b);
+  font-size: var(--fd-small, 0.875rem);
+}
+
+.fd-listing-save {
+  margin-top: 0.75rem;
+  width: 100%;
+}
+</style>

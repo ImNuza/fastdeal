@@ -16,6 +16,7 @@
     "firebase": "^13.0.0",
     "mongoose": "^8.19.2",
     "nodemailer": "^10.1.0",
+    "serpapi": "2.1.0",
     "vue": "^3.4.38",
     "vue-router": "^4.6.4"
   },

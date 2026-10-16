@@ -1,0 +1,114 @@
+{
+  "query": "Sony WH-1000XM5",
+  "searchTerm": "Sony WH 1000XM5",
+  "fullQuery": "\"Sony WH 1000XM5\"",
+  "minPrice": 300,
+  "productKey": "sony wh-1000xm5",
+  "listings": [
+    {
+      "store": "Gain City Best Electric",
+      "price": 329,
+      "rating": 4.4,
+      "reviews": 1600,
+      "freeShipping": false,
+      "onSale": false
+    },
+    {
+      "store": "Grooves-Inc.com",
+      "price": 306.35,
+      "rating": 4.6,
+      "reviews": 15000,
+      "freeShipping": false,
+      "onSale": true
+    },
+    {
+      "store": "Lazada Singapore",
+      "price": 329,
+      "rating": 4.6,
+      "reviews": 15000,
+      "freeShipping": false,
+      "onSale": false
+    },
+    {
+      "store": "thetechyard.com",
+      "price": 469,
+      "rating": 4.6,
+      "reviews": 15000,
+      "freeShipping": false,
+      "onSale": false
+    },
+    {
+      "store": "selfridges.com",
+      "price": 470,
+      "rating": 0,
+      "reviews": 0,
+      "freeShipping": false,
+      "onSale": false
+    },
+    {
+      "store": "D-Lifestylesg",
+      "price": 329,
+      "rating": 1,
+      "reviews": 1,
+      "freeShipping": false,
+      "onSale": false
+    },
+    {
+      "store": "Lazada Singapore",
+      "price": 324,
+      "rating": 4.6,
+      "reviews": 15000,
+      "freeShipping": false,
+      "onSale": false
+    },
+    {
+      "store": "Stereo Electronics",
+      "price": 309,
+      "rating": 4.6,
+      "reviews": 15000,
+      "freeShipping": false,
+      "onSale": false
+    },
+    {
+      "store": "eBay - tfldealz",
+      "price": 455.47,
+      "rating": 4.7,
+      "reviews": 6200,
+      "freeShipping": false,
+      "onSale": true
+    },
+    {
+      "store": "Mygsm.me",
+      "price": 331.08,
+      "rating": 0,
+      "reviews": 0,
+      "freeShipping": false,
+      "onSale": false
+    },
+    {
+      "store": "Desertcart.ae",
+      "price": 404.34,
+      "rating": 5,
+      "reviews": 1,
+      "freeShipping": false,
+      "onSale": false
+    },
+    {
+      "store": "Desertcart.ae",
+      "price": 475.16,
+      "rating": 4.6,
+      "reviews": 15000,
+      "freeShipping": false,
+      "onSale": false
+    },
+    {
+      "store": "glotelho.cm",
+      "price": 394.56,
+      "rating": 3.5,
+      "reviews": 11,
+      "freeShipping": false,
+      "onSale": false
+    }
+  ],
+  "fetchedAt": "2026-10-16T07:26:17.020Z"
+}
