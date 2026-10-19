@@ -26,6 +26,9 @@ importers:
       nodemailer:
         specifier: ^10.1.0
         version: 10.1.0
+      serpapi:
+        specifier: 2.1.0
+        version: 2.1.0
       vue:
         specifier: ^3.4.38
         version: 3.5.43
@@ -1103,6 +1106,9 @@ packages:
   send@0.19.2:
     resolution: {integrity: sha512-VMbMxbDeehAxpOtWJXlcUS5E8iXh6QmN+BkRX1GARS3wRaXEEgzCcB10gTQazO42tpNIya8xIyNx8fll1OFPrg==}
     engines: {node: '>= 0.8.0'}
+
+  serpapi@2.1.0:
+    resolution: {integrity: sha512-iXydBe7yLEwSYlHUNG9QRlZfFxtbxpQ0kZf7HDmRC4vbzhUzBW9rU+zOw2K6bcA2D6/qTCXivtCB/hnZJFZNTQ==}
 
   serve-static@1.16.3:
     resolution: {integrity: sha512-x0RTqQel6g5SY7Lg6ZreMmsOzncHFU7nhnRWkKgWuMTu5NN0DR5oruckMqRvacAN9d5w6ARnRBXl9xhDCgfMeA==}
@@ -2373,6 +2379,8 @@ snapshots:
       statuses: 2.0.2
     transitivePeerDependencies:
       - supports-color
+
+  serpapi@2.1.0: {}
 
   serve-static@1.16.3:
     dependencies:
