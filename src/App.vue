@@ -1,7 +1,8 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { user } from './mock/session.js'
+import axios from 'axios'
+import { user, firebaseUser } from './mock/session.js'
 
 // Computed so the navbar username updates reactively whenever user logs in, out, or sets a username.
 const username = computed(() => user.value?.username || '')
@@ -94,6 +95,34 @@ function syncNavHeight() {
   }
 }
 
+//notification badge
+
+const unreadCount = ref(0)
+
+async function refreshUnread() {
+  if (!firebaseUser.value) {
+    unreadCount.value = 0
+    return
+  }
+  try {
+    const res = await axios.get('/api/notifications', { params: { id: firebaseUser.value.uid } })
+    unreadCount.value = res.data.filter(n => !n.read).length
+  } catch (err) {
+    console.log(err)
+  }
+}
+
+let timer = 0
+
+onMounted(function () {
+  refreshUnread()
+  timer = window.setInterval(refreshUnread, 5000)
+})
+
+onBeforeUnmount(function () {
+  window.clearInterval(timer)
+})
+
 onMounted(() => {
   syncNavHeight()
   navObserver = new ResizeObserver(syncNavHeight)
@@ -147,6 +176,7 @@ watch([() => route.path, user], maybeShowEntryDialog)
             <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/notifications') }" active-class="" exact-active-class="" to="/notifications">
               <FdIcon name="bell" />
               <span class="fd-icon-label">Notifications</span>
+              <span v-if="unreadCount" class="badge rounded-pill bg-danger" style="position: absolute; top: 0; right: 0; font-family: var(--fd-font-body);">{{ unreadCount }}</span>
             </router-link>
           </li>
           <li v-if="!user" class="nav-item">

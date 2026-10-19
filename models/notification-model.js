@@ -1,3 +1,4 @@
+import { type } from 'firebase/firestore/pipelines'
 import mongoose from 'mongoose'
 
 // One alert for one user. The Notifications page lists these, newest first.
@@ -58,6 +59,11 @@ const notificationSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
       immutable: true
+    },
+    
+    read:{
+      type:Boolean,
+      default:false
     }
   },
   {

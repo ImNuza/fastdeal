@@ -9,7 +9,7 @@ const searchLogSchema = new mongoose.Schema(
       required: true,
       index: true
     },
-
+  
     query: {
       type: String,
       required: true,
@@ -30,7 +30,17 @@ const searchLogSchema = new mongoose.Schema(
     searchedAt: {
       type: Date,
       default: Date.now
-    }
+    },
+
+    count:{
+      type:Number,
+      default:1
+    },
+
+    image: {
+      type: String,
+      default: ''
+    },
   },
   {
     versionKey: false

@@ -11,6 +11,12 @@ import User from './models/user-model.js'
 import Friendship from './models/friendship-model.js'
 import { toPairKey } from './models/pair-key.js'
 import { search,identifyImage } from './models/shoppingapimodel.js'
+import SearchLog from './models/search-log-model.js'
+import { toProductKey } from './models/product-key.js'
+import { error } from 'console'
+import Notification from './models/notification-model.js'
+import WishlistItem from './models/wishlist-item-model.js'
+
 
 
 
@@ -203,6 +209,18 @@ app.post('/api/friends/request', async (req, res) => {
     if (existing) return res.status(409).json({ error: 'Friendship already exists', status: existing.status })
     const f = await Friendship.create({ requesterUid: myUid, addresseeUid, pairKey })
     console.log('[POST /api/friends/request]', myUid, '→', addresseeUid)
+
+     //notification sending
+    const me = await User.findOne({ firebaseUid: myUid }).select('username')
+    await Notification.create({
+      firebaseUid: addresseeUid,
+      type: 'friend-request',
+      title: 'New friend request',
+      body: (me?.username || 'Someone') + ' sent you a friend request.',
+      link: '/friends',
+      fromUid: myUid
+    })
+
     res.status(201).json(f)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -221,6 +239,18 @@ app.put('/api/friends/:pairKey/accept', async (req, res) => {
     )
     if (!f) return res.status(404).json({ error: 'Request not found' })
     console.log('[PUT /api/friends/accept]', req.params.pairKey)
+
+    //notification sending
+    const me = await User.findOne({ firebaseUid: myUid }).select('username')
+    await Notification.create({
+      firebaseUid: f.requesterUid,
+      type: 'friend-accepted',
+      title: 'Friend request accepted',
+      body: (me?.username || 'Someone') + ' accepted your friend request.',
+      link: '/friends',
+      fromUid: myUid
+    })
+
     res.json(f)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -253,9 +283,20 @@ app.get('/api/proposal', (req, res) => {
 app.get('/api/search', async (req, res) => {
   try {
     const result = await search(req.query.q)
+    try {
+      await SearchLog.create({
+        sessionId:1,
+        productKey: result.productKey,
+        query: result.query,
+        productName: result.searchTerm,
+        image: result.listings[0]?.image || ''
+      })
+    } catch (error) {
+      console.log(error)
+    }
     res.json(result)
   } catch (error) {
-    res.status(400).json({ error: error.message })
+    console.log(error)
   }
 })
 
@@ -278,6 +319,76 @@ app.get('/api/tempitem', (req, res) => {
     res.type('application/json').send(raw)
   } catch (error) {
     res.status(404).json({ error: 'No search result yet' })
+  }
+})
+
+//helper function to retrieve trending page
+async function topSince(since) {
+  return SearchLog.aggregate([
+    { $match: { searchedAt: { $gte: since } } },
+    { $sort: { searchedAt: -1 } },
+    { $group: {
+        _id: '$productKey',
+        query: { $first: '$productName' },
+        image: { $first: '$image' },
+        count: { $sum: 1 }
+    } },
+    { $sort: { count: -1 } },
+    { $limit: 13 }
+  ])
+}
+
+//retrieve data for trending page
+app.get('/api/trending' , async (req,res) =>{
+  try {
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+
+    const weekAgo = new Date()
+    weekAgo.setDate(weekAgo.getDate() - 7)
+
+    res.json({
+      today: await topSince(startOfToday),
+      week: await topSince(weekAgo)
+    })
+  }catch (error){
+    console.log(error)
+  }
+
+})
+
+//retrieve notifications
+app.get('/api/notifications',async(req,res)=>{
+  const id=req.query.id
+  try {
+    const rows = await Notification.find({ firebaseUid: id }).sort({ createdAt: -1 })
+    res.json(rows)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.put('/api/notifications/:id/read', async (req, res) => {
+  try {
+    await Notification.updateOne(
+      { _id: req.params.id },
+      { $set: { read: true, readAt: new Date() } }
+    )
+    res.json({ ok: true })
+  } catch (err) {
+    console.log(err)
+  }
+})
+
+app.put('/api/notifications/read-all', async (req, res) => {
+  try {
+    await Notification.updateMany(
+      { firebaseUid: req.query.id, read: false },
+      { $set: { read: true, readAt: new Date() } }
+    )
+    res.json({ ok: true })
+  } catch (err) {
+    console.log(err)
   }
 })
 

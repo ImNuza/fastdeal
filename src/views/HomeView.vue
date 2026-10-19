@@ -3,12 +3,15 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { catalog, dayLabel, nameFromFile } from '../mock/catalog.js'
 import FdIcon from '../components/FdIcon.vue'
+import axios from 'axios'
 
 const router = useRouter()
 const query = ref('')
 const photoName = ref('')
 const photoError = ref('')
 const photoBusy = ref(false)
+const trendingToday = ref([])
+const trendingWeek = ref([])
 
 function go(name) {
   const q = String(name || '').trim()
@@ -269,7 +272,37 @@ onMounted(function () {
   target = readTarget()
   current = target
   applySpread(current)
+
 })
+
+//trending page
+onMounted(async function retriveTrending() {
+ try {
+    const res = await axios.get('/api/trending')
+    trendingToday.value = res.data.today.slice(0,5)
+    
+    const shown = []
+    for (const t of trendingToday.value) {
+      shown.push(t._id)
+    }
+
+    trendingWeek.value = []
+    for (const item of res.data.week) {
+      if (!shown.includes(item._id)) {
+        if(trendingWeek.value.length<8){
+        trendingWeek.value.push(item)
+        }else{
+          continue
+        }
+      }
+    }
+  } catch (error) {
+    console.log(error)
+  }
+})
+
+
+
 
 onBeforeUnmount(function () {
   window.removeEventListener('scroll', onScroll)
@@ -437,6 +470,49 @@ onBeforeUnmount(function () {
     <section id="fd-trending">
       <h2 class="fd-section-title">Trending products</h2>
     </section>
+     <div class="container py-5">
+    <!-- Trending products: placeholder, not built yet. The id is the hero's "See what's trending" scroll target. -->
+      <section id="fd-trending" style="margin-bottom: 10px;">
+        <h2 class="fd-section-title">Trending Today</h2>
+      </section>
+      <div id="trendingCarousel" class="carousel slide" style="background: #fff; border: var(--fd-border) solid var(--fd-vanilla-line); border-radius: var(--fd-radius); padding-bottom: 1rem; overflow: hidden;">
+        <div class="carousel-inner">
+          <div v-for="(item,index) in trendingToday" class="carousel-item" :class="{ active: index === 0 }">
+             <router-link :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
+              <img :src="item.image" class="d-block mx-auto" style="width: 100%; height: 400px; object-fit: contain; background: #fff; border-radius: 8px;">
+              <div class="text-center">
+                <h3>{{ item.query }}</h3>
+              </div>
+             </router-link>
+          </div>
+        </div>
+        <div class="carousel-indicators" style="position: relative;">
+          <button  v-for="(item,index) in trendingToday" type="button" data-bs-target="#trendingCarousel" :data-bs-slide-to="index" :class="{ active: index === 0 }" aria-label="Slide" style="background-color: #25508c; width: 30px; height: 3px; border-radius: 35%; border: 0; margin: 0 4px;"></button>
+        </div>
+        
+        <button class="carousel-control-prev" type="button" data-bs-target="#trendingCarousel" data-bs-slide="prev">
+          <span aria-hidden="true" style="color: #25508c; font-size: 6rem; line-height: 1;">&lsaquo;</span>
+          <span class="visually-hidden">Previous</span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#trendingCarousel" data-bs-slide="next">
+          <span aria-hidden="true" style="color: #25508c; font-size: 6rem; line-height: 1;">&rsaquo;</span>
+          <span class="visually-hidden">Next</span>
+        </button>
+      </div>
+    </div>
+
+    <h3 class="fd-section-title">Trending This Week</h3>
+    <div class="row g-3 mt-4">
+      <div class="col-6 col-md-4 col-lg-3" v-for="item in trendingWeek" :key="item._id">
+        <router-link :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
+          <div class="card h-100" style="padding: 0.75rem; border-radius: 1rem;">
+            <img :src="item.image"  class="card-img-top" style="display: block; width: 100%; height: 150px; object-fit: contain; border-radius: 0.75rem; background: var(--fd-beige, #f3ede1); margin-bottom: 0.75rem;">
+            <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">{{ item.query }}</h5>
+          </div>
+        </router-link>
+      </div>
+    </div>
+
   </div>
 </template>
 
