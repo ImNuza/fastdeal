@@ -161,3 +161,26 @@ export async function search(q) {
 
   return result
 }
+
+
+export async function identifyImage(base64,mimeType) {
+  const res=await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`,{
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: 'Identify the retail product in this photo. Reply with ONLY the brand, ' +
+                  'model and product type as a shopping search term (e.g. "Sony WH-1000XM5 headphones"). ' +
+                  'If you are unsure of the model, give the brand and product type. ' +
+                  'If there is no product, reply with exactly: UNKNOWN' },
+          { inline_data: { mime_type: mimeType, data: base64 } }
+        ]
+      }]
+    })
+  })
+  const data = await res.json()
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+  if (!text || text === 'UNKNOWN') throw new Error('Could not identify a product in that photo')
+  return text
+}
