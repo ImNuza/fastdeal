@@ -52,6 +52,14 @@ export async function fetchCheapestLiveListing(productName) {
   const validListings = data.listings.filter(item =>
     isComparable(productName, item)
   )
+  console.table(
+    data.listings.map(item => ({
+      product: item.name,
+      store: item.store,
+      price: item.price,
+      accepted: isComparable(productName, item)
+    }))
+  )
 
   if (validListings.length === 0) {
     throw new Error('No comparable product listings found')
