@@ -1,4 +1,4 @@
-import { type } from 'firebase/firestore/pipelines'
+//import { type } from 'firebase/firestore/pipelines'
 import mongoose from 'mongoose'
 
 // One alert for one user. The Notifications page lists these, newest first.
@@ -73,6 +73,14 @@ const notificationSchema = new mongoose.Schema(
 
 // The Notifications page and the unread count.
 notificationSchema.index({ firebaseUid: 1, createdAt: -1 })
+
+notificationSchema.index(
+  { firebaseUid: 1, type: 1, productKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { type: 'sleep-ended' }
+  }
+)
 
 const Notification = mongoose.model('Notification', notificationSchema, 'notifications')
 

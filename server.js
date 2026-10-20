@@ -357,6 +357,64 @@ app.get('/api/trending' , async (req,res) =>{
 
 })
 
+
+app.post('/api/notifications/sleep-ended', async (req, res) => {
+  const { firebaseUid, productName, sleepUntil } = req.body
+
+  const expiry = Number(sleepUntil)
+
+  if (
+    typeof firebaseUid !== 'string' ||
+    !firebaseUid.trim() ||
+    typeof productName !== 'string' ||
+    !productName.trim() ||
+    !Number.isFinite(expiry) ||
+    expiry <= 0
+  ) {
+    return res.status(400).json({ error: 'Invalid sleep notification data' })
+  }
+
+  // Do not notify before the countdown expires.
+  if (expiry > Date.now()) {
+    return res.status(400).json({ error: 'Sleep timer has not expired' })
+  }
+
+  try {
+    // Unique identifier for this particular countdown.
+    const productKey = `${productName}:${expiry}`
+
+    const notification = await Notification.findOneAndUpdate(
+      {
+        firebaseUid,
+        type: 'sleep-ended',
+        productKey
+      },
+      {
+        $setOnInsert: {
+          title: 'Sleep On It completed!',
+          body: `Your waiting period for ${productName} has ended. View your purchase verdict.`,
+          link: '/wishlist?verdict=' + encodeURIComponent(productName),
+          read: false
+        }
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true
+      }
+    )
+
+    res.json(notification)
+  } catch (error) {
+    console.error('[Sleep On It] Notification error:', error)
+
+    res.status(500).json({
+      error: 'Could not create sleep notification'
+    })
+  }
+})
+
+
 //retrieve notifications
 app.get('/api/notifications',async(req,res)=>{
   const id=req.query.id

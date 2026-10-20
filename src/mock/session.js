@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { watchAuthState, signOutUser } from '../services/auth.js'
 import { getUser } from '../services/userApi.js'
 import { cheapestListing } from './catalog.js'
@@ -19,7 +19,7 @@ export const needsUsername = computed(() => !!(user.value && !user.value.usernam
 // The signup view handles DB creation itself, then calls applyDbUser.
 let _signupInProgress = false
 export function startSignup() { _signupInProgress = true }
-export function endSignup()   { _signupInProgress = false }
+export function endSignup() { _signupInProgress = false }
 
 // Manually populate user.value from a DB user object (called by signup views after createOrGetUser).
 export function applyDbUser(dbUser, fbUser) {
@@ -315,4 +315,83 @@ export function isAsleep(name, now = Date.now()) {
   }
 
   return Boolean(item.sleepUntil && item.sleepUntil > now)
+}
+
+
+const pendingSleepNotifications = new Set()
+const completedSleepNotifications = new Set()
+
+async function checkExpiredSleepTimers() {
+  const currentUser = user.value
+  const uid = firebaseUser.value?.uid
+
+  if (!currentUser || !uid) return
+
+  const currentTime = Date.now()
+
+  for (const item of currentUser.wishlist || []) {
+    const expiry = Number(item.sleepUntil)
+    const startingPrice = Number(item.sleepPriceAtStart)
+
+    // Only check completed countdowns with a valid starting price.
+    if (
+      !Number.isFinite(expiry) ||
+      expiry <= 0 ||
+      expiry > currentTime ||
+      !Number.isFinite(startingPrice) ||
+      startingPrice <= 0
+    ) {
+      continue
+    }
+
+    const key = `${uid}:${item.name}:${expiry}`
+
+    if (
+      pendingSleepNotifications.has(key) ||
+      completedSleepNotifications.has(key)
+    ) {
+      continue
+    }
+    pendingSleepNotifications.add(key)
+    try {
+      const response = await fetch('/api/notifications/sleep-ended', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          firebaseUid: uid,
+          productName: item.name,
+          sleepUntil: expiry
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create sleep notification')
+      }
+      completedSleepNotifications.add(key)
+
+      console.log('[Sleep On It] Expiry notification checked:', item.name)
+    } catch (error) {
+      console.error('[Sleep On It] Notification failed:', error)
+    } finally {
+      pendingSleepNotifications.delete(key)
+    }
+  }
+}
+
+// Check after login or when the wishlist changes.
+watch(
+  [user, firebaseUser],
+  () => {
+    void checkExpiredSleepTimers()
+  },
+  { immediate: true, deep: true }
+)
+
+// Also check while the user has FastDeal open.
+if (typeof window !== 'undefined') {
+  window.setInterval(() => {
+    void checkExpiredSleepTimers()
+  }, 30000)
 }

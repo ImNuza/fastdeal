@@ -1,13 +1,14 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { fetchCheapestLiveListing } from '../services/livePriceService.js'
-import { cheapestListing, productImage, sgd, storeLink } from '../mock/catalog.js'
+import { productImage, sgd, storeLink } from '../mock/catalog.js'
 import { addSampleWishlist, isAsleep, missingSamples, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user } from '../mock/session.js'
 import FdIcon from '../components/FdIcon.vue'
 import { planBudget } from '../mock/budget.js'
 
 const router = useRouter()
+const route = useRoute()
 
 if (!user.value) {
   router.replace('/login?next=/wishlist')
@@ -27,29 +28,78 @@ onBeforeUnmount(function () {
   window.clearInterval(clock)
 })
 
+const livePrices = ref({})
+const liveLoading = ref({})
+const liveErrors = ref({})
+
 function best(item) {
-  return cheapestListing(item.name)
+  return livePrices.value[item.name] ?? null
 }
+
+async function loadLivePrice(name) {
+  if (liveLoading.value[name]) return
+
+  liveLoading.value[name] = true
+  liveErrors.value[name] = ''
+
+  try {
+    const listing = await fetchCheapestLiveListing(name)
+    livePrices.value[name] = listing
+  } catch (error) {
+    delete livePrices.value[name]
+    liveErrors.value[name] = error.message || 'Price unavailable'
+  } finally {
+    liveLoading.value[name] = false
+  }
+}
+
+watch(
+  () => user.value?.wishlist?.map(item => item.name).join('|') ?? '',
+  async () => {
+    if (!user.value) return
+
+    for (const item of user.value.wishlist) {
+      if (!best(item)) {
+        await loadLivePrice(item.name)
+      }
+    }
+  },
+  { immediate: true }
+)
 
 // A price drop worth flagging: some store now sells it for at least 10% less than the saved price.
 // Smaller drops are left out so the tag only shows for real savings.
 const DROP_PERCENT = 10
 
-function cheaper(item) {
-  return saving(item) / item.savedPrice * 100 >= DROP_PERCENT
-}
-
 function saving(item) {
-  return item.savedPrice - best(item).price
+  const listing = best(item)
+  return listing ? Number(item.savedPrice) - listing.price : null
 }
 
-// How much lower the best price is than the saved price, as a whole percent.
+function cheaper(item) {
+  const amount = saving(item)
+
+  return amount !== null &&
+    Number(item.savedPrice) > 0 &&
+    (amount / Number(item.savedPrice)) * 100 >= DROP_PERCENT
+}
+
 function savingPercent(item) {
-  return Math.round((saving(item) / item.savedPrice) * 100)
+  const amount = saving(item)
+
+  return amount === null || Number(item.savedPrice) <= 0
+    ? 0
+    : Math.round((amount / Number(item.savedPrice)) * 100)
 }
 
 function reached(item) {
-  return best(item).price <= Number(item.targetPrice)
+  const listing = best(item)
+
+  return Boolean(
+    listing &&
+    Number(item.targetPrice) > 0 &&
+    listing.price <= Number(item.targetPrice)
+  )
 }
 
 function asleep(item) {
@@ -110,8 +160,25 @@ const sortOptions = [
 const sorters = {
   latest: function (a, b) { return b.savedAt - a.savedAt },
   earliest: function (a, b) { return a.savedAt - b.savedAt },
-  cheap: function (a, b) { return best(a).price - best(b).price },
-  pricey: function (a, b) { return best(b).price - best(a).price },
+  cheap: function (a, b) {
+    const aPrice = best(a)?.price
+    const bPrice = best(b)?.price
+
+    if (aPrice == null) return bPrice == null ? 0 : 1
+    if (bPrice == null) return -1
+
+    return aPrice - bPrice
+  },
+
+  pricey: function (a, b) {
+    const aPrice = best(a)?.price
+    const bPrice = best(b)?.price
+
+    if (aPrice == null) return bPrice == null ? 0 : 1
+    if (bPrice == null) return -1
+
+    return bPrice - aPrice
+  },
   az: function (a, b) { return a.name.localeCompare(b.name) },
   za: function (a, b) { return b.name.localeCompare(a.name) }
 }
@@ -145,7 +212,6 @@ const units = [
   { key: 'minutes', label: 'Minutes', size: 1, more: 'One more minute', less: 'One less minute' }
 ]
 const sleepItem = ref(null)
-const sleepLoading = ref(false)
 const sleepError = ref('')
 const holdTotal = ref(1440)
 const sleepDialog = ref(null)
@@ -211,44 +277,37 @@ function closeSleep() {
 }
 
 
-async function confirmSleep() {
-  if (!sleepItem.value || !holdMs.value || sleepLoading.value) {
+
+function confirmSleep() {
+  if (!sleepItem.value || !holdMs.value) {
     return
   }
 
-  sleepLoading.value = true
+  const item = sleepItem.value
+  const priceAtStart = Number(item.savedPrice)
+
+  if (!Number.isFinite(priceAtStart) || priceAtStart <= 0) {
+    sleepError.value = 'This product has no valid saved price.'
+    return
+  }
+
   sleepError.value = ''
 
-  try {
-    const productName = sleepItem.value.name
+  sleepOn(
+    item.name,
+    holdMs.value / 3600000,
+    priceAtStart
+  )
 
-    // Retrieve the cheapest comparable listing from SerpApi
-    const listing = await fetchCheapestLiveListing(productName)
+  console.log('[Sleep On It] Starting from saved price:', {
+    product: item.name,
+    savedStore: item.savedStore,
+    price: priceAtStart
+  })
 
-    // Record the live starting price
-    const priceAtStart = listing.price
-
-    // Start the countdown using the real price
-    sleepOn(
-      productName,
-      holdMs.value / 3600000,
-      priceAtStart
-    )
-
-    console.log('[Sleep On It] Live starting price:', {
-      product: productName,
-      store: listing.store,
-      price: priceAtStart
-    })
-
-    closeSleep()
-  } catch (error) {
-    sleepError.value = error.message || 'Could not retrieve live prices'
-    console.error('[Sleep On It]', error)
-  } finally {
-    sleepLoading.value = false
-  }
+  closeSleep()
 }
+
 
 
 // =====================================
@@ -299,28 +358,27 @@ function verdictData(item) {
   let message = ''
 
   if (percent <= -10) {
-    title = 'A more favourable price — worth considering'
+    title = 'A better deal is available!'
     message =
-      'The price has dropped by at least 10% since you started waiting. ' +
-      'If you still need this product, now may be a better time to buy.'
+      'The cheapest matching listing found is at least 10% below your saved price. ' +
+      'You may be able to save money by choosing this offer.'
 
   } else if (percent < 0) {
-    title = 'A small saving since you waited'
+    title = 'A small saving is available'
     message =
-      'The price has decreased slightly. Consider whether the savings ' +
-      'make the purchase worthwhile.'
+      'The cheapest matching listing found is slightly cheaper than your saved price. ' +
+      'Consider whether the savings are worthwhile.'
 
   } else if (percent === 0) {
-    title = 'No price advantage yet'
+    title = 'No better deal found yet'
     message =
-      'The price has not changed since you started waiting. ' +
-      'There is no price-based reason to rush your decision.'
+      'The cheapest matching listing found is the same as your saved price.'
 
   } else {
-    title = 'The price has increased — consider waiting'
+    title = 'No cheaper deal found'
     message =
-      'The product now costs more than when you started waiting. ' +
-      'Consider comparing alternatives or waiting for a better offer.'
+      'The cheapest matching listing found costs more than your saved price. ' +
+      'Your original saved offer may still be better, if it remains available.'
   }
 
   return {
@@ -357,6 +415,7 @@ async function openVerdict(item) {
   try {
     // Get the cheapest comparable price from SerpApi
     const listing = await fetchCheapestLiveListing(item.name)
+    console.log('[Purchase Verdict] Selected listing:', listing)
 
     // Ignore outdated responses if the dialog has changed
     if (requestId !== verdictRequestId) return
@@ -398,28 +457,38 @@ function closeVerdict() {
   verdictError.value = ''
 }
 
-// Watch for expired timers
+
 watch(
-  [now, () => user.value?.wishlist],
-  function () {
-    if (verdictItem.value || sleepItem.value || !user.value) {
+  [() => route.query.verdict, () => user.value?.wishlist],
+  ([productName]) => {
+    if (typeof productName !== 'string' || !user.value) {
       return
     }
 
-    // Find the first expired timer that has not been viewed
-    const newlyFinished = user.value.wishlist.find(item =>
-      hasFinishedSleep(item) && !item.sleepVerdictSeen
+    const item = user.value.wishlist.find(
+      saved => saved.name === productName
     )
 
-    if (newlyFinished) {
-      openVerdict(newlyFinished)
+    if (!item || !hasFinishedSleep(item)) {
+      return
     }
+
+    // Open the same popup used by View purchase verdict.
+    openVerdict(item)
+
+    // Remove the query parameter so refreshing the page
+    // doesn't automatically reopen the same verdict.
+    const { verdict, ...remainingQuery } = route.query
+
+    router.replace({
+      path: route.path,
+      query: remainingQuery
+    })
   },
-  {
-    immediate: true,
-    deep: true
-  }
+  { immediate: true }
 )
+
+
 
 // Plan a budget pop-up: enter a budget, tick and rank
 // the items to include, then see the best mix at today's best prices.
@@ -477,14 +546,30 @@ function findPlan() {
     return
   }
   // Only the ticked items go into the search; nothing else from the wishlist is added.
-  const items = plannable.value.filter(function (item) {
-    return rankOf(item.name) > 0
-  }).map(function (item) {
-    const now = best(item)
-    return { name: item.name, price: now.price, store: now.store, rank: included.value.indexOf(item.name) + 1 }
+  const selected = plannable.value.filter(item =>
+    rankOf(item.name) > 0
+  )
+
+  if (selected.some(item => !best(item))) {
+    budgetError.value =
+      'Some selected products do not have live prices yet. Please retry their price lookup.'
+    plan.value = null
+    return
+  }
+
+  const items = selected.map(item => {
+    const listing = best(item)
+
+    return {
+      name: item.name,
+      price: listing.price,
+      store: listing.store,
+      rank: included.value.indexOf(item.name) + 1
+    }
   })
   plan.value = planBudget(items, amount, 5)
   planIndex.value = 0
+  budgetError.value = ''
 }
 
 function nextOption() {
@@ -530,11 +615,13 @@ const missedItems = computed(function () {
 
 // The cheapest ticked item, for the "Nothing fits" message.
 function cheapestPlannable() {
-  return plannable.value.filter(function (item) {
-    return rankOf(item.name) > 0
-  }).reduce(function (low, item) {
-    return !low || best(item).price < best(low).price ? item : low
-  }, null)
+  return plannable.value
+    .filter(item => rankOf(item.name) > 0 && best(item))
+    .reduce((low, item) => {
+      return !low || best(item).price < best(low).price
+        ? item
+        : low
+    }, null)
 }
 </script>
 
@@ -606,16 +693,42 @@ function cheapestPlannable() {
                   target="_blank" rel="noopener">{{ item.savedStore }}</a>
                 <span v-else class="d-block small text-secondary">Store not recorded</span>
               </div>
+
               <div class="fd-wish-cell" role="cell">
-                <span class="fd-wish-label" aria-hidden="true">Best now</span>
-                <strong>{{ sgd(best(item).price) }}</strong>
-                <span v-if="cheaper(item)" class="fd-drop" :title="'Price drop, ' + sgd(saving(item)) + ' less'">
-                  <span aria-hidden="true">&minus;{{ savingPercent(item) }}%</span>
-                  <span class="visually-hidden">, price drop of {{ savingPercent(item) }}%, {{ sgd(saving(item)) }}
-                    less</span>
+                <span class="fd-wish-label" aria-hidden="true">
+                  Best now
                 </span>
-                <a class="d-block small" :href="storeLink(best(item).store, item.name)" target="_blank"
-                  rel="noopener">{{ best(item).store }}</a>
+
+                <span v-if="liveLoading[item.name] && !best(item)">
+                  Loading price...
+                </span>
+
+                <template v-else-if="best(item)">
+                  <strong>{{ sgd(best(item).price) }}</strong>
+
+                  <span v-if="cheaper(item)" class="fd-drop" :title="'Potential saving: ' + sgd(saving(item))">
+                    −{{ savingPercent(item) }}%
+                  </span>
+
+                  <a v-if="best(item).link" class="d-block small" :href="best(item).link" target="_blank"
+                    rel="noopener noreferrer">
+                    {{ best(item).store || 'View listing' }}
+                  </a>
+
+                  <span v-else class="d-block small text-secondary">
+                    {{ best(item).store || 'Store unavailable' }}
+                  </span>
+                </template>
+
+                <div v-else>
+                  <span class="small text-secondary">
+                    {{ liveErrors[item.name] || 'Price unavailable' }}
+                  </span>
+
+                  <button type="button" class="btn btn-link btn-sm d-block p-0" @click="loadLivePrice(item.name)">
+                    Retry
+                  </button>
+                </div>
               </div>
               <div class="fd-wish-cell" role="cell">
                 <span class="fd-wish-label" aria-hidden="true">Target price alert</span>
@@ -667,7 +780,7 @@ function cheapestPlannable() {
     <p v-if="missingSamples()" class="fd-entry-signup">
       Want to see how it works?
       <button class="btn btn-link p-0 fd-sample-link" type="button" @click="addSampleWishlist">Add {{ missingSamples()
-        }}
+      }}
         sample products</button>
     </p>
 
@@ -766,7 +879,7 @@ function cheapestPlannable() {
       </h2>
 
       <p class="fd-entry-description">
-       Your waiting period for
+        Your waiting period for
         <strong>{{ verdictItem.name }}</strong>
         has ended.
       </p>
@@ -788,12 +901,12 @@ function cheapestPlannable() {
         <div class="fd-verdict-prices">
 
           <div>
-            <span>Price when sleep started</span>
+            <span>Original saved price</span>
             <strong>{{ sgd(activeVerdict.start) }}</strong>
           </div>
 
           <div>
-            <span>Latest listed price</span>
+            <span>Cheapest matching price found</span>
             <strong>{{ sgd(activeVerdict.latest) }}</strong>
           </div>
 
@@ -804,6 +917,7 @@ function cheapestPlannable() {
           'is-lower': activeVerdict.percent < 0,
           'is-higher': activeVerdict.percent > 0
         }">
+
           <strong>
             {{ activeVerdict.percent > 0 ? '+' : '' }}
             {{ activeVerdict.percent.toFixed(1) }}%
@@ -854,7 +968,7 @@ function cheapestPlannable() {
         head.
       </p>
 
-    <form @submit.prevent="confirmSleep">
+      <form @submit.prevent="confirmSleep">
         <p v-if="sleepError" class="alert alert-danger" role="alert">
           {{ sleepError }}
         </p>
@@ -884,9 +998,9 @@ function cheapestPlannable() {
           </p>
         </fieldset>
 
-      <div class="fd-entry-actions">
-          <button class="btn btn-dark fd-btn-lg" type="submit" :disabled="!holdMs || sleepLoading">
-            {{ sleepLoading ? 'Checking live prices...' : 'Proceed' }}
+        <div class="fd-entry-actions">
+          <button class="btn btn-dark fd-btn-lg" type="submit" :disabled="!holdMs">
+            Proceed
           </button>
           <button class="btn btn-outline-dark fd-btn-lg" type="button" @click="closeSleep">Cancel</button>
         </div>
