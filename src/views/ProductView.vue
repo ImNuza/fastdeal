@@ -5,7 +5,6 @@ import DealCheck from '../components/DealCheck.vue'
 import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
 import SaveSleepButtons from '../components/SaveSleepButtons.vue'
 import { sgd } from '../mock/catalog.js'
-import { itemName } from '../services/itemName.js'
 import { fetchProduct } from '../services/productApi.js'
 
 // One product: every store that sells it, cheapest total first, with the Deal check,
@@ -26,9 +25,12 @@ const highest = computed(function () {
   return stores.length > 1 ? stores[stores.length - 1] : null
 })
 
-// Same name as the compare page, so one search gives one wishlist row.
-const saveName = computed(function () {
-  return product.value ? itemName(product.value.searchTerm || product.value.q || route.query.q) : ''
+// What the wishlist stores with this product, so it can open this page again.
+const saveInfo = computed(function () {
+  if (!product.value) {
+    return null
+  }
+  return { productId: product.value.productId, q: product.value.q || route.query.q || '', image: product.value.image }
 })
 
 const ratingTotal = computed(function () {
@@ -82,7 +84,8 @@ onMounted(async function () {
       </div>
     </div>
 
-    <SaveSleepButtons :name="saveName" :listing="cheapest ? { store: cheapest.store, price: cheapest.price } : null" />
+    <SaveSleepButtons :name="product.title" :listing="cheapest ? { store: cheapest.store, price: cheapest.price } : null"
+      :product="saveInfo" />
 
     <!-- Ronald: the AI "Buy now or wait?" verdict goes here. The API also returns
          typicalPrice, each store's deal check, ratings and userReviews for it. -->

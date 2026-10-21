@@ -487,6 +487,121 @@ app.put('/api/notifications/read-all', requireUser, async (req, res) => {
   }
 })
 
+// --- Wishlist routes ---
+// One row per saved product per user. The client keeps a copy in memory (src/mock/session.js)
+// and writes every change through these routes.
+
+// The item shape the client uses. Dates go out as milliseconds, like the old browser wishlist.
+function toWishItem(row) {
+  return {
+    name: row.productName,
+    productKey: row.productKey,
+    productId: row.productId,
+    q: row.q,
+    image: row.image,
+    savedPrice: row.savedPrice,
+    savedStore: row.savedStore,
+    targetPrice: row.targetPrice,
+    savedAt: row.savedAt ? row.savedAt.getTime() : 0,
+    sleepUntil: row.sleepUntil ? row.sleepUntil.getTime() : 0,
+    sleepPriceAtStart: row.sleepPriceAtStart,
+    sleepVerdictSeen: row.sleepVerdictSeen
+  }
+}
+
+function priceOrNull(value) {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null
+}
+
+function dateOrNull(ms) {
+  const n = Number(ms)
+  return Number.isFinite(n) && n > 0 ? new Date(n) : null
+}
+
+app.get('/api/wishlist', requireUser, async (req, res) => {
+  try {
+    const rows = await WishlistItem.find({ firebaseUid: req.uid }).sort({ savedAt: 1 })
+    res.json(rows.map(toWishItem))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Save a product, or switch a saved product to another store and price.
+// targetPrice, savedAt and the sleep fields are used only for a new row: the one-time
+// copy of an old browser wishlist sends them.
+app.post('/api/wishlist', requireUser, async (req, res) => {
+  const name = text(req.body.name)
+  const price = priceOrNull(req.body.price)
+  if (!name || !price) return res.status(400).json({ error: 'name and price required' })
+  const productKey = toProductKey(name)
+  const store = text(req.body.store) || null
+  try {
+    const existing = await WishlistItem.findOne({ firebaseUid: req.uid, productKey })
+    if (existing) {
+      if (store && existing.savedStore !== store) {
+        existing.savedStore = store
+        existing.savedPrice = price
+      }
+      existing.productId = existing.productId || text(req.body.productId) || null
+      existing.q = existing.q || text(req.body.q) || null
+      existing.image = existing.image || text(req.body.image) || null
+      await existing.save()
+      return res.json(toWishItem(existing))
+    }
+    const row = await WishlistItem.create({
+      firebaseUid: req.uid,
+      productName: name,
+      productKey,
+      productId: text(req.body.productId) || null,
+      q: text(req.body.q) || null,
+      image: text(req.body.image) || null,
+      savedPrice: price,
+      savedStore: store,
+      targetPrice: priceOrNull(req.body.targetPrice) || Math.round(price * 0.9 * 100) / 100,
+      savedAt: dateOrNull(req.body.savedAt) || new Date(),
+      sleepUntil: dateOrNull(req.body.sleepUntil),
+      sleepPriceAtStart: priceOrNull(req.body.sleepPriceAtStart),
+      sleepVerdictSeen: req.body.sleepVerdictSeen === true
+    })
+    res.status(201).json(toWishItem(row))
+  } catch (err) {
+    if (err.code === 11000) return res.status(409).json({ error: 'Already saved' })
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Change the target price or the Sleep on it fields of one saved product.
+app.patch('/api/wishlist/:productKey', requireUser, async (req, res) => {
+  const set = {}
+  if ('targetPrice' in req.body) set.targetPrice = priceOrNull(req.body.targetPrice)
+  if ('sleepUntil' in req.body) set.sleepUntil = dateOrNull(req.body.sleepUntil)
+  if ('sleepPriceAtStart' in req.body) set.sleepPriceAtStart = priceOrNull(req.body.sleepPriceAtStart)
+  if ('sleepVerdictSeen' in req.body) set.sleepVerdictSeen = req.body.sleepVerdictSeen === true
+  if (!Object.keys(set).length) return res.status(400).json({ error: 'Nothing to update' })
+  try {
+    const row = await WishlistItem.findOneAndUpdate(
+      { firebaseUid: req.uid, productKey: req.params.productKey },
+      { $set: set },
+      { new: true }
+    )
+    if (!row) return res.status(404).json({ error: 'Not in your wishlist' })
+    res.json(toWishItem(row))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.delete('/api/wishlist/:productKey', requireUser, async (req, res) => {
+  try {
+    await WishlistItem.deleteOne({ firebaseUid: req.uid, productKey: req.params.productKey })
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Database ERD for the team and graders
 app.get('/erd', (req, res) => {
   res.sendFile(erdPath)
