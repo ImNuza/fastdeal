@@ -29,8 +29,8 @@ async function onSubmit() {
   }
   loading.value = true
   try {
-    // Save username in MongoDB via PUT /api/users/:uid
-    const dbUser = await updateUser(firebaseUser.value.uid, { username: u })
+    // Save username in MongoDB via PUT /api/users/me
+    const dbUser = await updateUser({ username: u })
     console.log('[SetUsername] saved:', dbUser)
     // Update local session so the navbar shows it immediately
     if (user.value) user.value.username = dbUser.username

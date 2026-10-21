@@ -46,8 +46,8 @@ async function load() {
   loadingFriends.value = true
   try {
     const [f, r] = await Promise.all([
-      getFriends(myUid.value),       // GET /api/friends
-      getIncomingRequests(myUid.value) // GET /api/friends/requests
+      getFriends(),       // GET /api/friends
+      getIncomingRequests() // GET /api/friends/requests
     ])
     friends.value = f
     requests.value = r
@@ -73,7 +73,7 @@ watch(searchQuery, (q) => {
   searchTimer = setTimeout(async () => {
     searching.value = true
     try {
-      allSearchResults.value = await searchUsers(q.trim(), myUid.value)
+      allSearchResults.value = await searchUsers(q.trim())
       console.log('[Friends] search results:', allSearchResults.value)
     } catch (err) {
       console.warn('[Friends] search failed:', err.message)
@@ -88,7 +88,7 @@ watch(searchQuery, (q) => {
 async function onSendRequest(result) {
   actionLoading.value[result.pairKey] = true
   try {
-    await sendRequest(myUid.value, result.firebaseUid)
+    await sendRequest(result.firebaseUid)
     const hit = allSearchResults.value.find(r => r.pairKey === result.pairKey)
     if (hit) { hit.friendshipStatus = 'pending'; hit.iRequested = true }
     console.log('[Friends] request sent to', result.username)
@@ -104,7 +104,7 @@ async function onSendRequest(result) {
 async function onAccept(req) {
   actionLoading.value[req.pairKey] = true
   try {
-    await acceptRequest(req.pairKey, myUid.value)
+    await acceptRequest(req.pairKey)
     requests.value = requests.value.filter(r => r.pairKey !== req.pairKey)
     friends.value.push(req)
     const hit = allSearchResults.value.find(r => r.pairKey === req.pairKey)
@@ -121,7 +121,7 @@ async function onAccept(req) {
 async function onDecline(req) {
   actionLoading.value[req.pairKey] = true
   try {
-    await declineOrRemove(req.pairKey, myUid.value)
+    await declineOrRemove(req.pairKey)
     requests.value = requests.value.filter(r => r.pairKey !== req.pairKey)
     const hit = allSearchResults.value.find(r => r.pairKey === req.pairKey)
     if (hit) { hit.friendshipStatus = null; hit.iRequested = null }
@@ -138,7 +138,7 @@ async function onRemove(friend) {
   if (!confirm(`Remove ${friend.username || friend.email} from friends?`)) return
   actionLoading.value[friend.pairKey] = true
   try {
-    await declineOrRemove(friend.pairKey, myUid.value)
+    await declineOrRemove(friend.pairKey)
     friends.value = friends.value.filter(f => f.pairKey !== friend.pairKey)
     const hit = allSearchResults.value.find(r => r.pairKey === friend.pairKey)
     if (hit) { hit.friendshipStatus = null; hit.iRequested = null }
@@ -220,7 +220,6 @@ function initials(f) {
                 <div class="search-avatar">{{ initials(r) }}</div>
                 <div class="search-info">
                   <div class="search-username">{{ r.username }}</div>
-                  <div class="search-email">{{ r.email }}</div>
                 </div>
                 <div class="search-action">
                   <span v-if="r.friendshipStatus === 'accepted'" class="badge-friends">Friends</span>

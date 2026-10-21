@@ -29,7 +29,7 @@ async function onGoogleSignUp() {
   startSignup() // tell watchAuthState to skip the DB check — we handle it below
   try {
     const fbUser = await signInWithGoogle()
-    const dbUser = await createOrGetUser(fbUser.uid, fbUser.email)
+    const dbUser = await createOrGetUser()
     applyDbUser(dbUser, fbUser) // populate user.value immediately
     if (!dbUser.username) {
       router.push('/set-username')
@@ -64,7 +64,7 @@ async function onEmailSignUp() {
   startSignup() // tell watchAuthState to skip the DB check — we handle it below
   try {
     const fbUser = await signUpWithEmail(email.value, password.value)
-    const dbUser = await createOrGetUser(fbUser.uid, fbUser.email, u)
+    const dbUser = await createOrGetUser(u)
     applyDbUser(dbUser, fbUser) // populate user.value immediately
     const next = route.query.next
     router.push(typeof next === 'string' && next.startsWith('/') ? next : '/wishlist')
