@@ -47,6 +47,13 @@ const searchLogSchema = new mongoose.Schema(
   }
 )
 
+// One row per browser session per search. Only real browser sessions ("s-...") must be
+// unique: seed rows ("seed-...") and the old rows with sessionId "1" may repeat.
+searchLogSchema.index(
+  { sessionId: 1, productKey: 1 },
+  { unique: true, partialFilterExpression: { sessionId: { $gte: 's-', $lt: 's.' } } }
+)
+
 const SearchLog = mongoose.model('SearchLog', searchLogSchema, 'searchLogs')
 
 export default SearchLog
