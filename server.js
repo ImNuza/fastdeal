@@ -19,6 +19,7 @@ import { error } from 'console'
 import Notification from './models/notification-model.js'
 import WishlistItem from './models/wishlist-item-model.js'
 import { getProduct } from './services/productService.js'
+import { findBuyTogetherFriends, notifyBuyTogether } from './services/buyTogether.js'
 
 
 
@@ -172,7 +173,7 @@ app.get('/api/users/me', requireUser, async (req, res) => {
   }
 })
 
-// Update my profile. Allows emailAlertsOn and username.
+// Update my profile. Allows emailAlertsOn, username and telegramUsername.
 // Username must match USERNAME_RE and be unique.
 app.put('/api/users/me', requireUser, async (req, res) => {
   try {
@@ -184,6 +185,13 @@ app.put('/api/users/me', requireUser, async (req, res) => {
         return res.status(400).json({ error: 'Username must be 3–20 chars: letters, numbers, _ or .' })
       }
       patch.username = u
+    }
+    if ('telegramUsername' in req.body) {
+      const handle = text(req.body.telegramUsername).replace(/^@/, '')
+      if (handle && !/^[A-Za-z0-9_]{5,32}$/.test(handle)) {
+        return res.status(400).json({ error: 'Telegram username must be 5 to 32 letters, numbers or _' })
+      }
+      patch.telegramUsername = handle || null
     }
     if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' })
     const user = await User.findOneAndUpdate(
@@ -420,7 +428,7 @@ app.post('/api/notifications/sleep-ended', requireUser, async (req, res) => {
     // Unique identifier for this particular countdown.
     const productKey = `${productName}:${expiry}`
 
-    const notification = await Notification.findOneAndUpdate(
+    const result = await Notification.findOneAndUpdate(
       {
         firebaseUid,
         type: 'sleep-ended',
@@ -437,9 +445,20 @@ app.post('/api/notifications/sleep-ended', requireUser, async (req, res) => {
       {
         upsert: true,
         new: true,
-        setDefaultsOnInsert: true
+        setDefaultsOnInsert: true,
+        includeResultMetadata: true
       }
     )
+    const notification = result.value
+
+    // Only the first time this countdown ends, so a reload makes no second Buy Together alert.
+    if (!result.lastErrorObject.updatedExisting) {
+      try {
+        await notifyBuyTogether(firebaseUid, productName)
+      } catch (error) {
+        console.error('[Buy Together]', error)
+      }
+    }
 
     res.json(notification)
   } catch (error) {
@@ -482,6 +501,18 @@ app.put('/api/notifications/read-all', requireUser, async (req, res) => {
       { $set: { read: true, readAt: new Date() } }
     )
     res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Buy Together: my friends who saved the same product, with their Telegram.
+// The popup on the Notifications page calls this. Read live, never stored in a notification.
+app.get('/api/buy-together', requireUser, async (req, res) => {
+  const productKey = toProductKey(text(req.query.productKey))
+  if (!productKey) return res.status(400).json({ error: 'productKey required' })
+  try {
+    res.json(await findBuyTogetherFriends(req.uid, productKey))
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
