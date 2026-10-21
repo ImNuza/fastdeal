@@ -317,6 +317,23 @@ export function isAsleep(name, now = Date.now()) {
   return Boolean(item.sleepUntil && item.sleepUntil > now)
 }
 
+// Stop the Sleep on it timer early. The item stays in the wishlist.
+export function cancelSleep(name) {
+  const item = findSaved(name)
+  if (!item) {
+    return
+  }
+  item.sleepUntil = 0
+  item.sleepPriceAtStart = null
+  persist()
+}
+
+// When the hold on this product ends, as a timestamp. 0 when it is not on hold.
+export function sleepEndsAt(name) {
+  const item = findSaved(name)
+  return item && item.sleepUntil ? item.sleepUntil : 0
+}
+
 
 const pendingSleepNotifications = new Set()
 const completedSleepNotifications = new Set()

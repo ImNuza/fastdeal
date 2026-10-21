@@ -16,6 +16,7 @@ import { toProductKey } from './models/product-key.js'
 import { error } from 'console'
 import Notification from './models/notification-model.js'
 import WishlistItem from './models/wishlist-item-model.js'
+import { getProduct } from './services/productService.js'
 
 
 
@@ -279,24 +280,16 @@ app.get('/api/proposal', (req, res) => {
   res.json(JSON.parse(raw))
 })
 
-// Run a Google Shopping search, store it to src/mock/last-search.json, return it.
+// Run a Google Shopping search (or reuse the saved one from the last 6 hours) and return it.
+// sid is the browser's session id for searchLogs. Only the search page sends it.
 app.get('/api/search', async (req, res) => {
   try {
-    const result = await search(req.query.q)
-    try {
-      await SearchLog.create({
-        sessionId:1,
-        productKey: result.productKey,
-        query: result.query,
-        productName: result.searchTerm,
-        image: result.listings[0]?.image || ''
-      })
-    } catch (error) {
-      console.log(error)
-    }
+    // search() also writes the searchLogs row for Trending (only when sid is sent).
+    const result = await search(req.query.q, req.query.sid)
     res.json(result)
   } catch (error) {
-    console.log(error)
+    // The serpapi library rejects with a plain string, so error.message can be missing.
+    res.status(400).json({ error: String((error && error.message) || error) })
   }
 })
 
@@ -310,15 +303,14 @@ app.post('/api/identify-image', upload.single('photo'), async (req, res) => {
   }
 })
 
-// Serve the raw SerpAPI response written by the last search. CompareView fetches
-// this (not /mock/tempitem.json, which the Vite dev server rewrites to index.html).
-app.get('/api/tempitem', (req, res) => {
-  const tempItemPath = path.join(__dirname, 'src', 'mock', 'tempitem.json')
+// One product with every store, its price history and the Deal check.
+// q is the search it came from, so the page still works after a reload.
+app.get('/api/product/:productId', async (req, res) => {
   try {
-    const raw = fs.readFileSync(tempItemPath, 'utf8')
-    res.type('application/json').send(raw)
+    const product = await getProduct(req.params.productId, req.query.q)
+    res.json(product)
   } catch (error) {
-    res.status(404).json({ error: 'No search result yet' })
+    res.status(404).json({ error: String((error && error.message) || error) })
   }
 })
 

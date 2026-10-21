@@ -11,6 +11,7 @@ import {
   declineOrRemove
 } from '../services/friendsApi.js'
 import FdIcon from '../components/FdIcon.vue'
+import FdLoadingDots from '../components/FdLoadingDots.vue'
 
 const router = useRouter()
 
@@ -168,7 +169,9 @@ function initials(f) {
             {{ friends.length }} {{ friends.length === 1 ? 'friend' : 'friends' }}
           </p>
 
-          <div v-if="loadingFriends" class="text-secondary small">Loading…</div>
+          <div v-if="loadingFriends" class="text-secondary">
+            <FdLoadingDots size="inline" message="Loading friends" />
+          </div>
 
           <div v-else-if="friends.length === 0" class="empty-state">
             <FdIcon name="friends" class="empty-icon" />
@@ -209,7 +212,7 @@ function initials(f) {
                 type="text"
                 placeholder="Type a username…"
               />
-              <span v-if="searching" class="small text-secondary ms-1">…</span>
+              <FdLoadingDots v-if="searching" size="inline" message="Searching" class="text-secondary ms-1" />
             </div>
 
             <div v-if="searchResults.length" class="search-results mt-2">

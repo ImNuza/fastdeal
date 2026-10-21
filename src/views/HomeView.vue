@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { catalog, dayLabel, nameFromFile } from '../mock/catalog.js'
 import FdIcon from '../components/FdIcon.vue'
+import FdLoadingDots from '../components/FdLoadingDots.vue'
 import axios from 'axios'
 
 const router = useRouter()
@@ -453,7 +454,9 @@ onBeforeUnmount(function () {
           </li>
         </ul>
       </form>
-      <p v-if="photoBusy" class="fd-search-text small mt-3 mb-0 text-center">Processing your photo…</p>
+      <p v-if="photoBusy" class="fd-search-text small mt-3 mb-0 text-center">
+        <FdLoadingDots size="inline" message="Identifying your photo" />
+      </p>
       <p v-if="photoError" class="fd-search-text small mt-3 mb-0 text-center">{{ photoError }}</p>
       <p v-if="photoName" class="fd-search-text small mt-3 mb-0 text-center">Identified as {{ photoName }}</p>
 
