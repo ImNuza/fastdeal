@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { ref, computed, watch } from 'vue'
 import { watchAuthState, signOutUser } from '../services/auth.js'
 import { getUser } from '../services/userApi.js'
@@ -61,7 +62,7 @@ watchAuthState(async function (fbUser) {
   }
 
   try {
-    const dbUser = await getUser(fbUser.uid)
+    const dbUser = await getUser()
     applyDbUser(dbUser, fbUser)
   } catch (err) {
     if (err.response?.status === 404) {
@@ -264,7 +265,7 @@ export async function toggleEmail() {
   persist()
   try {
     const { updateUser } = await import('../services/userApi.js')
-    const updated = await updateUser(firebaseUser.value.uid, { emailAlertsOn: user.value.emailOn })
+    const updated = await updateUser({ emailAlertsOn: user.value.emailOn })
     console.log('[FastDeal] emailAlertsOn updated in MongoDB:', updated)
   } catch (err) {
     console.warn('[FastDeal] Could not sync emailAlertsOn to MongoDB:', err.message)
@@ -371,21 +372,11 @@ async function checkExpiredSleepTimers() {
     }
     pendingSleepNotifications.add(key)
     try {
-      const response = await fetch('/api/notifications/sleep-ended', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          firebaseUid: uid,
-          productName: item.name,
-          sleepUntil: expiry
-        })
+      // axios sends the login token (src/services/http.js). The server takes the uid from it.
+      await axios.post('/api/notifications/sleep-ended', {
+        productName: item.name,
+        sleepUntil: expiry
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to create sleep notification')
-      }
       completedSleepNotifications.add(key)
 
       console.log('[Sleep On It] Expiry notification checked:', item.name)

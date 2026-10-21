@@ -1,21 +1,20 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { user,firebaseUser } from '../mock/session.js'
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { user } from '../mock/session.js'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 
 const router = useRouter()
 const notifications=ref([])
 const unread=ref([])
 const read=ref([])
-const myUid = computed(() => firebaseUser.value?.uid)
 
 if (!user.value) {
   router.replace('/login?next=/notifications')
 }
 
 async function load() {
-  const res=await axios.get('/api/notifications' , { params: { id: myUid.value } })
+  const res = await axios.get('/api/notifications')
   notifications.value = res.data
   unreadSplit()
 }
@@ -40,7 +39,7 @@ function unreadSplit(){
 }
 
 async function markAllRead() {
-  await axios.put('/api/notifications/read-all', null, { params: { id: myUid.value } })
+  await axios.put('/api/notifications/read-all')
   notifications.value.forEach(n => { n.read = true })
   unreadSplit()
 }

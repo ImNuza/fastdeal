@@ -2,7 +2,7 @@
 import { nextTick, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { resetPassword, signInWithGoogle, signInWithEmail, signOutUser } from '../services/auth.js'
-import { lookupByUsername, getUser } from '../services/userApi.js'
+import { loginEmail, getUser } from '../services/userApi.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,7 +29,7 @@ async function onGoogleSignIn() {
     const fbUser = await signInWithGoogle()
     let dbUser
     try {
-      dbUser = await getUser(fbUser.uid)
+      dbUser = await getUser()
     } catch (dbErr) {
       await signOutUser()
       if (dbErr.response?.status === 404) {
@@ -62,21 +62,20 @@ async function onSignIn() {
   loading.value = true
   try {
     // If the input looks like an email, use it directly.
-    // Otherwise, look up the email from MongoDB by username first.
+    // Otherwise the server finds the email for that username, only if the password is right.
     let emailToUse = loginInput.value.trim()
     if (!emailToUse.includes('@')) {
       try {
-        const found = await lookupByUsername(emailToUse)
-        emailToUse = found.email
-      } catch {
-        errorText.value = 'No account found with that username.'
+        emailToUse = await loginEmail(emailToUse, password.value)
+      } catch (lookupErr) {
+        errorText.value = lookupErr.response?.data?.error || 'Could not reach the server. Make sure the backend is running.'
         return
       }
     }
     const fbUser = await signInWithEmail(emailToUse, password.value)
     let dbUser
     try {
-      dbUser = await getUser(fbUser.uid)
+      dbUser = await getUser()
     } catch (dbErr) {
       await signOutUser()
       if (dbErr.response?.status === 404) {

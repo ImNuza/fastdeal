@@ -2,6 +2,8 @@
 // dotenv.config()
 import 'dotenv/config'
 import express from 'express'
+import { initializeApp } from 'firebase-admin/app'
+import { getAuth } from 'firebase-admin/auth'
 import fs from 'fs'
 import mongoose from 'mongoose'
 import multer from 'multer'
@@ -33,25 +35,52 @@ const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd-v3.html')
 const erdPresentPath = path.join(__dirname, 'docs', 'fastdeal-erd-present.html')
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } })
 
+// Checking a login token needs only the project id, not a service account key.
+initializeApp({ projectId: process.env.VITE_FIREBASE_PROJECT_ID })
+
+// Routes for one user's data. The client sends "Authorization: Bearer <Firebase ID token>".
+// The uid comes from the checked token (req.uid), never from the URL, query or body.
+async function requireUser(req, res, next) {
+  const header = req.get('Authorization') || ''
+  const token = header.startsWith('Bearer ') ? header.slice(7) : ''
+  if (!token) return res.status(401).json({ error: 'Log in first' })
+  try {
+    const decoded = await getAuth().verifyIdToken(token)
+    req.uid = decoded.uid
+    req.email = decoded.email || null
+    next()
+  } catch (err) {
+    res.status(401).json({ error: 'Your login has expired. Log in again.' })
+  }
+}
+
+// Query and body values can arrive as objects (?q[$ne]=x). Use only plain strings.
+function text(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
 app.get('/health', (req, res) => {
   res.json({ ok: true })
 })
 
 // --- User routes ---
-// IMPORTANT: literal paths (/search, /lookup) must come before parameterised (:uid)
-// so Express does not swallow them as uid values.
+// Literal paths (/search, /login-email, /me) only. No route takes a uid from the URL.
+
+const USERNAME_RE = /^[a-z0-9_.]{3,20}$/
 
 // Search users by username (partial, case-insensitive). Returns each result
-// with the friendship status between that user and myUid.
-// Must be defined BEFORE /api/users/:uid so Express doesn't treat 'search' as a uid value.
-app.get('/api/users/search', async (req, res) => {
-  const { q, myUid } = req.query
-  if (!q || !myUid) return res.status(400).json({ error: 'q and myUid required' })
+// with the friendship status between that user and me. No emails.
+app.get('/api/users/search', requireUser, async (req, res) => {
+  const q = text(req.query.q)
+  if (!q) return res.status(400).json({ error: 'q required' })
+  const myUid = req.uid
   try {
+    // Escape the text so "." or ".*" matches itself, not every username.
+    const pattern = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const users = await User.find({
-      username: { $regex: q.trim(), $options: 'i' },
+      username: { $regex: pattern, $options: 'i' },
       firebaseUid: { $ne: myUid }
-    }).select('firebaseUid username email').limit(20)
+    }).select('firebaseUid username').limit(20)
 
     const pairKeys = users.map(u => toPairKey(myUid, u.firebaseUid))
     const friendships = await Friendship.find({ pairKey: { $in: pairKeys } })
@@ -64,7 +93,6 @@ app.get('/api/users/search', async (req, res) => {
       return {
         firebaseUid: u.firebaseUid,
         username: u.username,
-        email: u.email,
         pairKey: pk,
         friendshipStatus: f ? f.status : null,
         iRequested: f ? f.requesterUid === myUid : null
@@ -76,36 +104,56 @@ app.get('/api/users/search', async (req, res) => {
   }
 })
 
-// Look up a user's email by username — used by the login page so people can sign in
-// with username instead of email (Firebase needs the email to authenticate).
-app.get('/api/users/lookup', async (req, res) => {
-  const { username } = req.query
-  if (!username) return res.status(400).json({ error: 'username required' })
+// Login with a username. Firebase signs in with an email, so the server finds the email and
+// returns it only when the password is right. A wrong username and a wrong password get the
+// same answer, so nobody can use this route to collect emails.
+app.post('/api/users/login-email', async (req, res) => {
+  const username = text(req.body.username).toLowerCase()
+  const password = typeof req.body.password === 'string' ? req.body.password : ''
+  if (!username || !password) return res.status(400).json({ error: 'Enter your username and password.' })
   try {
-    const user = await User.findOne({ username: username.toLowerCase().trim() }).select('email firebaseUid username')
-    if (!user) return res.status(404).json({ error: 'No user with that username' })
-    res.json(user)
+    const user = await User.findOne({ username }).select('email')
+    if (!user) return res.status(401).json({ error: 'Username/email or password is wrong.' })
+    const check = await fetch(
+      'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + process.env.VITE_FIREBASE_API_KEY,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, password, returnSecureToken: false })
+      }
+    )
+    if (!check.ok) {
+      const body = await check.json().catch(() => ({}))
+      const reason = body.error && body.error.message ? body.error.message : ''
+      if (reason.startsWith('TOO_MANY_ATTEMPTS')) {
+        return res.status(429).json({ error: 'Too many tries. Wait a few minutes, then try again.' })
+      }
+      return res.status(401).json({ error: 'Username/email or password is wrong.' })
+    }
+    res.json({ email: user.email })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// Create or return existing user (called after Firebase signup/Google login).
-// Pass username only on first signup with email — Google users set it separately via /set-username.
-app.post('/api/users', async (req, res) => {
-  const { firebaseUid, email, username } = req.body
-  if (!firebaseUid || !email) {
-    return res.status(400).json({ error: 'firebaseUid and email are required' })
-  }
+// Create or return the logged-in user's row (after Firebase signup or Google login).
+// Pass username only on the first email signup. Google users set it later on /set-username.
+app.post('/api/users', requireUser, async (req, res) => {
+  if (!req.email) return res.status(400).json({ error: 'This account has no email.' })
   const setOnInsert = { emailAlertsOn: true }
-  if (username) setOnInsert.username = username.toLowerCase().trim()
+  const username = text(req.body.username).toLowerCase()
+  if (username) {
+    if (!USERNAME_RE.test(username)) {
+      return res.status(400).json({ error: 'Username must be 3–20 chars: letters, numbers, _ or .' })
+    }
+    setOnInsert.username = username
+  }
   try {
     const user = await User.findOneAndUpdate(
-      { firebaseUid },
-      { $set: { email }, $setOnInsert: setOnInsert },
+      { firebaseUid: req.uid },
+      { $set: { email: req.email }, $setOnInsert: setOnInsert },
       { upsert: true, new: true }
     )
-    console.log('[POST /api/users] upserted:', user.email, '| username:', user.username)
     res.json(user)
   } catch (err) {
     if (err.code === 11000) return res.status(409).json({ error: 'Username already taken' })
@@ -113,10 +161,10 @@ app.post('/api/users', async (req, res) => {
   }
 })
 
-// Get user profile
-app.get('/api/users/:uid', async (req, res) => {
+// My profile
+app.get('/api/users/me', requireUser, async (req, res) => {
   try {
-    const user = await User.findOne({ firebaseUid: req.params.uid })
+    const user = await User.findOne({ firebaseUid: req.uid })
     if (!user) return res.status(404).json({ error: 'User not found' })
     res.json(user)
   } catch (err) {
@@ -124,27 +172,26 @@ app.get('/api/users/:uid', async (req, res) => {
   }
 })
 
-// Update user — allows emailAlertsOn and username.
-// Username must match /^[a-z0-9_.]{3,20}$/ and be unique.
-app.put('/api/users/:uid', async (req, res) => {
-  const patch = {}
-  if ('emailAlertsOn' in req.body) patch.emailAlertsOn = req.body.emailAlertsOn
-  if ('username' in req.body) {
-    const u = req.body.username.toLowerCase().trim()
-    if (!/^[a-z0-9_.]{3,20}$/.test(u)) {
-      return res.status(400).json({ error: 'Username must be 3–20 chars: letters, numbers, _ or .' })
-    }
-    patch.username = u
-  }
-  if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' })
+// Update my profile. Allows emailAlertsOn and username.
+// Username must match USERNAME_RE and be unique.
+app.put('/api/users/me', requireUser, async (req, res) => {
   try {
+    const patch = {}
+    if ('emailAlertsOn' in req.body) patch.emailAlertsOn = req.body.emailAlertsOn === true
+    if ('username' in req.body) {
+      const u = text(req.body.username).toLowerCase()
+      if (!USERNAME_RE.test(u)) {
+        return res.status(400).json({ error: 'Username must be 3–20 chars: letters, numbers, _ or .' })
+      }
+      patch.username = u
+    }
+    if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' })
     const user = await User.findOneAndUpdate(
-      { firebaseUid: req.params.uid },
+      { firebaseUid: req.uid },
       { $set: patch },
       { new: true }
     )
     if (!user) return res.status(404).json({ error: 'User not found' })
-    console.log('[PUT /api/users] updated:', user.email, '| patch:', patch)
     res.json(user)
   } catch (err) {
     if (err.code === 11000) return res.status(409).json({ error: 'Username already taken' })
@@ -153,13 +200,11 @@ app.put('/api/users/:uid', async (req, res) => {
 })
 
 // --- Friendship routes ---
-// All routes take ?myUid=<firebaseUid> so the server knows who is acting.
-
+// Every route acts as the logged-in user (req.uid).
 
 // Get accepted friends list with profile info
-app.get('/api/friends', async (req, res) => {
-  const { myUid } = req.query
-  if (!myUid) return res.status(400).json({ error: 'myUid required' })
+app.get('/api/friends', requireUser, async (req, res) => {
+  const myUid = req.uid
   try {
     const rows = await Friendship.find({
       $or: [{ requesterUid: myUid }, { addresseeUid: myUid }],
@@ -180,19 +225,18 @@ app.get('/api/friends', async (req, res) => {
   }
 })
 
-// Get pending incoming requests (others who sent to me)
-app.get('/api/friends/requests', async (req, res) => {
-  const { myUid } = req.query
-  if (!myUid) return res.status(400).json({ error: 'myUid required' })
+// Get pending incoming requests (others who sent to me). No emails: they are not friends yet.
+app.get('/api/friends/requests', requireUser, async (req, res) => {
+  const myUid = req.uid
   try {
     const rows = await Friendship.find({ addresseeUid: myUid, status: 'pending' })
     const requesterUids = rows.map(r => r.requesterUid)
-    const users = await User.find({ firebaseUid: { $in: requesterUids } }).select('firebaseUid username email')
+    const users = await User.find({ firebaseUid: { $in: requesterUids } }).select('firebaseUid username')
     const uMap = {}
     for (const u of users) uMap[u.firebaseUid] = u
     const requests = rows.map(r => {
       const u = uMap[r.requesterUid] || {}
-      return { pairKey: r.pairKey, firebaseUid: r.requesterUid, username: u.username, email: u.email }
+      return { pairKey: r.pairKey, firebaseUid: r.requesterUid, username: u.username }
     })
     res.json(requests)
   } catch (err) {
@@ -201,15 +245,19 @@ app.get('/api/friends/requests', async (req, res) => {
 })
 
 // Send a friend request
-app.post('/api/friends/request', async (req, res) => {
-  const { myUid, addresseeUid } = req.body
-  if (!myUid || !addresseeUid) return res.status(400).json({ error: 'myUid and addresseeUid required' })
+app.post('/api/friends/request', requireUser, async (req, res) => {
+  const myUid = req.uid
+  const addresseeUid = text(req.body.addresseeUid)
+  if (!addresseeUid) return res.status(400).json({ error: 'addresseeUid required' })
+  if (addresseeUid === myUid) return res.status(400).json({ error: 'You cannot add yourself' })
   const pairKey = toPairKey(myUid, addresseeUid)
   try {
+    if (!(await User.exists({ firebaseUid: addresseeUid }))) {
+      return res.status(404).json({ error: 'User not found' })
+    }
     const existing = await Friendship.findOne({ pairKey })
     if (existing) return res.status(409).json({ error: 'Friendship already exists', status: existing.status })
     const f = await Friendship.create({ requesterUid: myUid, addresseeUid, pairKey })
-    console.log('[POST /api/friends/request]', myUid, '→', addresseeUid)
 
      //notification sending
     const me = await User.findOne({ firebaseUid: myUid }).select('username')
@@ -229,9 +277,8 @@ app.post('/api/friends/request', async (req, res) => {
 })
 
 // Accept a pending request
-app.put('/api/friends/:pairKey/accept', async (req, res) => {
-  const { myUid } = req.body
-  if (!myUid) return res.status(400).json({ error: 'myUid required' })
+app.put('/api/friends/:pairKey/accept', requireUser, async (req, res) => {
+  const myUid = req.uid
   try {
     const f = await Friendship.findOneAndUpdate(
       { pairKey: req.params.pairKey, addresseeUid: myUid, status: 'pending' },
@@ -239,7 +286,6 @@ app.put('/api/friends/:pairKey/accept', async (req, res) => {
       { new: true }
     )
     if (!f) return res.status(404).json({ error: 'Request not found' })
-    console.log('[PUT /api/friends/accept]', req.params.pairKey)
 
     //notification sending
     const me = await User.findOne({ firebaseUid: myUid }).select('username')
@@ -259,16 +305,14 @@ app.put('/api/friends/:pairKey/accept', async (req, res) => {
 })
 
 // Decline or cancel/remove a friendship (delete the row)
-app.delete('/api/friends/:pairKey', async (req, res) => {
-  const { myUid } = req.body
-  if (!myUid) return res.status(400).json({ error: 'myUid required' })
+app.delete('/api/friends/:pairKey', requireUser, async (req, res) => {
+  const myUid = req.uid
   try {
     const f = await Friendship.findOneAndDelete({
       pairKey: req.params.pairKey,
       $or: [{ requesterUid: myUid }, { addresseeUid: myUid }]
     })
     if (!f) return res.status(404).json({ error: 'Friendship not found' })
-    console.log('[DELETE /api/friends]', req.params.pairKey)
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -350,8 +394,9 @@ app.get('/api/trending' , async (req,res) =>{
 })
 
 
-app.post('/api/notifications/sleep-ended', async (req, res) => {
-  const { firebaseUid, productName, sleepUntil } = req.body
+app.post('/api/notifications/sleep-ended', requireUser, async (req, res) => {
+  const firebaseUid = req.uid
+  const { productName, sleepUntil } = req.body
 
   const expiry = Number(sleepUntil)
 
@@ -408,37 +453,37 @@ app.post('/api/notifications/sleep-ended', async (req, res) => {
 
 
 //retrieve notifications
-app.get('/api/notifications',async(req,res)=>{
-  const id=req.query.id
+app.get('/api/notifications', requireUser, async (req, res) => {
   try {
-    const rows = await Notification.find({ firebaseUid: id }).sort({ createdAt: -1 })
+    const rows = await Notification.find({ firebaseUid: req.uid }).sort({ createdAt: -1 })
     res.json(rows)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-app.put('/api/notifications/:id/read', async (req, res) => {
+// Only my own notification can be marked read.
+app.put('/api/notifications/:id/read', requireUser, async (req, res) => {
   try {
     await Notification.updateOne(
-      { _id: req.params.id },
+      { _id: req.params.id, firebaseUid: req.uid },
       { $set: { read: true, readAt: new Date() } }
     )
     res.json({ ok: true })
   } catch (err) {
-    console.log(err)
+    res.status(500).json({ error: err.message })
   }
 })
 
-app.put('/api/notifications/read-all', async (req, res) => {
+app.put('/api/notifications/read-all', requireUser, async (req, res) => {
   try {
     await Notification.updateMany(
-      { firebaseUid: req.query.id, read: false },
+      { firebaseUid: req.uid, read: false },
       { $set: { read: true, readAt: new Date() } }
     )
     res.json({ ok: true })
   } catch (err) {
-    console.log(err)
+    res.status(500).json({ error: err.message })
   }
 })
 
