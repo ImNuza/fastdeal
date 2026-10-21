@@ -15,6 +15,14 @@ if (!user.value) {
   router.replace('/login?next=/wishlist')
 }
 
+// Products saved from a product page open it again. Older items open a search for the name.
+function productLink(item) {
+  if (item.productId) {
+    return { path: '/product/' + item.productId, query: { q: item.q || item.name } }
+  }
+  return { path: '/compare', query: { q: item.name } }
+}
+
 // Ticks every 30 seconds so the "left" countdown on held items stays current.
 const now = ref(Date.now())
 let clock = 0
@@ -669,9 +677,9 @@ function cheapestPlannable() {
           <div v-for="item in shownItems" :key="item.name" class="fd-wish-row" :class="{ 'is-asleep': asleep(item) }"
             role="row">
             <div class="fd-wish-cell fd-wish-cell-product" role="cell">
-              <router-link class="fd-wish-product" :to="{ path: '/compare', query: { q: item.name } }">
+              <router-link class="fd-wish-product" :to="productLink(item)">
                 <span class="fd-wish-image">
-                  <img v-if="productImage(item.name)" :src="productImage(item.name)" alt="" />
+                  <img v-if="item.image || productImage(item.name)" :src="item.image || productImage(item.name)" alt="" />
                   <span v-else>{{ initials(item.name) }}</span>
                 </span>
                 <span class="fd-section-subtitle mb-0">{{ item.name }}</span>

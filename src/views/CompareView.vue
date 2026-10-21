@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
-import SaveSleepButtons from '../components/SaveSleepButtons.vue'
 import { buildResult, dayLabel, sgd, verdictFor } from '../mock/catalog.js'
 import { isSaved, savedFrom, saveProduct, user } from '../mock/session.js'
 import { itemName } from '../services/itemName.js'
@@ -115,20 +114,6 @@ const lowInView = computed(function () {
   return low
 })
 
-// The cheapest live listing, so Save records the real store and price.
-const cheapestRow = computed(function () {
-  if (!result.value || !result.value.listings.length) {
-    return null
-  }
-  let best = result.value.listings[0]
-  for (let i = 1; i < result.value.listings.length; i++) {
-    if (result.value.listings[i].price < best.price) {
-      best = result.value.listings[i]
-    }
-  }
-  return { store: best.store, price: best.price }
-})
-
 const historyMax = computed(function () {
   if (!result.value) {
     return 1
@@ -146,14 +131,19 @@ function loginNext() {
   router.push({ path: '/login', query: { next: route.fullPath } })
 }
 
-// Save from one specific store row in the listings table.
+// Each card is one product. Save saves that card's product from that card's store.
+function rowName(row) {
+  return row.name || result.value.name
+}
+
 function onSaveFrom(row) {
   if (!user.value) {
     loginNext()
     return
   }
-  saveProduct(result.value.name, { store: row.store, price: row.price })
-  note.value = 'Saved to wishlist from ' + row.store + '.'
+  saveProduct(rowName(row), { store: row.store, price: row.price },
+    { productId: row.productId, q: String(route.query.q || ''), image: row.image })
+  note.value = 'Saved ' + rowName(row) + ' from ' + row.store + '.'
 }
 
 // Map one listing from GET /api/search into the row shape the cards use
@@ -270,7 +260,6 @@ onMounted(async function () {
       <p class="small text-secondary mb-0">14-day low {{ sgd(verdict.low) }}. 14-day average {{ sgd(verdict.avg) }}. Mean rating {{ verdict.rating.toFixed(1) }} from {{ verdict.reviewSum }} reviews.</p>
     </div>
 
-    <SaveSleepButtons :name="result.name" :listing="cheapestRow" />
     <p v-if="note" class="small mb-3" role="status">{{ note }}</p>
 
     <div class="card p-3 mb-3">
@@ -361,9 +350,9 @@ onMounted(async function () {
           <button
             class="btn btn-sm btn-outline-dark fd-listing-save"
             type="button"
-            :disabled="savedFrom(result.name) === row.store"
+            :disabled="savedFrom(rowName(row), row.productId) === row.store"
             @click="onSaveFrom(row)"
-          >{{ savedFrom(result.name) === row.store ? 'Saved' : isSaved(result.name) ? 'Save from here instead' : 'Save from here' }}</button>
+          >{{ savedFrom(rowName(row), row.productId) === row.store ? 'Saved' : isSaved(rowName(row), row.productId) ? 'Save from here instead' : 'Save from here' }}</button>
         </article>
       </li>
     </ul>

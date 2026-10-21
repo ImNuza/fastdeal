@@ -13,19 +13,27 @@ import {
   user
 } from '../mock/session.js'
 
-// Save and Sleep on it buttons for one product, each with an undo.
-// Used on the compare page and the product page.
+// Save and Sleep on it buttons for one product, each with an undo. Used on the product page.
 const props = defineProps({
-  // Product name, as the wishlist stores it
+  // Product title, as the wishlist stores it
   name: {
     type: String,
     required: true
   },
-  // Optional { store, price } to save from. Without it, the cheapest store is used.
+  // { store, price } to save from. Without it there is nothing to save.
   listing: {
     type: Object,
     default: null
+  },
+  // Optional { productId, q, image }, so the wishlist can open this product page again
+  product: {
+    type: Object,
+    default: null
   }
+})
+
+const productId = computed(function () {
+  return props.product ? props.product.productId : undefined
 })
 
 const route = useRoute()
@@ -45,16 +53,16 @@ onBeforeUnmount(function () {
 })
 
 const saved = computed(function () {
-  return isSaved(props.name)
+  return isSaved(props.name, productId.value)
 })
 
 const asleep = computed(function () {
-  return isAsleep(props.name, now.value)
+  return isAsleep(props.name, now.value, productId.value)
 })
 
 // "23h 12m left", the same format as the wishlist page
 const leftText = computed(function () {
-  const ms = sleepEndsAt(props.name) - now.value
+  const ms = sleepEndsAt(props.name, productId.value) - now.value
   const days = Math.floor(ms / 86400000)
   const hours = Math.floor((ms % 86400000) / 3600000)
   const minutes = Math.max(Math.floor((ms % 3600000) / 60000), 1)
@@ -73,15 +81,15 @@ function onSave() {
     loginNext()
     return
   }
-  saveProduct(props.name, props.listing || undefined)
-  note.value = 'Saved to wishlist from ' + savedFrom(props.name) + '.'
+  saveProduct(props.name, props.listing, props.product)
+  note.value = 'Saved to wishlist from ' + savedFrom(props.name, productId.value) + '.'
 }
 
 function onRemove() {
   if (asleep.value && !window.confirm('This also cancels Sleep on it. Remove it from your wishlist?')) {
     return
   }
-  removeSaved(props.name)
+  removeSaved(props.name, productId.value)
   note.value = 'Removed from wishlist.'
 }
 
@@ -90,17 +98,17 @@ function onSleep() {
     loginNext()
     return
   }
-  // Save from the real store first. sleepOn on its own would pick a store from the mock catalog.
+  // Save from the real store first. sleepOn only changes a product that is already saved.
   if (!saved.value) {
-    saveProduct(props.name, props.listing || undefined)
+    saveProduct(props.name, props.listing, props.product)
   }
   // The start price lets the wishlist verdict and the "Sleep On It completed" notification compare prices later.
-  sleepOn(props.name, 24, props.listing ? props.listing.price : undefined)
+  sleepOn(props.name, 24, props.listing ? props.listing.price : undefined, productId.value)
   note.value = 'Saved to wishlist and on hold for 1 day.'
 }
 
 function onCancelSleep() {
-  cancelSleep(props.name)
+  cancelSleep(props.name, productId.value)
   note.value = 'Hold cancelled. Still in your wishlist.'
 }
 </script>
@@ -112,14 +120,14 @@ function onCancelSleep() {
       <button class="btn btn-link btn-sm px-1" type="button" :aria-label="'Remove ' + name + ' from wishlist'"
         @click="onRemove">Remove</button>
     </template>
-    <button v-else class="btn btn-dark" type="button" @click="onSave">Save</button>
+    <button v-else class="btn btn-dark" type="button" :disabled="!listing" @click="onSave">Save</button>
 
     <template v-if="asleep">
       <button class="btn btn-outline-dark" type="button" disabled>On hold, {{ leftText }}</button>
       <button class="btn btn-link btn-sm px-1" type="button" :aria-label="'Cancel the hold on ' + name"
         @click="onCancelSleep">Cancel hold</button>
     </template>
-    <button v-else class="btn btn-outline-dark" type="button" @click="onSleep">Sleep on it</button>
+    <button v-else class="btn btn-outline-dark" type="button" :disabled="!listing" @click="onSleep">Sleep on it</button>
 
     <span v-if="note" class="small" role="status">{{ note }}</span>
     <span v-if="!user" class="small text-secondary">Log in to save or hold this product.</span>
