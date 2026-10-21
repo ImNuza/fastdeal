@@ -1,6 +1,6 @@
 import mongoose from 'mongoose'
 
-// Lowest price of one product on one Singapore calendar day. Shared by all users.
+// Lowest price of one product at one store on one Singapore calendar day. Shared by all users.
 const priceDaySchema = new mongoose.Schema(
   {
     productKey: {
@@ -28,6 +28,13 @@ const priceDaySchema = new mongoose.Schema(
     oldPrice: {
       type: Number,
       default: null
+    },
+
+    // SerpApi product_id of the listing, for reference only. Not part of the key:
+    // the same listing can get a different id in another search.
+    productId: {
+      type: String,
+      default: null
     }
   },
   {
@@ -35,8 +42,8 @@ const priceDaySchema = new mongoose.Schema(
   }
 )
 
-// One row per product per day.
-priceDaySchema.index({ productKey: 1, day: 1 }, { unique: true })
+// One row per product, per store, per day.
+priceDaySchema.index({ productKey: 1, store: 1, day: 1 }, { unique: true })
 
 const PriceDay = mongoose.model('PriceDay', priceDaySchema, 'priceDays')
 

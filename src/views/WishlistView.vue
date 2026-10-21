@@ -3,8 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { fetchCheapestLiveListing } from '../services/livePriceService.js'
 import { productImage, sgd, storeLink } from '../mock/catalog.js'
-import { addSampleWishlist, isAsleep, missingSamples, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user } from '../mock/session.js'
+import { addSampleWishlist, cancelSleep, isAsleep, missingSamples, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user } from '../mock/session.js'
 import FdIcon from '../components/FdIcon.vue'
+import FdLoadingDots from '../components/FdLoadingDots.vue'
 import { planBudget } from '../mock/budget.js'
 
 const router = useRouter()
@@ -682,6 +683,8 @@ function cheapestPlannable() {
               <div>
                 <strong class="d-block">Sleeping on it, {{ leftText(item) }}</strong>
                 <span class="small text-secondary">Back on {{ untilText(item) }}</span>
+                <button class="btn btn-link btn-sm p-0 d-block" type="button"
+                  :aria-label="'Cancel the hold on ' + item.name" @click="cancelSleep(item.name)">Cancel hold</button>
               </div>
             </div>
 
@@ -699,9 +702,7 @@ function cheapestPlannable() {
                   Best now
                 </span>
 
-                <span v-if="liveLoading[item.name] && !best(item)">
-                  Loading price...
-                </span>
+                <FdLoadingDots v-if="liveLoading[item.name] && !best(item)" size="inline" message="Checking price" />
 
                 <template v-else-if="best(item)">
                   <strong>{{ sgd(best(item).price) }}</strong>
@@ -884,8 +885,8 @@ function cheapestPlannable() {
         has ended.
       </p>
 
-      <p v-if="verdictLoading" class="alert alert-secondary" role="status">
-        Checking the latest price from SerpApi...
+      <p v-if="verdictLoading" class="alert alert-secondary">
+        <FdLoadingDots size="inline" message="Checking the latest price" />
       </p>
 
       <p v-else-if="verdictError" class="alert alert-danger" role="alert">

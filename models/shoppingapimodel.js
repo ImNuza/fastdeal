@@ -1,22 +1,18 @@
 // Server-side (Node/Express) search model for FastDeal.
-// Flow: HomeView -> GET /api/search?q= -> search(q) -> SerpAPI (Google Shopping).
-// search() RETURNS a normalized { query, productKey, listings, ... } object (also the
-// HTTP response body) but WRITES the FULL RAW SerpAPI json to src/mock/tempitem.json
-// (CompareView reads shopping_results from that raw file via GET /api/tempitem).
-// A normalized copy is also written to src/mock/last-search.json.
+// Flow: CompareView -> GET /api/search?q=&sid= -> search(q, sid) -> SerpAPI (Google Shopping).
+// search() returns a normalized { query, productKey, searchTerm, listings, ... } object
+// (also the HTTP response body). Results are saved in the searchCache collection for
+// 6 hours, so the same search again uses no SerpApi credit. When the browser sent a
+// session id, the search is also logged once per session in searchLogs.
 //
 // Pre-processing: the raw user query is sent to Gemini, which returns a tighter
 // search term and a conservative minimum retail price (USD). Any Gemini failure
 // falls back to the raw query so search always runs.
 
 import { getJson } from 'serpapi'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
 import { toProductKey } from './product-key.js'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+import SearchCache from './search-cache-model.js'
+import SearchLog from './search-log-model.js'
 
 // Keys are read at module scope; server.js does `import 'dotenv/config'` BEFORE it
 // imports this model, so process.env is already populated when these evaluate.
@@ -27,9 +23,8 @@ const GEMINI_MODEL = 'gemini-3.5-flash-lite'
 const GEMINI_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
-// Where the results are written for the frontend to read.
-const TEMP_ITEM_PATH = path.join(__dirname, '..', 'src', 'mock', 'tempitem.json')
-const LAST_SEARCH_PATH = path.join(__dirname, '..', 'src', 'mock', 'last-search.json')
+// How long a saved search is reused before SerpApi is called again.
+const CACHE_HOURS = 6
 
 // Extract the first {...} JSON object from Gemini's text, tolerating ```json fences
 // and stray prose around it. Returns the parsed object, or null on any failure.
@@ -98,15 +93,59 @@ function toRow(item) {
     rating: Number(item.rating) || 0,
     reviews: Number(item.reviews) || 0,
     link: item.product_link || item.link || '',
-    productId: item.product_id || ''
+    productId: item.product_id || '',
+    // The crossed-out "was" price, or null when the store shows none
+    oldPrice: Number(item.extracted_old_price) || null,
+    freeShipping: String(item.delivery || '').toLowerCase().includes('free'),
+    // Needed by the product page to load every store for this product
+    immersiveToken: item.immersive_product_page_token || ''
   }
 }
 
-export async function search(q) {
+// One anonymous searchLogs row per session per search, for Trending. A reload or
+// coming back from a product page finds the row and adds nothing. Only searches from
+// the search page send a session id, so background price checks (Sleep on it) do not
+// count. productName and image are what the Trending page shows.
+async function logSearch(sessionId, query, productKey, searchTerm, listings) {
+  if (!sessionId) return
+  try {
+    await SearchLog.updateOne(
+      { sessionId: String(sessionId), productKey },
+      {
+        $setOnInsert: {
+          query,
+          productName: searchTerm,
+          image: (listings[0] && listings[0].image) || '',
+          searchedAt: new Date()
+        }
+      },
+      { upsert: true }
+    )
+  } catch (error) {
+    console.error('searchLogs write failed:', error.message)
+  }
+}
+
+export async function search(q, sessionId) {
   if (!API_KEY) throw new Error('SERPAPI_API_KEY is not set')
 
   const rawQuery = String(q || '').trim()
   if (!rawQuery) throw new Error('Query is required')
+  const productKey = toProductKey(rawQuery)
+
+  // Saved in the last CACHE_HOURS hours: return it and use no SerpApi credit.
+  const cached = await SearchCache.findOne({ queryKey: productKey, expiresAt: { $gt: new Date() } }).lean()
+  if (cached) {
+    await logSearch(sessionId, rawQuery, productKey, cached.searchTerm || rawQuery, cached.listings)
+    return {
+      query: rawQuery,
+      productKey,
+      searchTerm: cached.searchTerm || rawQuery,
+      listings: cached.listings,
+      fetchedAt: cached.fetchedAt,
+      cached: true
+    }
+  }
 
   const pre = await preprocess(rawQuery)
 
@@ -137,29 +176,38 @@ export async function search(q) {
     minPriceApplied = null
   }
 
-  // Write the FULL RAW SerpAPI response for CompareView to read.
-  fs.writeFileSync(TEMP_ITEM_PATH, JSON.stringify(json, null, 2), 'utf8')
-
   const results = Array.isArray(json.shopping_results) ? json.shopping_results : []
   const listings = results
     .map(toRow)
     .filter((r) => r.price > 0)
     .slice(0, 10)
 
-  const result = {
+  const fetchedAt = new Date()
+
+  // Save for the next CACHE_HOURS hours, then log the search.
+  await SearchCache.findOneAndUpdate(
+    { queryKey: productKey },
+    {
+      queryKey: productKey,
+      searchTerm: pre.searchTerm,
+      listings,
+      fetchedAt,
+      expiresAt: new Date(fetchedAt.getTime() + CACHE_HOURS * 3600000)
+    },
+    { upsert: true }
+  )
+  await logSearch(sessionId, rawQuery, productKey, pre.searchTerm, listings)
+
+  return {
     query: rawQuery,
-    productKey: toProductKey(rawQuery),
+    productKey,
     searchTerm: pre.searchTerm,
     fullQuery,
     minPrice: minPriceApplied,
     listings,
-    fetchedAt: new Date().toISOString()
+    fetchedAt,
+    cached: false
   }
-
-  // Write the normalized result too.
-  fs.writeFileSync(LAST_SEARCH_PATH, JSON.stringify(result, null, 2), 'utf8')
-
-  return result
 }
 
 
