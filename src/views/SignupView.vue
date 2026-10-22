@@ -11,10 +11,12 @@ const router = useRouter()
 const username = ref('')
 const email = ref('')
 const password = ref('')
+const telegram = ref('')
 const errorText = ref('')
 const loading = ref(false)
 
 const USERNAME_RE = /^[a-z0-9_.]{3,20}$/
+const TELEGRAM_RE = /^[A-Za-z0-9_]{5,32}$/
 
 // Show a banner if redirected here from the login page because the account wasn't found.
 if (route.query.error === 'not-registered') {
@@ -49,7 +51,7 @@ async function onEmailSignUp() {
   errorText.value = ''
   const u = username.value.toLowerCase().trim()
   if (!u || !email.value || !password.value) {
-    errorText.value = 'Fill in all three fields.'
+    errorText.value = 'Fill in username, email and password.'
     return
   }
   if (!USERNAME_RE.test(u)) {
@@ -60,12 +62,22 @@ async function onEmailSignUp() {
     errorText.value = 'Password must be at least 6 characters.'
     return
   }
+  const tg = telegram.value.trim().replace(/^@/, '')
+  if (tg && !TELEGRAM_RE.test(tg)) {
+    errorText.value = 'Telegram username must be 5–32 characters: letters, numbers or _.'
+    return
+  }
   loading.value = true
-  startSignup() // tell watchAuthState to skip the DB check — we handle it below
+  startSignup()
   try {
+    const { updateUser } = await import('../services/userApi.js')
     const fbUser = await signUpWithEmail(email.value, password.value)
     const dbUser = await createOrGetUser(u)
-    applyDbUser(dbUser, fbUser) // populate user.value immediately
+    if (tg) {
+      try { await updateUser({ telegramUsername: tg }) } catch {}
+      dbUser.telegramUsername = tg
+    }
+    applyDbUser(dbUser, fbUser)
     const next = route.query.next
     router.push(typeof next === 'string' && next.startsWith('/') ? next : '/wishlist')
   } catch (err) {
@@ -120,6 +132,18 @@ async function onEmailSignUp() {
             placeholder="Password (min 6 characters)"
             autocomplete="new-password"
           />
+          <div class="input-group mb-1">
+            <span class="input-group-text" style="border-radius: 999px 0 0 999px;">@</span>
+            <input
+              id="telegram"
+              v-model="telegram"
+              class="form-control login-input-flat"
+              type="text"
+              placeholder="Telegram username (optional)"
+              autocomplete="off"
+            />
+          </div>
+          <p class="small text-secondary mb-3">Shared only with friends who want to Buy Together on the same item.</p>
           <button class="btn btn-dark fd-btn-lg w-100 mb-4" type="submit" :disabled="loading">
             {{ loading ? 'Creating account…' : 'Create account' }}
           </button>
@@ -159,8 +183,11 @@ async function onEmailSignUp() {
 
 <style scoped>
 .login-input {
-  /* Pill inputs; colours, border, and focus ring come from the shared .form-control styles. */
   border-radius: 999px;
+  padding: 0.75rem 1.25rem;
+}
+.login-input-flat {
+  border-radius: 0 999px 999px 0;
   padding: 0.75rem 1.25rem;
 }
 </style>

@@ -452,16 +452,16 @@ app.post('/api/notifications/sleep-ended', requireUser, async (req, res) => {
     )
     const notification = result.value
 
-    // Only the first time this countdown ends, so a reload makes no second Buy Together alert.
-    if (!result.lastErrorObject.updatedExisting) {
+    // Only on the first expiry — check if any friends saved the same product.
+    if (!result.lastErrorObject?.updatedExisting) {
       try {
         await notifyBuyTogether(firebaseUid, productName)
-      } catch (error) {
-        console.error('[Buy Together]', error)
+      } catch (btErr) {
+        console.error('[Buy Together] notification failed:', btErr)
       }
     }
 
-    res.json(notification)
+    res.json(result.value)
   } catch (error) {
     console.error('[Sleep On It] Notification error:', error)
 
@@ -470,7 +470,6 @@ app.post('/api/notifications/sleep-ended', requireUser, async (req, res) => {
     })
   }
 })
-
 
 //retrieve notifications
 app.get('/api/notifications', requireUser, async (req, res) => {

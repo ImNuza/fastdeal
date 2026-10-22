@@ -161,9 +161,6 @@ function findSaved(name, productId) {
   return list.find(function (item) { return toProductKey(item.name) === key }) || null
 }
 
-// Saves one product from one store. listing = { store, price }.
-// product = { productId, q, image } when known, so the wishlist can open the product page.
-// Saving an already saved product from a different store switches it to that store and price.
 export function saveProduct(name, listing, product) {
   if (!user.value || !listing || !(listing.price > 0)) {
     return
