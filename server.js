@@ -32,7 +32,8 @@ app.use(express.json())
 
 const PORT = process.env.PORT || 3000
 const proposalPath = path.join(__dirname, 'data', 'proposal.json')
-const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd-v3.html')
+const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd-v4.html')
+const erdV3Path = path.join(__dirname, 'docs', 'fastdeal-erd-v3.html')
 const erdPresentPath = path.join(__dirname, 'docs', 'fastdeal-erd-present.html')
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } })
 
@@ -636,6 +637,11 @@ app.delete('/api/wishlist/:productKey', requireUser, async (req, res) => {
 // Database ERD for the team and graders
 app.get('/erd', (req, res) => {
   res.sendFile(erdPath)
+})
+
+// The previous version, linked from the v4 page
+app.get('/erd/v3', (req, res) => {
+  res.sendFile(erdV3Path)
 })
 
 // Clean ERD for presenting in class

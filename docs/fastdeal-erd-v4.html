@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FastDeal ERD v4</title>
+<style>
+  :root {
+    --bg: #f4ede3;
+    --paper: #fbf8f3;
+    --ink: #343b1b;
+    --muted: #585f3e;
+    --blue: #27508a;
+    --line: #e8d9ad;
+    --vanilla: #fae8a4;
+    --vanilla-soft: #fcf2cc;
+    --green-soft: #d8e4b4;
+    --red-soft: #f4d9cf;
+    --red: #a3301f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16191f;
+      --paper: #1f242c;
+      --ink: #e9e4da;
+      --muted: #b0aa9c;
+      --blue: #8fb3e8;
+      --line: #3a3f48;
+      --vanilla: #e6cf7a;
+      --vanilla-soft: #3a3420;
+      --green-soft: #2f3d22;
+      --red-soft: #4a2a24;
+      --red: #f0a493;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16191f;
+    --paper: #1f242c;
+    --ink: #e9e4da;
+    --muted: #b0aa9c;
+    --blue: #8fb3e8;
+    --line: #3a3f48;
+    --vanilla: #e6cf7a;
+    --vanilla-soft: #3a3420;
+    --green-soft: #2f3d22;
+    --red-soft: #4a2a24;
+    --red: #f0a493;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .page { max-width: 1040px; margin: 0 auto; padding: 28px 16px 64px; }
+  .kicker {
+    margin: 0 0 6px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 { margin: 0 0 8px; font-size: 24px; font-weight: 700; }
+  h2.section { margin: 40px 0 10px; font-size: 18px; }
+  .lead { margin: 0 0 16px; max-width: 72ch; color: var(--muted); }
+
+  .switch { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 999px; overflow: hidden; margin: 6px 0 14px; }
+  .switch button {
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    padding: 6px 16px;
+    cursor: pointer;
+  }
+  .switch button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+  .canvas { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .canvas svg { display: block; min-width: 900px; width: 100%; height: auto; }
+  .canvas svg line, .canvas svg polyline { stroke: var(--ink); stroke-width: 1.5; fill: none; }
+  .canvas svg .bus { stroke: var(--blue); }
+  .rel { font-size: 11px; fill: var(--muted); }
+  .rel.b { fill: var(--blue); }
+  [hidden] { display: none !important; }
+
+  .entity {
+    height: 100%;
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+    padding: 8px 10px 6px;
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .entity.ext { border-style: dashed; }
+  .entity.alone { border-color: var(--blue); }
+  .entity.concept { border-style: dashed; border-color: var(--blue); }
+  .entity.newbox { border-width: 2.5px; }
+  .entity h3 { margin: 0; font-size: 14px; font-weight: 700; }
+  .entity .coll {
+    margin: 0 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+    font: 11px/1.4 ui-monospace, Menlo, monospace;
+    color: var(--muted);
+  }
+  .entity ul { margin: 0; padding: 0; list-style: none; }
+  .entity li { font-size: 12.5px; line-height: 1.45; padding: 0 3px; border-radius: 3px; }
+  .entity li::before { content: ""; display: inline-block; width: 12px; font-weight: 700; }
+  .entity li.add { background: var(--green-soft); }
+  .entity li.add::before { content: "+"; }
+  .entity li.chg { background: var(--vanilla-soft); }
+  .entity li.chg::before { content: "~"; }
+  .entity .hint { margin: 4px 0 0; font-size: 11px; line-height: 1.35; color: var(--muted); }
+  .pk { font-weight: 700; text-decoration: underline; }
+  .fk { color: var(--blue); }
+  .dn {
+    display: inline-block;
+    min-width: 15px;
+    margin-left: 4px;
+    padding: 0 3px;
+    border-radius: 8px;
+    background: var(--blue);
+    color: var(--paper);
+    font-size: 10px;
+    line-height: 15px;
+    text-align: center;
+    text-decoration: none;
+    vertical-align: 1px;
+  }
+
+  .legend { font-size: 12px; line-height: 1.5; }
+  .legend h3 { font-size: 13px; margin: 0 0 6px; }
+  .legend p { margin: 0 0 3px; }
+  .sw { display: inline-block; width: 22px; height: 12px; margin-right: 6px; vertical-align: -1px; border-radius: 2px; }
+
+  .note { margin: 10px 0 0; max-width: 72ch; font-size: 13px; color: var(--muted); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; background: var(--paper); }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  code { font: 12.5px ui-monospace, Menlo, monospace; }
+
+  .summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+  .badge {
+    display: inline-block;
+    padding: 1px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .badge.must { background: var(--blue); color: var(--paper); }
+  .badge.should { background: var(--vanilla); color: #343b1b; }
+  .badge.nice { border: 1.5px solid var(--muted); color: var(--muted); }
+
+  .diff {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin: 0 0 14px;
+    scroll-margin-top: 16px;
+  }
+  .diff:target { outline: 2px solid var(--blue); }
+  .diff header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .diff header .num {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--blue); color: var(--paper);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+  }
+  .diff h3 { margin: 0; font-size: 16px; flex: 1 1 260px; }
+  .oldnew { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .oldnew div { padding: 8px 10px; border-radius: 6px; font-size: 13.5px; }
+  .oldnew .o { background: var(--red-soft); }
+  .oldnew .n { background: var(--green-soft); }
+  .oldnew b { display: block; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 2px; }
+  .diff h4 { margin: 10px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .diff ul { margin: 0; padding-left: 20px; }
+  .diff li { margin: 0 0 4px; }
+  .diff p { margin: 0; }
+  .plain { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; }
+  .plain ul { margin: 0; padding-left: 20px; }
+  .plain li { margin: 0 0 6px; }
+
+  @media (max-width: 640px) {
+    .oldnew { grid-template-columns: 1fr; }
+    h1 { font-size: 21px; }
+  }
+  .entity.unused { opacity: 0.55; border-style: dotted; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="kicker">Logical model, not SQL. v4, matches the code and Atlas on 22 Oct 2026</p>
+  <h1>FastDeal ERD v4</h1>
+  <p class="lead">v4 is the database as it is built now. It adds the product cache, moves the wishlist from the browser to MongoDB, builds the Telegram field for Buy Together and drops the group order collection. Use the switch to see v3. Each new or changed field has a number. Click a number to read why it changed.</p>
+
+  <div class="switch" role="group" aria-label="Choose diagram">
+    <button type="button" data-show="new" aria-pressed="true">New (v4)</button>
+    <button type="button" data-show="old" aria-pressed="false">Old (v3)</button>
+  </div>
+
+  <!-- NEW ERD v4 -->
+  <div class="canvas" id="erd-new">
+    <svg viewBox="0 0 1000 980" role="img" aria-label="FastDeal ERD version 4">
+      <!-- Firebase to User -->
+      <line x1="210" y1="90" x2="250" y2="90"/>
+      <text class="rel" x="212" y="82">1 to 1</text>
+      <!-- User to Wishlist -->
+      <line x1="470" y1="90" x2="510" y2="90"/>
+      <text class="rel" x="474" y="82">1 to n</text>
+      <!-- User to Sleep -->
+      <line x1="360" y1="262" x2="360" y2="300"/>
+      <text class="rel" x="367" y="286">1 to n</text>
+      <!-- User bus to Friendship and Notification -->
+      <polyline class="bus" points="440,30 440,14 765,14 765,420 780,420"/>
+      <line class="bus" x1="765" y1="110" x2="780" y2="110"/>
+      <text class="rel b" x="480" y="10">User to Friendship (2 links) and Notification: 1 to many each</text>
+      <!-- Wishlist to Product key -->
+      <line x1="630" y1="470" x2="630" y2="510"/>
+      <text class="rel" x="637" y="494">n to 1</text>
+      <!-- Sleep to Product key -->
+      <line x1="470" y1="560" x2="510" y2="560"/>
+      <text class="rel" x="474" y="552">n to 1</text>
+      <!-- Product key to Price day -->
+      <line x1="630" y1="620" x2="630" y2="660"/>
+      <text class="rel" x="637" y="644">1 to n</text>
+      <!-- Search log to Product key -->
+      <polyline points="470,740 490,740 490,600 510,600"/>
+      <text class="rel" x="495" y="680">n to 1</text>
+      <!-- Session to Search log -->
+      <line x1="210" y1="710" x2="250" y2="710"/>
+      <text class="rel" x="214" y="702">1 to n</text>
+
+      <foreignObject x="10" y="30" width="200" height="120">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity ext">
+          <h3>Firebase Auth</h3>
+          <p class="coll">not in Mongo</p>
+          <ul>
+            <li class="pk">uid</li>
+            <li>email</li>
+            <li>password (hashed)</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="250" y="30" width="220" height="232">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>User</h3>
+          <p class="coll">users</p>
+          <ul>
+            <li class="pk fk">firebaseUid</li>
+            <li>email</li>
+            <li>username</li>
+            <li>emailAlertsOn</li>
+            <li>recentSearches [max 10]</li>
+            <li class="chg">telegramUsername<a class="dn" href="#d4">4</a></li>
+            <li>createdAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="510" y="30" width="240" height="440">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Wishlist item<a class="dn" href="#d2">2</a></h3>
+          <p class="coll">wishlistItems</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">firebaseUid</li>
+            <li class="chg">productName (product title)<a class="dn" href="#d2">2</a></li>
+            <li class="fk">productKey</li>
+            <li class="fk add">productId<a class="dn" href="#d2">2</a></li>
+            <li class="add">q (search it came from)</li>
+            <li class="add">image</li>
+            <li>savedPrice</li>
+            <li class="add">savedStore</li>
+            <li>targetPrice (can be empty)</li>
+            <li>priority (can be empty)</li>
+            <li>latestPrice</li>
+            <li>latestStore</li>
+            <li>latestLink</li>
+            <li>flag: none / drop / target</li>
+            <li>lastCheckedAt</li>
+            <li>lastEmailAt</li>
+            <li class="add">sleepUntil (can be empty)<a class="dn" href="#d3">3</a></li>
+            <li class="add">sleepPriceAtStart</li>
+            <li class="add">sleepVerdictSeen</li>
+            <li>savedAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="780" y="30" width="215" height="226">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Friendship</h3>
+          <p class="coll">friendships</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">requesterUid</li>
+            <li class="fk">addresseeUid</li>
+            <li>pairKey</li>
+            <li>status: pending / accepted / blocked</li>
+            <li>createdAt</li>
+            <li>respondedAt</li>
+            <li class="fk">blockedByUid (can be empty)</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="780" y="270" width="215" height="300">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Notification<a class="dn" href="#d9">9</a></h3>
+          <p class="coll">notifications</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">firebaseUid</li>
+            <li>type</li>
+            <li>title</li>
+            <li>body</li>
+            <li>link</li>
+            <li class="fk">productKey (can be empty)</li>
+            <li class="fk">fromUid (can be empty)</li>
+            <li>readAt (can be empty)</li>
+            <li class="add">read<a class="dn" href="#d9">9</a></li>
+            <li>emailedAt (can be empty)</li>
+            <li>createdAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="10" y="250" width="200" height="256">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity legend" style="border-style: dotted;">
+          <h3>Legend</h3>
+          <p><span class="sw" style="background: var(--green-soft);"></span>+ new field</p>
+          <p><span class="sw" style="background: var(--vanilla-soft);"></span>~ changed field</p>
+          <p><b>Thick box</b> = new collection</p>
+          <p><span class="pk">underlined</span> = key</p>
+          <p><span class="fk">blue</span> = link to a box</p>
+          <p>Dashed box = not a Mongo collection</p>
+          <p>Faded box = in Atlas, not used by the app</p>
+          <p>n = many</p>
+          <p><span class="dn" style="margin-left:0">1</span> = see change below</p>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="250" y="300" width="220" height="306">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity unused">
+          <h3>Sleep hold<a class="dn" href="#d3">3</a></h3>
+          <p class="coll">sleepHolds (not used by the app)</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">firebaseUid</li>
+            <li>productName</li>
+            <li class="fk">productKey</li>
+            <li>priceAtStart</li>
+            <li>latestPrice</li>
+            <li>startedAt</li>
+            <li>endsAt (user picks)</li>
+            <li>reason</li>
+            <li>reasonNote</li>
+            <li>status: waiting / ended / done</li>
+            <li>decision: buy / skip</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="510" y="510" width="240" height="110">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity concept">
+          <h3>Product key</h3>
+          <p class="coll">a rule, not a collection</p>
+          <ul>
+            <li class="pk">productKey</li>
+          </ul>
+          <p class="hint">productName in lowercase, trimmed, single spaces.</p>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="510" y="660" width="240" height="186">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Price day<a class="dn" href="#d7">7</a></h3>
+          <p class="coll">priceDays</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk chg">productKey (product title)<a class="dn" href="#d7">7</a></li>
+            <li>day</li>
+            <li>price</li>
+            <li class="chg">store (part of the key)</li>
+            <li>oldPrice (can be empty)</li>
+            <li class="add">productId</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="780" y="600" width="215" height="370">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity newbox">
+          <h3>Product cache<a class="dn" href="#d1">1</a></h3>
+          <p class="coll">productCache (new)</p>
+          <ul>
+            <li class="pk add">productId</li>
+            <li class="add">productKey (the search)</li>
+            <li class="add">q, searchTerm</li>
+            <li class="add">immersiveToken</li>
+            <li class="add">title, brand, image</li>
+            <li class="add">rating, reviews</li>
+            <li class="add">description</li>
+            <li class="add">features [ ]</li>
+            <li class="add">ratings [ ]</li>
+            <li class="add">userReviews [ ]</li>
+            <li class="add">stores [ ]</li>
+            <li class="add">storesFetchedAt</li>
+            <li class="add">expiresAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="10" y="650" width="200" height="120">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity ext">
+          <h3>Session</h3>
+          <p class="coll">not in Mongo (browser only)</p>
+          <ul>
+            <li class="pk">sessionId</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="250" y="640" width="220" height="210">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Search log<a class="dn" href="#d6">6</a></h3>
+          <p class="coll">searchLogs</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">sessionId</li>
+            <li>query</li>
+            <li>productName</li>
+            <li class="fk">productKey</li>
+            <li class="add">image<a class="dn" href="#d6">6</a></li>
+            <li class="add">count</li>
+            <li>searchedAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="10" y="800" width="200" height="160">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity alone">
+          <h3>Search cache<a class="dn" href="#d8">8</a></h3>
+          <p class="coll">searchCache</p>
+          <ul>
+            <li class="pk">queryKey</li>
+            <li class="add">searchTerm</li>
+            <li>listings</li>
+            <li>fetchedAt</li>
+            <li class="chg">expiresAt (6 hours)</li>
+          </ul>
+        </div>
+      </foreignObject>
+    </svg>
+  </div>
+
+  <!-- OLD ERD v3, as agreed on 14 Oct. Its numbers link to the v3 page. -->
+  <div class="canvas" id="erd-old" hidden>
+    <svg viewBox="0 0 1000 950" role="img" aria-label="FastDeal ERD version 3">
+      <!-- Firebase to User -->
+      <line x1="210" y1="90" x2="250" y2="90"/>
+      <text class="rel" x="212" y="82">1 to 1</text>
+      <!-- User to Wishlist -->
+      <line x1="470" y1="90" x2="510" y2="90"/>
+      <text class="rel" x="474" y="82">1 to n</text>
+      <!-- User to Sleep -->
+      <line x1="360" y1="262" x2="360" y2="300"/>
+      <text class="rel" x="367" y="286">1 to n</text>
+      <!-- User bus to Friendship, Notification, Group order -->
+      <polyline class="bus" points="440,30 440,14 765,14 765,700 780,700"/>
+      <line class="bus" x1="765" y1="110" x2="780" y2="110"/>
+      <line class="bus" x1="765" y1="380" x2="780" y2="380"/>
+      <text class="rel b" x="480" y="10">User to Friendship (2 links), Notification and Group order: 1 to many each</text>
+      <!-- Wishlist to Product key -->
+      <line x1="630" y1="356" x2="630" y2="400"/>
+      <text class="rel" x="637" y="382">n to 1</text>
+      <!-- Sleep to Product key -->
+      <line x1="470" y1="455" x2="510" y2="455"/>
+      <text class="rel" x="474" y="447">n to 1</text>
+      <!-- Product key to Price day -->
+      <line x1="630" y1="510" x2="630" y2="580"/>
+      <text class="rel" x="637" y="550">1 to n</text>
+      <!-- Search log to Product key -->
+      <polyline points="470,710 490,710 490,490 510,490"/>
+      <text class="rel" x="495" y="540">n to 1</text>
+      <!-- Session to Search log -->
+      <line x1="210" y1="710" x2="250" y2="710"/>
+      <text class="rel" x="214" y="702">1 to n</text>
+
+      <foreignObject x="10" y="30" width="200" height="120">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity ext">
+          <h3>Firebase Auth</h3>
+          <p class="coll">not in Mongo</p>
+          <ul>
+            <li class="pk">uid</li>
+            <li>email</li>
+            <li>password (hashed)</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="250" y="30" width="220" height="232">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>User</h3>
+          <p class="coll">users</p>
+          <ul>
+            <li class="pk fk">firebaseUid</li>
+            <li>email</li>
+            <li class="add">username<a class="dn" href="/erd/v3#d1">1</a></li>
+            <li>emailAlertsOn</li>
+            <li class="add">recentSearches [max 10]<a class="dn" href="/erd/v3#d7">7</a></li>
+            <li class="add">telegramUsername<a class="dn" href="/erd/v3#d9">9</a></li>
+            <li>createdAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="510" y="30" width="240" height="326">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Wishlist item</h3>
+          <p class="coll">wishlistItems</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">firebaseUid</li>
+            <li>productName</li>
+            <li class="fk">productKey</li>
+            <li>savedPrice</li>
+            <li>targetPrice (can be empty)</li>
+            <li class="add">priority (can be empty)<a class="dn" href="/erd/v3#d5">5</a></li>
+            <li>latestPrice</li>
+            <li>latestStore</li>
+            <li>latestLink</li>
+            <li>flag: none / drop / target</li>
+            <li>lastCheckedAt</li>
+            <li>lastEmailAt</li>
+            <li>savedAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="780" y="30" width="215" height="226">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity newbox">
+          <h3>Friendship<a class="dn" href="/erd/v3#d2">2</a></h3>
+          <p class="coll">friendships (new)</p>
+          <ul>
+            <li class="pk add">_id</li>
+            <li class="fk add">requesterUid</li>
+            <li class="fk add">addresseeUid</li>
+            <li class="add">pairKey</li>
+            <li class="add">status: pending / accepted / blocked</li>
+            <li class="add">createdAt</li>
+            <li class="add">respondedAt</li>
+            <li class="fk add">blockedByUid (can be empty)</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="780" y="260" width="215" height="294">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity newbox">
+          <h3>Notification<a class="dn" href="/erd/v3#d3">3</a></h3>
+          <p class="coll">notifications (new)</p>
+          <ul>
+            <li class="pk add">_id</li>
+            <li class="fk add">firebaseUid</li>
+            <li class="add">type</li>
+            <li class="add">title</li>
+            <li class="add">body</li>
+            <li class="add">link</li>
+            <li class="fk add">productKey (can be empty)</li>
+            <li class="fk add">fromUid (can be empty)</li>
+            <li class="add">readAt (can be empty)</li>
+            <li class="add">emailedAt (can be empty)</li>
+            <li class="add">createdAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="10" y="250" width="200" height="236">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity legend" style="border-style: dotted;">
+          <h3>Legend</h3>
+          <p><span class="sw" style="background: var(--green-soft);"></span>+ new field</p>
+          <p><span class="sw" style="background: var(--vanilla-soft);"></span>~ changed field</p>
+          <p><b>Thick box</b> = new collection</p>
+          <p><span class="pk">underlined</span> = key</p>
+          <p><span class="fk">blue</span> = link to a box</p>
+          <p>Dashed box = not a Mongo collection</p>
+          <p>n = many</p>
+          <p><span class="dn" style="margin-left:0">1</span> = see change below</p>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="250" y="300" width="220" height="306">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Sleep hold</h3>
+          <p class="coll">sleepHolds</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">firebaseUid</li>
+            <li>productName</li>
+            <li class="fk">productKey</li>
+            <li>priceAtStart</li>
+            <li>latestPrice</li>
+            <li>startedAt</li>
+            <li>endsAt (user picks)</li>
+            <li class="add">reason<a class="dn" href="/erd/v3#d4">4</a></li>
+            <li class="add">reasonNote<a class="dn" href="/erd/v3#d4">4</a></li>
+            <li class="chg">status: waiting / ended / done<a class="dn" href="/erd/v3#d4">4</a></li>
+            <li class="add">decision: buy / skip<a class="dn" href="/erd/v3#d4">4</a></li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="510" y="400" width="240" height="110">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity concept">
+          <h3>Product key</h3>
+          <p class="coll">a rule, not a collection</p>
+          <ul>
+            <li class="pk">productKey</li>
+          </ul>
+          <p class="hint">productName in lowercase, trimmed, single spaces.</p>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="510" y="580" width="240" height="166">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Price day</h3>
+          <p class="coll">priceDays</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">productKey</li>
+            <li>day</li>
+            <li>price</li>
+            <li>store</li>
+            <li class="add">oldPrice (can be empty)<a class="dn" href="/erd/v3#d6">6</a></li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="780" y="556" width="215" height="300">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity newbox">
+          <h3>Group order<a class="dn" href="/erd/v3#d8">8</a></h3>
+          <p class="coll">groupOrders (new)</p>
+          <ul>
+            <li class="pk add">_id</li>
+            <li class="fk add">initiatorUid</li>
+            <li class="fk add">sleepHoldId (can be empty)</li>
+            <li class="fk add">productKey</li>
+            <li class="add">productName</li>
+            <li class="add">price</li>
+            <li class="add">store</li>
+            <li class="add">link</li>
+            <li class="fk add">invitedUids []</li>
+            <li class="fk add">joinedUids []</li>
+            <li class="add">status: open / closed</li>
+            <li class="add">createdAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="10" y="650" width="200" height="120">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity ext">
+          <h3>Session</h3>
+          <p class="coll">not in Mongo (browser only)</p>
+          <ul>
+            <li class="pk">sessionId</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="250" y="630" width="220" height="166">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity">
+          <h3>Search log</h3>
+          <p class="coll">searchLogs</p>
+          <ul>
+            <li class="pk">_id</li>
+            <li class="fk">sessionId</li>
+            <li>query</li>
+            <li>productName</li>
+            <li class="fk">productKey</li>
+            <li>searchedAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="10" y="800" width="200" height="140">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="entity alone">
+          <h3>Search cache</h3>
+          <p class="coll">searchCache</p>
+          <ul>
+            <li class="pk">queryKey</li>
+            <li>listings</li>
+            <li>fetchedAt</li>
+            <li>expiresAt</li>
+          </ul>
+        </div>
+      </foreignObject>
+    </svg>
+  </div>
+
+  <p class="note" id="note-new">The blue line along the top is one line from User to Friendship and Notification. Friendship has two links to User: the user who sends the request and the user who gets it. Sleep hold is faded: the collection is still in Atlas, but the app keeps Sleep on it on the wishlist item now. The lines from Notification to Product key, from Product cache to Wishlist item and from Product cache to Price day are left out so the diagram stays readable. The links table lists them all.</p>
+  <p class="note" id="note-old" hidden>v3 as agreed on 14 Oct 2026, with its change markers. Group order (change 8 in v3) was never built.</p>
+
+  <h2 class="section">At a glance</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th></th><th>v3 (14 Oct)</th><th>v4 (now, 22 Oct)</th></tr></thead>
+      <tbody>
+        <tr><td>Collections</td><td>9 planned, 8 built</td><td>9 built: adds productCache, drops groupOrders</td></tr>
+        <tr><td>Changed collections</td><td></td><td>wishlistItems, users, priceDays, searchLogs, searchCache, notifications</td></tr>
+        <tr><td>Unchanged</td><td></td><td>friendships</td></tr>
+        <tr><td>In Atlas, not used by the app</td><td></td><td>sleepHolds (2 seed rows)</td></tr>
+        <tr><td>Fields removed</td><td></td><td>none</td></tr>
+        <tr><td>Indexes, not counting _id</td><td>15</td><td>19</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="section">Links in v4</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>From</th><th>To</th><th>Link</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td>Firebase Auth</td><td>User</td><td>1 to 1</td><td>The server reads the uid from a checked login token, never from the URL or body.</td></tr>
+        <tr><td>User</td><td>Wishlist item</td><td>1 to many</td><td>One row per saved product. Same user cannot save one product twice.</td></tr>
+        <tr><td>User</td><td>Sleep hold</td><td>1 to many</td><td>Only the seed writes it. See change 3.</td></tr>
+        <tr><td>User</td><td>Friendship</td><td>1 to many, twice</td><td>A user can be the requester or the addressee. One row per pair of users.</td></tr>
+        <tr><td>User</td><td>Notification</td><td>1 to many</td><td>The user who receives it. <code>fromUid</code> is the user who caused it. It is empty for system alerts, including Buy Together.</td></tr>
+        <tr><td>Product key</td><td>Wishlist item, Price day, Search log, Notification, Sleep hold</td><td>1 to many</td><td>Same lowercase rule everywhere. Buy Together matches friends' wishlist items by productKey.</td></tr>
+        <tr><td>Product cache</td><td>Wishlist item</td><td>1 to many, by productId</td><td>A saved item keeps its productId. When the cache row has expired, opening the product builds it again.</td></tr>
+        <tr><td>Product cache</td><td>Price day</td><td>1 to many</td><td>Each product page load with live prices writes one row per store, keyed by the product title.</td></tr>
+        <tr><td>Session</td><td>Search log</td><td>1 to many</td><td>Search logs stay anonymous.</td></tr>
+        <tr><td>Search cache</td><td>none</td><td>none</td><td>Same as v3.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="section">What changed since v3 and why</h2>
+  <div class="summary">
+    <span>9 changes:</span>
+    <span class="badge must">8 Built</span>
+    <span class="badge nice">1 Dropped</span>
+  </div>
+  <p class="lead">Built = in the code on main and in Atlas on 22 Oct 2026. Dropped = planned in v3, not built, and no longer needed.</p>
+
+  <article class="diff" id="d1">
+    <header><span class="num">1</span><h3>Product cache: a new collection for the product page</h3><span class="badge must">Built</span></header>
+    <div class="oldnew">
+      <div class="o"><b>v3</b>No product page. A search result was the only product data.</div>
+      <div class="n"><b>v4</b><code>productCache</code>: one row per product, with every store, ratings, reviews, details and a refresh token.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>One product page costs 1 SerpApi search. The row keeps the result, so opening the product again in the next 24 hours costs nothing.</li>
+      <li><code>immersiveToken</code> lets the server refresh the store prices after 24 hours without a new search. A failed refresh keeps the old prices and tries again after 1 hour.</li>
+      <li>The row lives 30 days (a TTL index on <code>expiresAt</code>), so a saved product link keeps working.</li>
+    </ul>
+    <h4>Owner</h4>
+    <p>Dewa (product page, 21 Oct). Ronald's AI verdict can read the same row.</p>
+  </article>
+
+  <article class="diff" id="d2">
+    <header><span class="num">2</span><h3>Wishlist item is a product, and it lives in MongoDB</h3><span class="badge must">Built</span></header>
+    <div class="oldnew">
+      <div class="o"><b>v3</b>The app kept the wishlist in the browser only, and an item was the search the user typed.</div>
+      <div class="n"><b>v4</b>One row per user per product in <code>wishlistItems</code>. <code>productName</code> is the product title. Adds <code>productId</code>, <code>q</code>, <code>image</code> and <code>savedStore</code>.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>Two products from one search are two rows. Before, saving a second card overwrote the first.</li>
+      <li>The wishlist shows on any computer after login, and the email alerts have data to read.</li>
+      <li><code>productId</code> and <code>q</code> open the product page again from the wishlist. <code>image</code> shows the product without a new search.</li>
+      <li>An old browser wishlist is copied to MongoDB once at login, then deleted from the browser.</li>
+    </ul>
+    <h4>Owner</h4>
+    <p>Marvel (M4, built 21 Oct). Jayden's live price check can use <code>productId</code>.</p>
+  </article>
+
+  <article class="diff" id="d3">
+    <header><span class="num">3</span><h3>Sleep on it lives on the wishlist item</h3><span class="badge must">Built</span></header>
+    <div class="oldnew">
+      <div class="o"><b>v3</b>Holds were planned in <code>sleepHolds</code>, with a reason and a decision.</div>
+      <div class="n"><b>v4</b>The wishlist item has <code>sleepUntil</code>, <code>sleepPriceAtStart</code> and <code>sleepVerdictSeen</code>. <code>sleepHolds</code> stays in Atlas but the app does not use it.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>A hold is always on a saved product, and one product has at most one hold. Three fields on the item are enough.</li>
+      <li>The wishlist page reads the hold with the item, so it needs no second query.</li>
+      <li>The reason and decision from v3 were not built. If the team wants them later, they can be two more fields on the item.</li>
+    </ul>
+    <h4>Owner</h4>
+    <p>Zoe (Sleep on it) and Jayden (the verdict and the notification).</p>
+  </article>
+
+  <article class="diff" id="d4">
+    <header><span class="num">4</span><h3>Telegram username is built, for Buy Together</h3><span class="badge must">Built</span></header>
+    <div class="oldnew">
+      <div class="o"><b>v3</b><code>telegramUsername</code> was planned for a Telegram bot. Not built.</div>
+      <div class="n"><b>v4</b>Built as an optional field, stored without "@". The user sets or clears it on the Account page.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>Buy Together shows friends who saved the same product, with a link to message them on Telegram, so they can order together and split the shipping.</li>
+      <li>It is shown only to accepted friends who saved the same product. Friend search and friend requests never return it.</li>
+      <li>There is no bot. The field is only a contact.</li>
+    </ul>
+    <h4>Owner</h4>
+    <p>Marvel (Buy Together, built 21 Oct).</p>
+  </article>
+
+  <article class="diff" id="d5">
+    <header><span class="num">5</span><h3>Group orders: no collection</h3><span class="badge nice">Dropped</span></header>
+    <div class="oldnew">
+      <div class="o"><b>v3</b><code>groupOrders</code> with invited and joined friends. Planned, not built.</div>
+      <div class="n"><b>v4</b>No collection. Buy Together uses one <code>group-order</code> notification and reads the friends live.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>v3 already said: if the group order becomes the smaller Buy Together, notifications are enough. That is what the team built.</li>
+      <li>The friend list is read when the user opens the pop-up, so a friend who removed the product or the friendship is not shown. A stored list would go out of date.</li>
+      <li>The <code>group-order</code> type was already in the notification type list, so no field changed.</li>
+    </ul>
+  </article>
+
+  <article class="diff" id="d6">
+    <header><span class="num">6</span><h3>Search log: one row per browser session per search</h3><span class="badge must">Built</span></header>
+    <div class="oldnew">
+      <div class="o"><b>v3</b>Every reload wrote a new row, so a few users could push a product to the top of Trending.</div>
+      <div class="n"><b>v4</b>A partial unique index on <code>sessionId + productKey</code> for browser sessions. Adds <code>image</code> and <code>count</code>.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>Trending counts sessions, not reloads.</li>
+      <li>The index covers only browser session ids (they start with "s-"). Seed rows and the old rows with session "1" are not covered, so the seed script still runs.</li>
+      <li><code>image</code> lets the Trending page show a picture without a new search.</li>
+    </ul>
+    <h4>Owner</h4>
+    <p>Bernard (Trending). Index and clean-up by Dewa on 21 Oct: 150 repeat rows deleted, with a backup.</p>
+  </article>
+
+  <article class="diff" id="d7">
+    <header><span class="num">7</span><h3>Price day: one row per store per day, from the product page</h3><span class="badge must">Built</span></header>
+    <div class="oldnew">
+      <div class="o"><b>v3</b>One row per product per day, written from the search, keyed by the search words.</div>
+      <div class="n"><b>v4</b>One row per product, per store, per day. Written by the product page, keyed by the product title. Adds <code>productId</code> for reference.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>Search words are not a product: "sony headphones" covers many products. The product title is one product.</li>
+      <li>One row per store keeps each store's price, not only the lowest.</li>
+      <li>No page reads these rows yet. Showing the history is Dewa's task D5.</li>
+    </ul>
+  </article>
+
+  <article class="diff" id="d8">
+    <header><span class="num">8</span><h3>Search cache keeps the search term and lives 6 hours</h3><span class="badge must">Built</span></header>
+    <div class="oldnew">
+      <div class="o"><b>v3</b>Rows lived 24 hours.</div>
+      <div class="n"><b>v4</b>Rows live 6 hours. Adds <code>searchTerm</code>: the clean search term Gemini made from what the user typed.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>Prices move during the day. 6 hours keeps results fresh and still makes a repeat search free.</li>
+      <li><code>searchTerm</code> is the page heading on the compare page.</li>
+    </ul>
+  </article>
+
+  <article class="diff" id="d9">
+    <header><span class="num">9</span><h3>Notification: one Sleep on it alert per countdown</h3><span class="badge must">Built</span></header>
+    <div class="oldnew">
+      <div class="o"><b>v3</b>No rule against a second alert for the same countdown.</div>
+      <div class="n"><b>v4</b>A partial unique index on <code>firebaseUid + type + productKey</code> for <code>sleep-ended</code> rows. Adds <code>read</code>.</div>
+    </div>
+    <h4>Why it is better</h4>
+    <ul>
+      <li>The browser sends the "timer ended" call on every check. The index makes the second call find the first row, so the user gets one alert, and one Buy Together alert.</li>
+      <li><code>read</code> is the flag the Notifications page uses. <code>readAt</code> is set at the same time. One of the two can go later.</li>
+    </ul>
+  </article>
+
+  <h2 class="section">Not changed</h2>
+  <div class="plain">
+    <ul>
+      <li><b>friendships:</b> the same. Buy Together reads accepted rows only.</li>
+      <li><b>users:</b> <code>username</code> and its partial unique index are the same. <code>recentSearches</code> is in the schema, but only the seed writes it so far.</li>
+      <li><b>Product key rule:</b> the same, in <code>models/product-key.js</code>. The client uses the same file for the wishlist routes.</li>
+      <li><b>Every v3 field stays.</b> Nothing is renamed or removed.</li>
+    </ul>
+  </div>
+
+  <h2 class="section">Not an ERD change, but it protects the data</h2>
+  <div class="plain">
+    <ul>
+      <li>Done on 21 Oct: every users, friends, notifications and wishlist route checks the Firebase login token and takes the uid only from it. It needs only the project ID, not a service account key.</li>
+      <li>Friend search and friend requests return usernames, not emails. Username login returns the email only when the password is right.</li>
+    </ul>
+  </div>
+
+  <h2 class="section">Indexes in Atlas</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Collection</th><th>Index</th><th>Why</th><th>v4</th></tr></thead>
+      <tbody>
+        <tr><td><code>users</code></td><td>firebaseUid, unique</td><td>One profile per Firebase account.</td><td>kept</td></tr>
+        <tr><td><code>users</code></td><td>username, unique, partial: only where username is a string</td><td>No two users with one username.</td><td>kept</td></tr>
+        <tr><td><code>wishlistItems</code></td><td>firebaseUid + productKey, unique</td><td>Same user cannot save one product twice. Also serves Buy Together.</td><td>kept</td></tr>
+        <tr><td><code>wishlistItems</code></td><td>productKey</td><td>Every user who saved this product.</td><td>kept</td></tr>
+        <tr><td><code>priceDays</code></td><td>productKey + store + day, unique</td><td>One row per product, per store, per day.</td><td><b>changed</b></td></tr>
+        <tr><td><code>productCache</code></td><td>productId, unique</td><td>One row per product.</td><td><b>new</b></td></tr>
+        <tr><td><code>productCache</code></td><td>expiresAt, TTL with 0 seconds</td><td>Deleted 30 days after it was saved.</td><td><b>new</b></td></tr>
+        <tr><td><code>searchLogs</code></td><td>sessionId, and productKey</td><td>Searched together, and Trending.</td><td>kept (2)</td></tr>
+        <tr><td><code>searchLogs</code></td><td>sessionId + productKey, unique, partial: browser sessions only</td><td>One row per browser session per search.</td><td><b>new</b></td></tr>
+        <tr><td><code>searchCache</code></td><td>queryKey, unique. expiresAt, TTL with 0 seconds</td><td>One row per query, deleted after 6 hours.</td><td>kept (2)</td></tr>
+        <tr><td><code>friendships</code></td><td>pairKey, unique. requesterUid + status. addresseeUid + status</td><td>One row per pair, and the friends and requests lists.</td><td>kept (3)</td></tr>
+        <tr><td><code>notifications</code></td><td>firebaseUid + createdAt (newest first)</td><td>The Notifications page and the unread count.</td><td>kept</td></tr>
+        <tr><td><code>notifications</code></td><td>firebaseUid + type + productKey, unique, partial: sleep-ended only</td><td>One alert per Sleep on it countdown.</td><td><b>new</b></td></tr>
+        <tr><td><code>sleepHolds</code></td><td>firebaseUid. status + endsAt</td><td>From v3. The app does not use them.</td><td>kept (2)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">19 indexes, not counting _id. Checked against Atlas on 22 Oct 2026.</p>
+
+  <h2 class="section">Code in v4</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>File</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr><td><code>models/product-cache-model.js</code></td><td>New. Collection <code>productCache</code>.</td></tr>
+        <tr><td><code>models/wishlist-item-model.js</code></td><td>Adds <code>productId</code>, <code>q</code>, <code>image</code>, <code>savedStore</code>, <code>sleepUntil</code>, <code>sleepPriceAtStart</code>, <code>sleepVerdictSeen</code>.</td></tr>
+        <tr><td><code>models/user-model.js</code></td><td>Adds <code>telegramUsername</code>.</td></tr>
+        <tr><td><code>models/search-log-model.js</code></td><td>The partial unique index on sessionId + productKey.</td></tr>
+        <tr><td><code>models/price-day-model.js</code></td><td>Key is productKey + store + day. Adds <code>productId</code>.</td></tr>
+        <tr><td><code>models/search-cache-model.js</code></td><td>Adds <code>searchTerm</code>. Rows live 6 hours (set in <code>models/shoppingapimodel.js</code>).</td></tr>
+        <tr><td><code>models/notification-model.js</code></td><td>The partial unique index for sleep-ended rows, and <code>read</code>.</td></tr>
+        <tr><td><code>services/productService.js</code></td><td>Writes <code>productCache</code> and <code>priceDays</code>.</td></tr>
+        <tr><td><code>services/buyTogether.js</code></td><td>Reads <code>friendships</code>, <code>wishlistItems</code> and <code>users</code>. Writes the Buy Together notification.</td></tr>
+        <tr><td><code>server.js</code></td><td>The token check, <code>/api/wishlist</code> and <code>/api/buy-together</code>.</td></tr>
+        <tr><td><code>docs/fastdeal-erd-v4.html</code></td><td>This page. <code>/erd</code> shows it. The v2 and v3 pages stay in <code>docs/</code> for the record.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var buttons = document.querySelectorAll('.switch button');
+    var views = {
+      new: [document.getElementById('erd-new'), document.getElementById('note-new')],
+      old: [document.getElementById('erd-old'), document.getElementById('note-old')]
+    };
+    function show(which) {
+      Object.keys(views).forEach(function (key) {
+        views[key].forEach(function (el) { el.hidden = key !== which; });
+      });
+      buttons.forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.getAttribute('data-show') === which));
+      });
+    }
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () { show(b.getAttribute('data-show')); });
+    });
+    document.querySelectorAll('#erd-new .dn').forEach(function (a) {
+      a.addEventListener('click', function () { show('new'); });
+    });
+  })();
+</script>
+</body>
+</html>
+
