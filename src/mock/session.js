@@ -80,14 +80,23 @@ watchAuthState(async function (fbUser) {
 let writes = Promise.resolve()
 
 function write(request) {
-  writes = writes.then(request).catch(function (err) {
+  // Queue the database write, allowing later writes
+  // to proceed even if an earlier one failed.
+  const operation = writes.then(request)
+
+  writes = operation.catch(function (err) {
     console.error('[Wishlist] Could not save the change:', err)
-    // Show what the server really has.
+
+    // Restore the actual server data if a write fails.
     if (user.value) {
       void loadWishlist(user.value.email)
     }
   })
+
+  // Return the original operation so callers can detect failures.
+  return operation
 }
+
 
 function keyPath(item) {
   return '/api/wishlist/' + encodeURIComponent(toProductKey(item.name))
@@ -272,14 +281,30 @@ export function isSaved(name, productId) {
   return Boolean(findSaved(name, productId))
 }
 
+
+
 export function setTarget(name, price) {
   const item = findSaved(name)
+
   if (!item) {
-    return
+    return Promise.reject(new Error('Wishlist product not found'))
   }
-  item.targetPrice = Number(price)
-  write(function () { return axios.patch(keyPath(item), { targetPrice: item.targetPrice }) })
+
+  const newTarget = Number(price)
+
+  if (!Number.isFinite(newTarget) || newTarget < 0) {
+    return Promise.reject(new Error('Invalid target price'))
+  }
+
+  item.targetPrice = newTarget
+
+  return write(function () {
+    return axios.patch(keyPath(item), {
+      targetPrice: newTarget
+    })
+  })
 }
+
 
 export function removeSaved(name, productId) {
   const item = findSaved(name, productId)

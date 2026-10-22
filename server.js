@@ -20,6 +20,7 @@ import Notification from './models/notification-model.js'
 import WishlistItem from './models/wishlist-item-model.js'
 import { getProduct } from './services/productService.js'
 import { findBuyTogetherFriends, notifyBuyTogether } from './services/buyTogether.js'
+import { checkTargetPrice } from './services/targetPriceEmail.js'
 
 
 
@@ -603,26 +604,84 @@ app.post('/api/wishlist', requireUser, async (req, res) => {
   }
 })
 
-// Change the target price or the Sleep on it fields of one saved product.
+
+
 app.patch('/api/wishlist/:productKey', requireUser, async (req, res) => {
-  const set = {}
-  if ('targetPrice' in req.body) set.targetPrice = priceOrNull(req.body.targetPrice)
-  if ('sleepUntil' in req.body) set.sleepUntil = dateOrNull(req.body.sleepUntil)
-  if ('sleepPriceAtStart' in req.body) set.sleepPriceAtStart = priceOrNull(req.body.sleepPriceAtStart)
-  if ('sleepVerdictSeen' in req.body) set.sleepVerdictSeen = req.body.sleepVerdictSeen === true
-  if (!Object.keys(set).length) return res.status(400).json({ error: 'Nothing to update' })
   try {
-    const row = await WishlistItem.findOneAndUpdate(
-      { firebaseUid: req.uid, productKey: req.params.productKey },
-      { $set: set },
-      { new: true }
-    )
-    if (!row) return res.status(404).json({ error: 'Not in your wishlist' })
+    const row = await WishlistItem.findOne({
+      firebaseUid: req.uid,
+      productKey: req.params.productKey
+    })
+
+    if (!row) {
+      return res.status(404).json({ error: 'Not in your wishlist' })
+    }
+
+    const set = {}
+
+    if ('targetPrice' in req.body) {
+      const newTarget = priceOrNull(req.body.targetPrice)
+
+      // Reset email state only if the target actually changes.
+      if (row.targetPrice !== newTarget) {
+        set.targetPrice = newTarget
+        set.targetEmailFor = null
+        set.lastCheckedAt = null
+      }
+    }
+
+    if ('sleepUntil' in req.body) {
+      set.sleepUntil = dateOrNull(req.body.sleepUntil)
+    }
+
+    if ('sleepPriceAtStart' in req.body) {
+      set.sleepPriceAtStart = priceOrNull(req.body.sleepPriceAtStart)
+    }
+
+    if ('sleepVerdictSeen' in req.body) {
+      set.sleepVerdictSeen = req.body.sleepVerdictSeen === true
+    }
+
+    // An unchanged target is not an error.
+    if (!Object.keys(set).length) {
+      return res.json(toWishItem(row))
+    }
+
+    Object.assign(row, set)
+    await row.save()
+
     res.json(toWishItem(row))
-  } catch (err) {
-    res.status(500).json({ error: err.message })
+  } catch (error) {
+    console.error('[Wishlist PATCH]', error)
+    res.status(500).json({ error: 'Could not update wishlist' })
   }
 })
+
+
+
+// Check whether a saved product has reached its target price.
+// Firebase authentication is verified by requireUser.
+app.post(
+  '/api/wishlist/:productKey/check-target',
+  requireUser,
+  async (req, res) => {
+    try {
+      const result = await checkTargetPrice(
+        req.uid,
+        req.params.productKey
+      )
+
+      res.json(result)
+    } catch (error) {
+      console.error('[Target email]', error)
+
+      res.status(500).json({
+        error: 'Could not check target price'
+      })
+    }
+  }
+)
+
 
 app.delete('/api/wishlist/:productKey', requireUser, async (req, res) => {
   try {
