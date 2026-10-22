@@ -29,6 +29,15 @@ const userSchema = new mongoose.Schema(
       default: true
     },
 
+    // Shared only with accepted friends who saved the same product (Buy Together).
+    // Stored without "@". null = not set yet.
+    telegramUsername: {
+      type: String,
+      trim: true,
+      default: null,
+      match: /^[A-Za-z0-9_]{5,32}$/
+    },
+
     // The user's own last 10 searches, newest first. Keep it at 10 with $push, $position 0 and $slice 10.
     recentSearches: [
       {

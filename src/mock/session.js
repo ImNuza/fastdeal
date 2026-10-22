@@ -163,6 +163,15 @@ export function saveProduct(name, listing) {
     sleepUntil: 0
   })
   persist()
+
+  // Sync to MongoDB so Buy Together can match friends who saved the same product.
+  if (firebaseUser.value?.uid) {
+    fetch('/api/wishlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebaseUid: firebaseUser.value.uid, productName: name })
+    }).catch(err => console.warn('[Wishlist sync]', err))
+  }
 }
 
 // Sample wishlist for trying the page: a mix of price drops, reached targets, and items on hold.

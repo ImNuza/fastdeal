@@ -123,7 +123,7 @@ app.get('/api/users/:uid', async (req, res) => {
   }
 })
 
-// Update user — allows emailAlertsOn and username.
+// Update user — allows emailAlertsOn, username, telegramUsername.
 // Username must match /^[a-z0-9_.]{3,20}$/ and be unique.
 app.put('/api/users/:uid', async (req, res) => {
   const patch = {}
@@ -134,6 +134,13 @@ app.put('/api/users/:uid', async (req, res) => {
       return res.status(400).json({ error: 'Username must be 3–20 chars: letters, numbers, _ or .' })
     }
     patch.username = u
+  }
+  if ('telegramUsername' in req.body) {
+    const handle = String(req.body.telegramUsername || '').trim().replace(/^@/, '')
+    if (handle && !/^[A-Za-z0-9_]{5,32}$/.test(handle)) {
+      return res.status(400).json({ error: 'Telegram username must be 5–32 characters: letters, numbers or _' })
+    }
+    patch.telegramUsername = handle || null
   }
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' })
   try {
@@ -358,6 +365,51 @@ app.get('/api/trending' , async (req,res) =>{
 })
 
 
+// Upsert a wishlist item for the current user. Called from the frontend whenever
+// a product is saved so the server can match friends for Buy Together.
+app.post('/api/wishlist', async (req, res) => {
+  const { firebaseUid, productName } = req.body
+  if (!firebaseUid || !productName) {
+    return res.status(400).json({ error: 'firebaseUid and productName required' })
+  }
+  const productKey = toProductKey(productName)
+  try {
+    const item = await WishlistItem.findOneAndUpdate(
+      { firebaseUid, productKey },
+      { $setOnInsert: { productName: productName.trim(), savedPrice: 0 } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    )
+    res.json(item)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Friends who saved the same product, with their Telegram handles. The Buy Together
+// popup calls this live so the list is always current.
+app.get('/api/buy-together', async (req, res) => {
+  const { myUid, productName } = req.query
+  if (!myUid || !productName) return res.status(400).json({ error: 'myUid and productName required' })
+  const productKey = toProductKey(String(productName))
+  try {
+    const rows = await Friendship.find({
+      $or: [{ requesterUid: myUid }, { addresseeUid: myUid }],
+      status: 'accepted'
+    })
+    const friendUids = rows.map(r => r.requesterUid === myUid ? r.addresseeUid : r.requesterUid)
+    if (!friendUids.length) return res.json([])
+
+    const saved = await WishlistItem.find({ firebaseUid: { $in: friendUids }, productKey }).select('firebaseUid')
+    if (!saved.length) return res.json([])
+
+    const matchedUids = saved.map(s => s.firebaseUid)
+    const users = await User.find({ firebaseUid: { $in: matchedUids } }).select('username telegramUsername')
+    res.json(users.map(u => ({ username: u.username, telegramUsername: u.telegramUsername || null })))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.post('/api/notifications/sleep-ended', async (req, res) => {
   const { firebaseUid, productName, sleepUntil } = req.body
 
@@ -383,7 +435,7 @@ app.post('/api/notifications/sleep-ended', async (req, res) => {
     // Unique identifier for this particular countdown.
     const productKey = `${productName}:${expiry}`
 
-    const notification = await Notification.findOneAndUpdate(
+    const result = await Notification.findOneAndUpdate(
       {
         firebaseUid,
         type: 'sleep-ended',
@@ -400,11 +452,21 @@ app.post('/api/notifications/sleep-ended', async (req, res) => {
       {
         upsert: true,
         new: true,
-        setDefaultsOnInsert: true
+        setDefaultsOnInsert: true,
+        includeResultMetadata: true
       }
     )
 
-    res.json(notification)
+    // Only on the first expiry — check if any friends saved the same product.
+    if (!result.lastErrorObject?.updatedExisting) {
+      try {
+        await notifyBuyTogether(firebaseUid, productName)
+      } catch (btErr) {
+        console.error('[Buy Together] notification failed:', btErr)
+      }
+    }
+
+    res.json(result.value)
   } catch (error) {
     console.error('[Sleep On It] Notification error:', error)
 
@@ -413,6 +475,35 @@ app.post('/api/notifications/sleep-ended', async (req, res) => {
     })
   }
 })
+
+// Find accepted friends who also saved the same product and create one group-order
+// notification for the initiator. Friends are not notified.
+async function notifyBuyTogether(myUid, productName) {
+  const productKey = toProductKey(productName)
+  const rows = await Friendship.find({
+    $or: [{ requesterUid: myUid }, { addresseeUid: myUid }],
+    status: 'accepted'
+  })
+  const friendUids = rows.map(r => r.requesterUid === myUid ? r.addresseeUid : r.requesterUid)
+  if (!friendUids.length) return
+
+  const saved = await WishlistItem.find({ firebaseUid: { $in: friendUids }, productKey }).select('firebaseUid')
+  if (!saved.length) return
+
+  const matchedUids = saved.map(s => s.firebaseUid)
+  const friends = await User.find({ firebaseUid: { $in: matchedUids } }).select('username')
+  const names = friends.map(f => f.username).join(', ')
+
+  await Notification.create({
+    firebaseUid: myUid,
+    type: 'group-order',
+    title: 'Buy together?',
+    body: `${names} also saved ${productName}. Order together to split the shipping.`,
+    productKey: toProductKey(productName),
+    read: false
+  })
+  console.log('[Buy Together] notified', myUid, 'about', productName, '— matched:', names)
+}
 
 
 //retrieve notifications
