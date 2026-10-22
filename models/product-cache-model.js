@@ -18,7 +18,7 @@ const productCacheSchema = new mongoose.Schema(
       required: true
     },
 
-    // The search as typed, and Gemini's search term (the wishlist name comes from it)
+    // The search as typed, and Gemini's search term
     q: {
       type: String,
       default: ''

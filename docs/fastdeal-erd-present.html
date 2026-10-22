@@ -133,15 +133,16 @@
   .board.coll .grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     grid-template-areas:
-      "friends users wish  price cache"
-      "notif   users sleep logs  .";
+      "friends users wish  price pcache"
+      "notif   users sleep logs  cache";
   }
   .board.full .grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     grid-template-areas:
       "fire    users wish  pkey price"
-      "friends users sleep pkey sess"
-      "notif   users cache pkey logs";
+      "friends users sleep pkey pcache"
+      "notif   users cache pkey logs"
+      ".       .     .     .    sess";
   }
   /* users and Product key span rows, so every link to them stays a straight line */
   #box-users, .board.full #box-pkey { align-self: stretch; }
@@ -184,6 +185,7 @@
   .board.all .box .idx { display: block; }
   .box .idx b { color: var(--ink); font-weight: 700; }
 
+  .box.unused { opacity: 0.6; border-style: dotted; }
   .box.ext { border-style: dashed; border-color: var(--muted); background: transparent; }
   .box.ext header { background: transparent; color: var(--ink); border-bottom: 1px dashed var(--muted); }
   .box.ext h2 { font-family: "DM Sans", system-ui, sans-serif; font-weight: 700; }
@@ -205,6 +207,7 @@
   .chip.uid { color: var(--uid); background: var(--uid-soft); }
   .chip.pk { color: var(--pk); background: var(--pk-soft); }
   .chip.sid { color: var(--sid); background: var(--sid-soft); }
+  .dot { display: inline-block; width: 26px; height: 14px; border: 1.5px dotted var(--ink); opacity: 0.6; border-radius: 4px; margin-right: 6px; vertical-align: -2px; }
   .dash { display: inline-block; width: 26px; height: 14px; border: 1.5px dashed var(--muted); border-radius: 4px; margin-right: 6px; vertical-align: -2px; }
   .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; margin-top: 14px; font-size: 12.5px; color: var(--muted); }
   .foot a { color: var(--blue); }
@@ -224,7 +227,7 @@
     <div>
       <p class="kicker">FastDeal · IS216 G8-3</p>
       <h1>Database design</h1>
-      <p class="sub">MongoDB Atlas · database <b>fastdeal</b> · 8 collections · v3</p>
+      <p class="sub">MongoDB Atlas · database <b>fastdeal</b> · 9 collections · v4, 22 Oct 2026</p>
     </div>
     <div class="controls">
       <div class="ctl"><span class="seglabel">Show</span>
@@ -274,6 +277,7 @@
     <span><span class="chip pk">productKey</span>same product, lowercase name</span>
     <span><span class="chip sid">sessionId</span>same browser visit, no user</span>
     <span><span class="dash"></span>not a MongoDB collection</span>
+    <span><span class="dot"></span>in Atlas, not used by the app</span>
   </div>
 
   <div class="foot">
@@ -288,17 +292,25 @@
     var boxes = [
       { id: 'users', name: 'users', what: 'One row per account', fields: [
         ['_id', 'extra id'], ['firebaseUid', 'uid'], ['email'], ['username', '', 'for friends'], ['emailAlertsOn'],
-        ['recentSearches', 'extra', 'last 10'], ['createdAt', 'extra']
+        ['recentSearches', 'extra', 'last 10'], ['telegramUsername', '', 'Buy Together'], ['createdAt', 'extra']
       ], idx: '<b>unique</b> firebaseUid · <b>unique</b> username, when set' },
-      { id: 'wish', name: 'wishlistItems', what: 'Products a user saved', fields: [
-        ['_id', 'extra id'], ['firebaseUid', 'uid'], ['productName'], ['productKey', 'pk'], ['savedPrice'], ['targetPrice'],
+      { id: 'wish', name: 'wishlistItems', what: 'Products a user saved, one row each', fields: [
+        ['_id', 'extra id'], ['firebaseUid', 'uid'], ['productName', '', 'product title'], ['productKey', 'pk'], ['productId', '', 'opens the product'],
+        ['q', 'extra', 'search it came from'], ['image', 'extra'], ['savedPrice'], ['savedStore'], ['targetPrice'],
         ['priority', '', '1 = top'], ['latestPrice'], ['latestStore', 'extra'], ['latestLink', 'extra'], ['flag', '', 'none / drop / target'],
-        ['lastCheckedAt', 'extra'], ['lastEmailAt', 'extra'], ['savedAt', 'extra']
+        ['lastCheckedAt', 'extra'], ['lastEmailAt', 'extra'], ['sleepUntil', '', 'Sleep on it'], ['sleepPriceAtStart', 'extra'],
+        ['sleepVerdictSeen', 'extra'], ['savedAt', 'extra']
       ], idx: '<b>unique</b> firebaseUid + productKey · <b>index</b> productKey' },
-      { id: 'price', name: 'priceDays', what: 'Lowest price per product per day', fields: [
-        ['_id', 'extra id'], ['productKey', 'pk'], ['day', '', 'YYYY-MM-DD'], ['price'], ['oldPrice', '', '"was" price'], ['store', 'extra']
-      ], idx: '<b>unique</b> productKey + day' },
-      { id: 'sleep', name: 'sleepHolds', what: '"Sleep on it" holds', fields: [
+      { id: 'price', name: 'priceDays', what: 'Price per product, per store, per day', fields: [
+        ['_id', 'extra id'], ['productKey', 'pk', 'product title'], ['store'], ['day', '', 'YYYY-MM-DD'], ['price'], ['oldPrice', '', '"was" price'],
+        ['productId', 'extra']
+      ], idx: '<b>unique</b> productKey + store + day' },
+      { id: 'pcache', name: 'productCache', what: 'One product page, every store', fields: [
+        ['_id', 'extra id'], ['productId', 'id'], ['title'], ['stores', '', 'one per store'], ['ratings', 'extra'], ['userReviews', 'extra'],
+        ['features', 'extra'], ['immersiveToken', 'extra', 'price refresh'], ['storesFetchedAt', '', 'refresh after 24 h'],
+        ['expiresAt', '', 'deleted after 30 days']
+      ], idx: '<b>unique</b> productId · <b>TTL</b> expiresAt' },
+      { id: 'sleep', name: 'sleepHolds', what: 'Not used: Sleep on it is on the wishlist item', unused: true, fields: [
         ['_id', 'extra id'], ['firebaseUid', 'uid'], ['productName', 'extra'], ['productKey', 'pk'], ['priceAtStart'],
         ['latestPrice', 'extra'], ['startedAt', 'extra'], ['endsAt', '', 'user picks'], ['reason', '', 'why wait'],
         ['reasonNote', 'extra'], ['status', '', 'waiting / ended / done'], ['decision', 'extra', 'buy / skip']
@@ -309,14 +321,16 @@
       ], idx: '<b>unique</b> pairKey · <b>index</b> requesterUid + status, addresseeUid + status' },
       { id: 'notif', name: 'notifications', what: 'Alerts for one user', fields: [
         ['_id', 'extra id'], ['firebaseUid', 'uid'], ['type', '', 'price-drop, friend-request...'], ['title'], ['body', 'extra'],
-        ['link', 'extra'], ['productKey', 'pk extra'], ['fromUid', 'uid extra'], ['readAt', '', 'empty = unread'],
+        ['link', 'extra'], ['productKey', 'pk extra'], ['fromUid', 'uid extra'], ['readAt', '', 'empty = unread'], ['read', 'extra'],
         ['emailedAt', 'extra'], ['createdAt', 'extra']
-      ], idx: '<b>index</b> firebaseUid + createdAt' },
+      ], idx: '<b>index</b> firebaseUid + createdAt · <b>unique</b> firebaseUid + type + productKey, sleep-ended only' },
       { id: 'logs', name: 'searchLogs', what: 'Anonymous searches', fields: [
-        ['_id', 'extra id'], ['sessionId', 'sid'], ['query'], ['productName', 'extra'], ['productKey', 'pk'], ['searchedAt']
-      ], idx: '<b>index</b> sessionId, productKey' },
-      { id: 'cache', name: 'searchCache', what: 'Saved SerpApi results', fields: [
-        ['_id', 'extra id'], ['queryKey', 'id'], ['listings', '', 'array'], ['fetchedAt', 'extra'], ['expiresAt', '', 'deleted after 24 h']
+        ['_id', 'extra id'], ['sessionId', 'sid'], ['query'], ['productName', 'extra'], ['productKey', 'pk'], ['image', 'extra'],
+        ['count', 'extra'], ['searchedAt']
+      ], idx: '<b>index</b> sessionId, productKey · <b>unique</b> sessionId + productKey, browser sessions only' },
+      { id: 'cache', name: 'searchCache', what: 'Saved SerpApi searches', fields: [
+        ['_id', 'extra id'], ['queryKey', 'id'], ['searchTerm', 'extra'], ['listings', '', 'array'], ['fetchedAt', 'extra'],
+        ['expiresAt', '', 'deleted after 6 h']
       ], idx: '<b>unique</b> queryKey · <b>TTL</b> expiresAt' },
       { id: 'fire', name: 'Firebase Auth', what: 'Login only, not in MongoDB', ext: true, fields: [
         ['uid', 'uid'], ['email'], ['password', '', 'hashed']
@@ -337,6 +351,7 @@
       { a: 'users', b: 'friends', kind: 'uid', card: '1 : many', field: 'two uid fields', ends: ['one', 'many'], views: ['coll', 'full'] },
       { a: 'users', b: 'notif', kind: 'uid', card: '1 : many', field: 'firebaseUid', ends: ['one', 'many'], views: ['coll', 'full'] },
       { a: 'wish', b: 'price', kind: 'pk', card: 'shares', field: 'productKey', ends: ['many', 'many'], views: ['coll'] },
+      { a: 'price', b: 'pcache', kind: 'pk', card: 'many : 1', field: 'product title', ends: ['many', 'one'], views: ['coll', 'full'] },
       { a: 'wish', b: 'pkey', kind: 'pk', card: 'many : 1', field: 'productKey', ends: ['many', 'one'], views: ['full'] },
       { a: 'sleep', b: 'pkey', kind: 'pk', card: 'many : 1', field: 'productKey', ends: ['many', 'one'], views: ['full'] },
       { a: 'pkey', b: 'price', kind: 'pk', card: '1 : many', field: 'productKey', ends: ['one', 'many'], views: ['full'] },
@@ -345,18 +360,18 @@
     ]
 
     var focusInfo = {
-      1: { boxes: ['wish', 'sleep', 'price', 'pkey', 'logs'], kinds: ['pk'], glow: ['productKey'],
+      1: { boxes: ['wish', 'price', 'pcache', 'pkey', 'logs'], kinds: ['pk'], glow: ['productKey', 'productId'],
         title: 'Price history belongs to the product, not to each user',
-        text: 'Every collection that stores a product uses the same productKey. priceDays keeps one row per product per day, so five users saving the same headphones means one price check a day, not five. It also keeps the "was" price, so the app can tell a real discount from a gimmick.' },
-      2: { boxes: ['cache'], kinds: [], glow: ['expiresAt', 'queryKey'],
-        title: 'The search cache cleans itself',
-        text: 'Results are kept for 24 hours. A TTL index on expiresAt makes MongoDB delete old rows by itself. A repeat search in that time uses no API call.' },
+        text: 'Every collection that stores a product uses the same productKey: the name in lowercase. A wishlist row is one product, saved under its title. Each product page load writes one priceDays row per store per day, shared by every user, with the "was" price when the store shows one.' },
+      2: { boxes: ['cache', 'pcache'], kinds: [], glow: ['expiresAt', 'queryKey', 'productId', 'storesFetchedAt'],
+        title: 'Two caches save SerpApi credits',
+        text: 'searchCache keeps a search for 6 hours. productCache keeps a product page for 30 days and refreshes its store prices after 24 hours. TTL indexes on expiresAt make MongoDB delete old rows by itself.' },
       3: { boxes: ['logs', 'sess'], kinds: ['sid'], glow: ['sessionId'],
         title: 'Search logs are anonymous',
-        text: 'A log stores a random sessionId from the browser, never a firebaseUid. Same session with different products means “searched together”. This powers the Trending page.' },
-      4: { boxes: ['users', 'friends', 'notif'], kinds: ['uid'], glow: ['pairKey', 'requesterUid', 'addresseeUid', 'username'],
-        title: 'One row per friendship',
-        text: 'Both users read the same friendships row, so they can never disagree. pairKey is the two uids sorted, and its unique index stops a second request. A request or an accept also writes a notifications row.' }
+        text: 'A log stores a random sessionId from the browser, never a firebaseUid. A unique index keeps one row per session per search, so reloads do not count twice. Same session with different products means “searched together”. This powers the Trending page.' },
+      4: { boxes: ['users', 'friends', 'notif', 'wish'], kinds: ['uid'], glow: ['pairKey', 'requesterUid', 'addresseeUid', 'username', 'telegramUsername', 'productKey'],
+        title: 'One row per friendship, and Buy Together',
+        text: 'Both users read the same friendships row, so they can never disagree. pairKey is the two uids sorted, and its unique index stops a second request. Buy Together reads accepted friends who saved the same productKey and shows their telegramUsername.' }
     }
 
     var state = { view: 'coll', fields: 'main', focus: '0', theme: 'light' }
@@ -373,7 +388,7 @@
 
     boxes.forEach(function (b) {
       var el = document.createElement('article')
-      el.className = 'box' + (b.ext ? ' ext' : '')
+      el.className = 'box' + (b.ext ? ' ext' : '') + (b.unused ? ' unused' : '')
       el.id = 'box-' + b.id
       el.style.gridArea = b.id
       var html = '<header><h2>' + esc(b.name) + '</h2><p class="what">' + esc(b.what) + '</p></header><ul>'
