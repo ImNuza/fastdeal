@@ -1,9 +1,11 @@
-import { ref, computed, watch } from 'vue'
+import axios from 'axios'
+import { ref, watch } from 'vue'
+import { toProductKey } from '../../models/product-key.js'
 import { watchAuthState, signOutUser } from '../services/auth.js'
 import { getUser } from '../services/userApi.js'
-import { cheapestListing } from './catalog.js'
 
-const USERS_KEY = 'fastdeal-users'
+// Wishlists used to live only in this browser, under this key. Read once to copy them to MongoDB.
+const OLD_USERS_KEY = 'fastdeal-users'
 
 export const user = ref(null)
 export const firebaseUser = ref(null)
@@ -12,32 +14,25 @@ export const firebaseUser = ref(null)
 // Views watch this before redirecting so a refresh doesn't immediately boot the user.
 export const authReady = ref(false)
 
-// True when the logged-in user hasn't set a username yet.
-export const needsUsername = computed(() => !!(user.value && !user.value.username))
-
 // Set true before any signup Firebase call so watchAuthState skips the DB check.
 // The signup view handles DB creation itself, then calls applyDbUser.
 let _signupInProgress = false
 export function startSignup() { _signupInProgress = true }
 export function endSignup() { _signupInProgress = false }
 
-// Manually populate user.value from a DB user object (called by signup views after createOrGetUser).
+// Populate user.value from a DB user object, then load the wishlist from MongoDB.
+// Called on login and page reload, and by the signup views after createOrGetUser.
 export function applyDbUser(dbUser, fbUser) {
-  const list = readUsers()
-  let found = null
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].email === fbUser.email) { found = list[i]; break }
+  user.value = {
+    email: fbUser.email,
+    displayName: fbUser.displayName || '',
+    photoURL: fbUser.photoURL || '',
+    username: dbUser.username || '',
+    emailOn: dbUser.emailAlertsOn,
+    telegramUsername: dbUser.telegramUsername || '',
+    wishlist: []
   }
-  if (!found) {
-    found = { email: fbUser.email, displayName: fbUser.displayName || '', photoURL: fbUser.photoURL || '', username: dbUser.username || '', emailOn: dbUser.emailAlertsOn, wishlist: [] }
-    list.push(found)
-    writeUsers(list)
-  } else {
-    found.username = dbUser.username || ''
-    found.emailOn = dbUser.emailAlertsOn
-  }
-  user.value = found
-  console.log('[FastDeal] user applied from DB:', dbUser)
+  void loadWishlist(fbUser.email)
 }
 
 // On every Firebase auth state change (login, logout, page reload):
@@ -61,7 +56,7 @@ watchAuthState(async function (fbUser) {
   }
 
   try {
-    const dbUser = await getUser(fbUser.uid)
+    const dbUser = await getUser()
     applyDbUser(dbUser, fbUser)
   } catch (err) {
     if (err.response?.status === 404) {
@@ -77,104 +72,137 @@ watchAuthState(async function (fbUser) {
   }
 })
 
-function readUsers() {
-  const raw = localStorage.getItem(USERS_KEY)
-  if (!raw) {
-    return []
-  }
-  return JSON.parse(raw)
-}
+// --- Wishlist ---
+// user.value.wishlist is the in-memory copy. Every change updates it at once, then is written
+// to MongoDB through /api/wishlist. Writes run one after another, so a save always reaches the
+// server before the Sleep on it change that follows it.
 
-function writeUsers(list) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(list))
-}
+let writes = Promise.resolve()
 
-function persist() {
-  const list = readUsers()
-  const current = user.value
-  if (!current) {
-    return
-  }
-  let found = false
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].email === current.email) {
-      list[i] = JSON.parse(JSON.stringify(current))
-      found = true
+function write(request) {
+  writes = writes.then(request).catch(function (err) {
+    console.error('[Wishlist] Could not save the change:', err)
+    // Show what the server really has.
+    if (user.value) {
+      void loadWishlist(user.value.email)
     }
-  }
-  if (!found) {
-    list.push(JSON.parse(JSON.stringify(current)))
-  }
-  writeUsers(list)
-}
-
-function seed() {
-  const now = Date.now()
-  const demo = {
-    email: 'demo@smu.edu.sg',
-    password: 'demo1234',
-    emailOn: true,
-    wishlist: [
-      { name: 'Sony WH-1000XM5', savedPrice: 498, targetPrice: 430, savedAt: now - 5 * 86400000 },
-      { name: 'Kindle Paperwhite', savedPrice: 199, targetPrice: 170, savedAt: now - 2 * 86400000 }
-    ],
-    sleep: [
-      { name: 'Apple AirPods Pro 2', endsAt: now + 4 * 3600000 },
-      { name: 'Nintendo Switch OLED', endsAt: now - 2 * 3600000 }
-    ]
-  }
-  writeUsers([demo])
-}
-
-export function initSession() {
-  if (!localStorage.getItem(USERS_KEY)) {
-    seed()
-  }
-  // Firebase auth state watcher (set up above) handles restoring user on reload
-}
-
-export function logout() {
-  user.value = null
-}
-
-// Saves the product with the store it came from. With no listing given, that is today's cheapest store.
-// Saving an already saved product from a different store switches it to that store and price.
-export function saveProduct(name, listing) {
-  if (!user.value) {
-    return
-  }
-  const from = listing || cheapestListing(name)
-  const saved = findSaved(name)
-  if (saved) {
-    if (listing && saved.savedStore !== listing.store) {
-      saved.savedStore = listing.store
-      saved.savedPrice = listing.price
-      saved.savedAt = Date.now()
-      persist()
-    }
-    return
-  }
-  user.value.wishlist.push({
-    name: name,
-    savedPrice: from.price,
-    savedStore: from.store,
-    targetPrice: Math.round(from.price * 0.9 * 100) / 100,
-    savedAt: Date.now(),
-    sleepUntil: 0
   })
-  persist()
+}
 
-  // Sync to MongoDB so Buy Together can match friends who saved the same product.
-  if (firebaseUser.value?.uid) {
-    fetch('/api/wishlist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firebaseUid: firebaseUser.value.uid, productName: name })
-    }).catch(err => console.warn('[Wishlist sync]', err))
+function keyPath(item) {
+  return '/api/wishlist/' + encodeURIComponent(toProductKey(item.name))
+}
+
+async function loadWishlist(email) {
+  try {
+    const { data } = await axios.get('/api/wishlist')
+    // The user logged out or switched account while this was loading.
+    if (!user.value || user.value.email !== email) {
+      return
+    }
+    user.value.wishlist = data
+    await copyOldWishlist(email)
+  } catch (err) {
+    console.error('[Wishlist] Could not load:', err)
   }
+}
+
+// Copy this user's old browser wishlist to MongoDB once, then delete the browser copy.
+// If a copy fails, the browser copy stays and the next login tries again.
+async function copyOldWishlist(email) {
+  let list = []
+  try {
+    list = JSON.parse(localStorage.getItem(OLD_USERS_KEY) || '[]')
+  } catch (err) {
+    list = []
+  }
+  const mine = list.find(function (entry) { return entry.email === email })
+  if (!mine) {
+    return
+  }
+  for (const old of mine.wishlist || []) {
+    if (!old.name || !(Number(old.savedPrice) > 0) || findSaved(old.name)) {
+      continue
+    }
+    const { data } = await axios.post('/api/wishlist', {
+      name: old.name,
+      store: old.savedStore,
+      price: old.savedPrice,
+      targetPrice: old.targetPrice,
+      savedAt: old.savedAt,
+      sleepUntil: old.sleepUntil,
+      sleepPriceAtStart: old.sleepPriceAtStart,
+      sleepVerdictSeen: old.sleepVerdictSeen
+    })
+    user.value.wishlist.push(data)
+  }
+  const rest = list.filter(function (entry) { return entry.email !== email })
+  if (rest.length) {
+    localStorage.setItem(OLD_USERS_KEY, JSON.stringify(rest))
+  } else {
+    localStorage.removeItem(OLD_USERS_KEY)
+  }
+}
+
+// Find a saved product: by productId first (the product page title can differ a little
+// from the search card title), then by productKey of the name.
+function findSaved(name, productId) {
+  if (!user.value) {
+    return null
+  }
+  const list = user.value.wishlist
+  if (productId) {
+    const byId = list.find(function (item) { return item.productId === productId })
+    if (byId) {
+      return byId
+    }
+  }
+  const key = toProductKey(name)
+  return list.find(function (item) { return toProductKey(item.name) === key }) || null
+}
+
+export function saveProduct(name, listing, product) {
+  if (!user.value || !listing || !(listing.price > 0)) {
+    return
+  }
+  const info = product || {}
+  const body = {
+    name: name,
+    store: listing.store,
+    price: listing.price,
+    productId: info.productId || null,
+    q: info.q || null,
+    image: info.image || null
+  }
+  const saved = findSaved(name, info.productId)
+  if (saved) {
+    if (saved.savedStore === listing.store) {
+      return
+    }
+    saved.savedStore = listing.store
+    saved.savedPrice = listing.price
+    body.name = saved.name
+  } else {
+    user.value.wishlist.push({
+      name: name,
+      productKey: toProductKey(name),
+      productId: body.productId,
+      q: body.q,
+      image: body.image,
+      savedPrice: listing.price,
+      savedStore: listing.store,
+      targetPrice: Math.round(listing.price * 0.9 * 100) / 100,
+      savedAt: Date.now(),
+      sleepUntil: 0,
+      sleepPriceAtStart: null,
+      sleepVerdictSeen: false
+    })
+  }
+  write(function () { return axios.post('/api/wishlist', body) })
 }
 
 // Sample wishlist for trying the page: a mix of price drops, reached targets, and items on hold.
+// The prices are invented, so the button only shows in development (npm run dev).
 const SAMPLE_WISHLIST = [
   { name: 'Sony WH-1000XM5', savedPrice: 499, savedStore: 'Amazon.sg', targetPrice: 430, holdHours: 0 },
   { name: 'Apple AirPods Pro 2', savedPrice: 319, savedStore: 'Shopee', targetPrice: 290, holdHours: 0 },
@@ -187,6 +215,9 @@ const SAMPLE_WISHLIST = [
 ]
 
 export function missingSamples() {
+  if (!import.meta.env.DEV) {
+    return 0
+  }
   return SAMPLE_WISHLIST.filter(function (item) {
     return !findSaved(item.name)
   }).length
@@ -198,71 +229,65 @@ export function addSampleWishlist() {
     return
   }
   const now = Date.now()
-  SAMPLE_WISHLIST.forEach(function (item, i) {
-    if (findSaved(item.name)) {
+  SAMPLE_WISHLIST.forEach(function (sample, i) {
+    if (findSaved(sample.name)) {
       return
     }
-    user.value.wishlist.push({
-      name: item.name,
-      savedPrice: item.savedPrice,
-      savedStore: item.savedStore,
-      targetPrice: item.targetPrice,
+    const item = {
+      name: sample.name,
+      productKey: toProductKey(sample.name),
+      productId: null,
+      q: null,
+      image: null,
+      savedPrice: sample.savedPrice,
+      savedStore: sample.savedStore,
+      targetPrice: sample.targetPrice,
       savedAt: now - (i + 1) * 86400000,
-      sleepUntil: item.holdHours ? now + item.holdHours * 3600000 : 0
+      sleepUntil: sample.holdHours ? now + sample.holdHours * 3600000 : 0,
+      sleepPriceAtStart: sample.holdHours ? sample.savedPrice : null,
+      sleepVerdictSeen: false
+    }
+    user.value.wishlist.push(item)
+    write(function () {
+      return axios.post('/api/wishlist', {
+        name: item.name,
+        store: item.savedStore,
+        price: item.savedPrice,
+        targetPrice: item.targetPrice,
+        savedAt: item.savedAt,
+        sleepUntil: item.sleepUntil,
+        sleepPriceAtStart: item.sleepPriceAtStart
+      })
     })
   })
-  persist()
 }
 
 // The store a saved product was saved from, or '' if it is not saved or the store was not recorded.
-export function savedFrom(name) {
-  const saved = findSaved(name)
+export function savedFrom(name, productId) {
+  const saved = findSaved(name, productId)
   return saved && saved.savedStore ? saved.savedStore : ''
 }
 
-function findSaved(name) {
-  if (!user.value) {
-    return null
-  }
-  const list = user.value.wishlist
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].name === name) {
-      return list[i]
-    }
-  }
-  return null
-}
-
-export function isSaved(name) {
-  return Boolean(findSaved(name))
+export function isSaved(name, productId) {
+  return Boolean(findSaved(name, productId))
 }
 
 export function setTarget(name, price) {
-  if (!user.value) {
+  const item = findSaved(name)
+  if (!item) {
     return
   }
-  const list = user.value.wishlist
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].name === name) {
-      list[i].targetPrice = Number(price)
-    }
-  }
-  persist()
+  item.targetPrice = Number(price)
+  write(function () { return axios.patch(keyPath(item), { targetPrice: item.targetPrice }) })
 }
 
-export function removeSaved(name) {
-  if (!user.value) {
+export function removeSaved(name, productId) {
+  const item = findSaved(name, productId)
+  if (!item) {
     return
   }
-  const next = []
-  const list = user.value.wishlist
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].name !== name) {
-      next.push(list[i])
-    }
-  }
-  user.value.wishlist = next
-  persist()
+  user.value.wishlist = user.value.wishlist.filter(function (other) { return other !== item })
+  write(function () { return axios.delete(keyPath(item)) })
 }
 
 export async function toggleEmail() {
@@ -270,62 +295,70 @@ export async function toggleEmail() {
     return
   }
   user.value.emailOn = !user.value.emailOn
-  persist()
   try {
     const { updateUser } = await import('../services/userApi.js')
-    const updated = await updateUser(firebaseUser.value.uid, { emailAlertsOn: user.value.emailOn })
-    console.log('[FastDeal] emailAlertsOn updated in MongoDB:', updated)
+    await updateUser({ emailAlertsOn: user.value.emailOn })
   } catch (err) {
     console.warn('[FastDeal] Could not sync emailAlertsOn to MongoDB:', err.message)
   }
 }
 
-// Sleep on it: save the starting price and expiry time.
-export function sleepOn(name, hours, priceAtStart) {
-  if (!user.value) {
+// Sleep on it: save the starting price and expiry time. The product must be saved first:
+// the caller saves it from a real store, so this never falls back to a made-up price.
+export function sleepOn(name, hours, priceAtStart, productId) {
+  const item = findSaved(name, productId)
+  if (!item) {
     return
   }
-
-  saveProduct(name)
-
-  const item = findSaved(name)
-
-  // Existing countdown functionality
   item.sleepUntil = Date.now() + hours * 3600000
-
-  // NEW: Record the price when the user starts sleeping on it
-  item.sleepPriceAtStart =
-    Number.isFinite(priceAtStart) && priceAtStart > 0
-      ? priceAtStart
-      : null
-
-  // NEW: Reset whether the user has viewed the verdict
+  // The price when the user starts sleeping on it, for the verdict later
+  item.sleepPriceAtStart = Number.isFinite(priceAtStart) && priceAtStart > 0 ? priceAtStart : null
+  // Reset whether the user has viewed the verdict
   item.sleepVerdictSeen = false
-
-  persist()
+  write(function () {
+    return axios.patch(keyPath(item), {
+      sleepUntil: item.sleepUntil,
+      sleepPriceAtStart: item.sleepPriceAtStart,
+      sleepVerdictSeen: false
+    })
+  })
 }
 
-// NEW: Remember when a user closes the verdict
+// Remember when a user closes the verdict
 export function markSleepVerdictSeen(name) {
   const item = findSaved(name)
-
-  if (!item) return
-
+  if (!item) {
+    return
+  }
   item.sleepVerdictSeen = true
-  persist()
+  write(function () { return axios.patch(keyPath(item), { sleepVerdictSeen: true }) })
 }
 
 // Check whether a product is still sleeping
-export function isAsleep(name, now = Date.now()) {
-  const item = findSaved(name)
-
+export function isAsleep(name, now = Date.now(), productId) {
+  const item = findSaved(name, productId)
   if (!item) {
     return false
   }
-
   return Boolean(item.sleepUntil && item.sleepUntil > now)
 }
 
+// Stop the Sleep on it timer early. The item stays in the wishlist.
+export function cancelSleep(name, productId) {
+  const item = findSaved(name, productId)
+  if (!item) {
+    return
+  }
+  item.sleepUntil = 0
+  item.sleepPriceAtStart = null
+  write(function () { return axios.patch(keyPath(item), { sleepUntil: 0, sleepPriceAtStart: null }) })
+}
+
+// When the hold on this product ends, as a timestamp. 0 when it is not on hold.
+export function sleepEndsAt(name, productId) {
+  const item = findSaved(name, productId)
+  return item && item.sleepUntil ? item.sleepUntil : 0
+}
 
 const pendingSleepNotifications = new Set()
 const completedSleepNotifications = new Set()
@@ -363,24 +396,12 @@ async function checkExpiredSleepTimers() {
     }
     pendingSleepNotifications.add(key)
     try {
-      const response = await fetch('/api/notifications/sleep-ended', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          firebaseUid: uid,
-          productName: item.name,
-          sleepUntil: expiry
-        })
+      // axios sends the login token (src/services/http.js). The server takes the uid from it.
+      await axios.post('/api/notifications/sleep-ended', {
+        productName: item.name,
+        sleepUntil: expiry
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to create sleep notification')
-      }
       completedSleepNotifications.add(key)
-
-      console.log('[Sleep On It] Expiry notification checked:', item.name)
     } catch (error) {
       console.error('[Sleep On It] Notification failed:', error)
     } finally {

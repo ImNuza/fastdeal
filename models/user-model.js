@@ -29,8 +29,8 @@ const userSchema = new mongoose.Schema(
       default: true
     },
 
-    // Shared only with accepted friends who saved the same product (Buy Together).
-    // Stored without "@". null = not set yet.
+    // Shown only to accepted friends who saved the same product (Buy Together).
+    // Stored without "@". null = not set.
     telegramUsername: {
       type: String,
       trim: true,

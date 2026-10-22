@@ -38,7 +38,7 @@ async function onSubmit() {
   try {
     const patch = { username: u }
     if (tg) patch.telegramUsername = tg
-    const dbUser = await updateUser(firebaseUser.value.uid, patch)
+    const dbUser = await updateUser(patch)
     console.log('[SetUsername] saved:', dbUser)
     if (user.value) {
       user.value.username = dbUser.username
@@ -114,9 +114,4 @@ async function onSubmit() {
 }
 </style>
 
-<style scoped>
-.login-input {
-  border-radius: 999px;
-  padding: 0.75rem 1.25rem;
-}
-</style>
+

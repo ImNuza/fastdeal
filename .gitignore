@@ -4,3 +4,6 @@ dist
 .DS_Store
 *.log
 .atlas-credentials.env
+# Old search output files. Search results now live in the searchCache collection.
+src/mock/tempitem.json
+src/mock/last-search.json

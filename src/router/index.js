@@ -9,6 +9,7 @@ import FriendsView from '../views/FriendsView.vue'
 import NotificationsView from '../views/NotificationsView.vue'
 import AccountView from '../views/AccountView.vue'
 import SetUsernameView from '../views/SetUsernameView.vue'
+import ProductView from '../views/ProductView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -16,6 +17,7 @@ const router = createRouter({
     { path: '/', component: HomeView, meta: { fullBleed: true } },
     { path: '/search', component: HomeView, meta: { fullBleed: true } },
     { path: '/compare', component: CompareView },
+    { path: '/product/:productId', component: ProductView },
     { path: '/trending', component: TrendingView },
     { path: '/friends', component: FriendsView },
     { path: '/notifications', component: NotificationsView },
@@ -24,7 +26,11 @@ const router = createRouter({
     { path: '/signup', component: SignupView },
     { path: '/set-username', component: SetUsernameView },
     { path: '/wishlist', component: WishlistView }
-  ]
+  ],
+  // A new page opens at the top. Back and forward return to where you were.
+  scrollBehavior(to, from, savedPosition) {
+    return savedPosition || { top: 0 }
+  }
 })
 
 export default router

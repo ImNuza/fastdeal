@@ -9,6 +9,12 @@ const searchCacheSchema = new mongoose.Schema(
       unique: true
     },
 
+    // The cleaned search term Gemini made, for example "Hydro Flask water bottle"
+    searchTerm: {
+      type: String,
+      default: null
+    },
+
     listings: {
       type: Array,
       default: []

@@ -1,29 +1,31 @@
 import axios from 'axios'
 
-// Create or return existing MongoDB user after Firebase signup/login.
+// The server reads who I am from the login token (see http.js), so no uid is sent.
+
+// Create or return my MongoDB user after Firebase signup/login.
 // Pass username only on first email signup; Google users set it via /set-username.
-export async function createOrGetUser(firebaseUid, email, username) {
-  const body = { firebaseUid, email }
+export async function createOrGetUser(username) {
+  const body = {}
   if (username) body.username = username
   const { data } = await axios.post('/api/users', body)
   return data
 }
 
-// Get the current user's profile from MongoDB.
-export async function getUser(firebaseUid) {
-  const { data } = await axios.get(`/api/users/${firebaseUid}`)
+// Get my profile from MongoDB.
+export async function getUser() {
+  const { data } = await axios.get('/api/users/me')
   return data
 }
 
-// Patch the current user — allowed fields: emailAlertsOn, username.
-export async function updateUser(firebaseUid, patch) {
-  const { data } = await axios.put(`/api/users/${firebaseUid}`, patch)
+// Patch my profile. Allowed fields: emailAlertsOn, username.
+export async function updateUser(patch) {
+  const { data } = await axios.put('/api/users/me', patch)
   return data
 }
 
-// Look up a user's email by their username — needed for username-based login
-// because Firebase signInWithEmailAndPassword requires an email.
-export async function lookupByUsername(username) {
-  const { data } = await axios.get('/api/users/lookup', { params: { username } })
-  return data // { email, firebaseUid, username }
+// Username login: Firebase signs in with an email, so the server returns the email,
+// but only when the password is right.
+export async function loginEmail(username, password) {
+  const { data } = await axios.post('/api/users/login-email', { username, password })
+  return data.email
 }

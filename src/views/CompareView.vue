@@ -1,8 +1,11 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
 import { buildResult, dayLabel, sgd, verdictFor } from '../mock/catalog.js'
-import { isAsleep, isSaved, savedFrom, saveProduct, sleepOn, user } from '../mock/session.js'
+import { isSaved, savedFrom, saveProduct, user } from '../mock/session.js'
+import { itemName } from '../services/itemName.js'
+import { sessionId } from '../services/searchSession.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,7 +25,7 @@ const note = ref('')
 const brokenImages = ref({})
 
 // Unique per card. store + price alone collides when one store lists the same
-// price twice (it does in tempitem.json), so live rows carry SerpAPI's product id.
+// price twice (it does in live results), so live rows carry SerpAPI's product id.
 function rowKey(row) {
   return row.id || row.store + row.price
 }
@@ -128,55 +131,35 @@ function loginNext() {
   router.push({ path: '/login', query: { next: route.fullPath } })
 }
 
-function onSave() {
-  if (!user.value) {
-    loginNext()
-    return
-  }
-  saveProduct(result.value.name)
-  note.value = 'Saved to wishlist from ' + savedFrom(result.value.name) + '.'
+// Each card is one product. Save saves that card's product from that card's store.
+function rowName(row) {
+  return row.name || result.value.name
 }
 
-// Save from one specific store row in the listings table.
 function onSaveFrom(row) {
   if (!user.value) {
     loginNext()
     return
   }
-  saveProduct(result.value.name, { store: row.store, price: row.price })
-  note.value = 'Saved to wishlist from ' + row.store + '.'
+  saveProduct(rowName(row), { store: row.store, price: row.price },
+    { productId: row.productId, q: String(route.query.q || ''), image: row.image })
+  note.value = 'Saved ' + rowName(row) + ' from ' + row.store + '.'
 }
 
-function onSleep() {
-  if (!user.value) {
-    loginNext()
-    return
-  }
-  // Already on hold: leave its timer alone.
-  if (isAsleep(result.value.name)) {
-    return
-  }
-  sleepOn(result.value.name, 24)
-  note.value = 'Saved to wishlist and on hold for 1 day.'
-}
-
-// Map one raw SerpAPI shopping_results item into the row shape the cards use
-// (name, image, store, price, rating, reviews, freeShipping, onSale).
+// Map one listing from GET /api/search into the row shape the cards use
+// (name, image, store, price, rating, reviews, freeShipping, onSale, productId).
 function toRow(item, index) {
-  const price = Number(item.extracted_price)
-  const rating = Number(item.rating)
-  const reviews = Number(item.reviews)
-  const delivery = String(item.delivery || '').toLowerCase()
   return {
-    id: String(item.product_id || '') + '-' + (item.position || index),
-    name: item.title || '',
-    image: item.thumbnail || '',
-    store: item.source || 'Unknown',
-    price: Number.isFinite(price) ? price : 0,
-    rating: Number.isFinite(rating) ? rating : 0,
-    reviews: Number.isFinite(reviews) ? reviews : 0,
-    freeShipping: delivery.indexOf('free') !== -1,
-    onSale: item.old_price != null
+    id: String(item.productId || '') + '-' + index,
+    productId: item.productId || '',
+    name: item.name || '',
+    image: item.image || '',
+    store: item.store || 'Unknown',
+    price: Number(item.price) || 0,
+    rating: Number(item.rating) || 0,
+    reviews: Number(item.reviews) || 0,
+    freeShipping: Boolean(item.freeShipping),
+    onSale: item.oldPrice != null
   }
 }
 
@@ -201,31 +184,20 @@ function seedPriceRange(listings) {
   maxPrice.value = high
 }
 
-// Title-case the search query for the product heading, since SerpAPI's per-item
-// titles are each a different variant (e.g. "...Pro", "...Pro XL").
-function titleCase(text) {
-  return String(text || '').replace(/\b\w/g, function (c) { return c.toUpperCase() })
-}
-
-// Run the live SerpAPI search on the server, then read src/mock/tempitem.json
-// (the raw response Vite serves as a static asset). Returns { name, listings }
-// built from the first 10 usable results, or null if nothing usable came back.
+// Run the search on the server. It reuses a saved copy from the last 6 hours,
+// so a reload costs no SerpApi credit. Returns { name, listings } built from the
+// first 10 usable results, or null if nothing usable came back.
 async function loadLive(q) {
   try {
-    // Server calls SerpAPI and writes src/mock/tempitem.json before responding.
-    // If that call fails, still read whatever tempitem.json already holds.
-    await fetch('/api/search?q=' + encodeURIComponent(q)).catch(function () {})
-    // Read the raw response via the Express route (the Vite dev server rewrites
-    // a direct /mock/tempitem.json request to index.html, so we can't fetch that).
-    const res = await fetch('/api/tempitem?t=' + Date.now())
+    const res = await fetch('/api/search?q=' + encodeURIComponent(q) + '&sid=' + encodeURIComponent(sessionId()))
     if (!res.ok) {
       return null
     }
-    const raw = await res.json()
-    const results = Array.isArray(raw.shopping_results) ? raw.shopping_results : []
+    const data = await res.json()
+    const listings = Array.isArray(data.listings) ? data.listings : []
     const rowsOut = []
-    for (let i = 0; i < results.length && rowsOut.length < 10; i++) {
-      const row = toRow(results[i], i)
+    for (let i = 0; i < listings.length && rowsOut.length < 10; i++) {
+      const row = toRow(listings[i], i)
       if (row.price > 0) {
         rowsOut.push(row)
       }
@@ -233,8 +205,7 @@ async function loadLive(q) {
     if (!rowsOut.length) {
       return null
     }
-    const q2 = raw.search_parameters && raw.search_parameters.q
-    return { name: titleCase(q2 || q), listings: rowsOut }
+    return { name: itemName(data.searchTerm || q), listings: rowsOut }
   } catch (err) {
     return null
   }
@@ -255,7 +226,7 @@ onMounted(async function () {
 
   // Mock supplies the 14-day price history and related items (SerpAPI returns
   // neither). The product name, the listings table and the verdict all come
-  // from the live tempitem.json when it has usable results; otherwise the whole
+  // from the live search when it has usable results; otherwise the whole
   // result falls back to mock so the demo never breaks.
   const built = buildResult(q)
   const live = await loadLive(q)
@@ -272,7 +243,7 @@ onMounted(async function () {
 </script>
 
 <template>
-  <p v-if="loading" class="text-secondary">Loading listings...</p>
+  <FdLoadingSpeed v-if="loading" message="Comparing prices across stores" />
 
   <div v-else-if="failed" class="alert alert-danger">
     Could not load listings. Search again from the home page.
@@ -289,12 +260,7 @@ onMounted(async function () {
       <p class="small text-secondary mb-0">14-day low {{ sgd(verdict.low) }}. 14-day average {{ sgd(verdict.avg) }}. Mean rating {{ verdict.rating.toFixed(1) }} from {{ verdict.reviewSum }} reviews.</p>
     </div>
 
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <button class="btn btn-dark" type="button" @click="onSave">{{ isSaved(result.name) ? 'Saved' : 'Save' }}</button>
-      <button class="btn btn-outline-dark" type="button" @click="onSleep">{{ isAsleep(result.name) ? 'On hold' : 'Sleep on it' }}</button>
-      <span v-if="note" class="align-self-center small">{{ note }}</span>
-      <span v-if="!user" class="align-self-center small text-secondary">Log in to save or hold this product.</span>
-    </div>
+    <p v-if="note" class="small mb-3" role="status">{{ note }}</p>
 
     <div class="card p-3 mb-3">
       <div class="row g-2">
@@ -363,7 +329,12 @@ onMounted(async function () {
           </div>
 
           <div class="fd-listing-body">
-            <h3 class="fd-listing-name" :title="row.name || result.name">{{ row.name || result.name }}</h3>
+            <h3 class="fd-listing-name" :title="row.name || result.name">
+              <!-- stretched-link makes the whole card open the product page -->
+              <router-link v-if="row.productId" class="fd-listing-link stretched-link"
+                :to="{ path: '/product/' + row.productId, query: { q: route.query.q } }">{{ row.name || result.name }}</router-link>
+              <template v-else>{{ row.name || result.name }}</template>
+            </h3>
             <p class="fd-listing-price">
               {{ sgd(row.price) }}
               <span v-if="row.price === lowInView" class="visually-hidden">(cheapest listing)</span>
@@ -379,9 +350,9 @@ onMounted(async function () {
           <button
             class="btn btn-sm btn-outline-dark fd-listing-save"
             type="button"
-            :disabled="savedFrom(result.name) === row.store"
+            :disabled="savedFrom(rowName(row), row.productId) === row.store"
             @click="onSaveFrom(row)"
-          >{{ savedFrom(result.name) === row.store ? 'Saved' : isSaved(result.name) ? 'Save from here instead' : 'Save from here' }}</button>
+          >{{ savedFrom(rowName(row), row.productId) === row.store ? 'Saved' : isSaved(rowName(row), row.productId) ? 'Save from here instead' : 'Save from here' }}</button>
         </article>
       </li>
     </ul>
@@ -440,6 +411,7 @@ onMounted(async function () {
 }
 
 .fd-listing-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -527,7 +499,20 @@ onMounted(async function () {
 }
 
 .fd-listing-save {
+  position: relative;
+  z-index: 2;
   margin-top: 0.75rem;
   width: 100%;
+}
+
+/* The title link opens the product page. It keeps the card's text colour. */
+.fd-listing-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.fd-listing-link:hover,
+.fd-listing-link:focus-visible {
+  text-decoration: underline;
 }
 </style>

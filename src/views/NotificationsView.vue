@@ -1,27 +1,27 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { user, firebaseUser } from '../mock/session.js'
-import { ref, computed, onMounted } from 'vue'
+import { user } from '../mock/session.js'
+import { ref, nextTick, onMounted } from 'vue'
 import axios from 'axios'
+import FdLoadingDots from '../components/FdLoadingDots.vue'
 
 const router = useRouter()
 const notifications = ref([])
 const unread = ref([])
 const read = ref([])
-const myUid = computed(() => firebaseUser.value?.uid)
 
-// Buy Together popup state
-const buyTogetherOpen = ref(false)
-const buyTogetherFriends = ref([])
-const buyTogetherProduct = ref('')
-const buyTogetherLoading = ref(false)
+const buyItem = ref(null)
+const buyFriends = ref([])
+const buyLoading = ref(false)
+const buyError = ref('')
+const buyDialog = ref(null)
 
 if (!user.value) {
   router.replace('/login?next=/notifications')
 }
 
 async function load() {
-  const res = await axios.get('/api/notifications', { params: { id: myUid.value } })
+  const res = await axios.get('/api/notifications')
   notifications.value = res.data
   unreadSplit()
 }
@@ -45,31 +45,33 @@ function unreadSplit() {
 }
 
 async function markAllRead() {
-  await axios.put('/api/notifications/read-all', null, { params: { id: myUid.value } })
+  await axios.put('/api/notifications/read-all')
   notifications.value.forEach(n => { n.read = true })
   unreadSplit()
 }
 
+function isBuyTogether(n) {
+  return n.type === 'group-order' && !n.fromUid && Boolean(n.productKey)
+}
+
 async function openBuyTogether(n) {
-  buyTogetherProduct.value = n.productKey || ''
-  buyTogetherFriends.value = []
-  buyTogetherLoading.value = true
-  buyTogetherOpen.value = true
+  buyItem.value = n
+  buyFriends.value = []
+  buyError.value = ''
+  buyLoading.value = true
+  nextTick(() => buyDialog.value?.querySelector('.fd-entry-actions button')?.focus())
   try {
-    const res = await axios.get('/api/buy-together', {
-      params: { myUid: myUid.value, productName: n.productKey || '' }
-    })
-    buyTogetherFriends.value = res.data
+    const res = await axios.get('/api/buy-together', { params: { productKey: n.productKey } })
+    buyFriends.value = res.data
   } catch (err) {
-    console.error('[Buy Together]', err)
+    buyError.value = err.response?.data?.error || 'Could not load your friends. Try again.'
   } finally {
-    buyTogetherLoading.value = false
+    buyLoading.value = false
   }
-  if (!n.read) markRead(n)
 }
 
 function closeBuyTogether() {
-  buyTogetherOpen.value = false
+  buyItem.value = null
 }
 
 onMounted(load)
@@ -86,8 +88,7 @@ onMounted(load)
       <h2 class="fd-section-subtitle">Unread</h2>
       <div class="row g-3">
         <div class="col-12" v-for="n in unread" :key="n._id">
-          <!-- Buy Together notification -->
-          <div v-if="n.type === 'group-order'" class="card h-100" style="padding: 0.75rem; border-color: var(--fd-blue);">
+          <div v-if="isBuyTogether(n)" class="card h-100" style="padding: 0.75rem; border-color: var(--fd-blue);">
             <div class="d-flex justify-content-between align-items-center gap-2">
               <div>
                 <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">🛒 {{ n.title }}</h5>
@@ -100,7 +101,6 @@ onMounted(load)
             </div>
           </div>
 
-          <!-- Regular notification -->
           <router-link v-else :to="n.link || '/'" style="text-decoration: none;">
             <div class="card h-100" style="padding: 0.75rem; border-radius: 1rem;">
               <div class="d-flex justify-content-between align-items-center">
@@ -121,7 +121,7 @@ onMounted(load)
       <h2 class="fd-section-subtitle">Read</h2>
       <div class="row g-3">
         <div class="col-12" v-for="n in read" :key="n._id">
-          <div v-if="n.type === 'group-order'" class="card h-100" style="padding: 0.75rem;">
+          <div v-if="isBuyTogether(n)" class="card h-100" style="padding: 0.75rem;">
             <div class="d-flex justify-content-between align-items-center gap-2">
               <div>
                 <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">🛒 {{ n.title }}</h5>
@@ -144,39 +144,33 @@ onMounted(load)
       </div>
     </div>
 
-    <!-- Buy Together popup — uses the same .fd-entry-backdrop / .fd-entry-dialog as Login/Signup -->
-    <div v-if="buyTogetherOpen" class="fd-entry-backdrop" @click.self="closeBuyTogether">
-      <div class="fd-entry-dialog">
-        <div class="d-flex justify-content-between align-items-start mb-3">
-          <div>
-            <p class="fd-eyebrow mb-1">Buy Together</p>
-            <p class="small text-secondary mb-0">Friends who also saved <strong>{{ buyTogetherProduct }}</strong></p>
-          </div>
-          <button type="button" class="btn-close" @click="closeBuyTogether" aria-label="Close"></button>
-        </div>
-
-        <div v-if="buyTogetherLoading" class="text-center py-3 text-secondary small">Loading…</div>
-
-        <div v-else-if="buyTogetherFriends.length === 0" class="text-center py-3 text-secondary small">
-          No friends have this item saved right now.
-        </div>
-
-        <ul v-else class="list-unstyled mb-0">
-          <li v-for="f in buyTogetherFriends" :key="f.username" class="d-flex justify-content-between align-items-center py-2" style="border-bottom: 2px solid var(--fd-vanilla-line);">
+    <!-- Buy Together pop-up. Uses the welcome prompt's dialog styles from app.css. -->
+    <div v-if="buyItem" class="fd-entry-backdrop" @click.self="closeBuyTogether" @keydown.esc="closeBuyTogether">
+      <section ref="buyDialog" class="fd-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-buy-title">
+        <h2 id="fd-buy-title" class="fd-page-title">Buy together</h2>
+        <p class="fd-entry-description">These friends also saved this product. Message them to order together and
+          split the shipping.</p>
+        <FdLoadingDots v-if="buyLoading" size="inline" message="Finding your friends" />
+        <p v-else-if="buyError" class="alert alert-danger" role="alert">{{ buyError }}</p>
+        <p v-else-if="!buyFriends.length" class="text-secondary">None of your friends has this product saved now.</p>
+        <ul v-else class="list-unstyled text-start mb-4">
+          <li v-for="f in buyFriends" :key="f.username"
+            class="d-flex justify-content-between align-items-center gap-2 py-2 border-bottom">
             <span class="fw-bold" style="font-family: var(--fd-font-display); letter-spacing: 0.04em;">{{ f.username.toUpperCase() }}</span>
-            <span v-if="f.telegramUsername" class="small fw-bold" style="color: var(--fd-blue);">@{{ f.telegramUsername }}</span>
-            <span v-else class="small text-secondary">No Telegram set</span>
+            <a v-if="f.telegramUsername" class="btn btn-sm btn-outline-dark" :href="'https://t.me/' + f.telegramUsername"
+              target="_blank" rel="noopener">Message @{{ f.telegramUsername }}</a>
+            <span v-else class="small text-secondary">No Telegram yet</span>
           </li>
         </ul>
-
-        <p class="small text-secondary mt-3 mb-0">Message them on Telegram to coordinate your order.</p>
-      </div>
+        <div class="fd-entry-actions">
+          <button class="btn btn-dark" type="button" @click="closeBuyTogether">Close</button>
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* group-order card accent uses fd-blue border, matching the app's card style */
 .bt-card {
   border-color: var(--fd-blue) !important;
 }

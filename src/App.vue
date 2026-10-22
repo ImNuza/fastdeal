@@ -105,7 +105,7 @@ async function refreshUnread() {
     return
   }
   try {
-    const res = await axios.get('/api/notifications', { params: { id: firebaseUser.value.uid } })
+    const res = await axios.get('/api/notifications')
     unreadCount.value = res.data.filter(n => !n.read).length
   } catch (err) {
     console.log(err)

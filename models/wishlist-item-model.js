@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 
 // A product one user saved. targetPrice null means the 10% drop rule applies.
+// productName is the product title (not the search), so two products from one search are two rows.
 const wishlistItemSchema = new mongoose.Schema(
   {
     firebaseUid: {
@@ -14,14 +15,37 @@ const wishlistItemSchema = new mongoose.Schema(
       trim: true
     },
 
+    // toProductKey(productName), from models/product-key.js
     productKey: {
       type: String,
       required: true
     },
 
+    // Google Shopping product id, for /product/:productId. null for items saved before 21 Oct 2026.
+    productId: {
+      type: String,
+      default: null
+    },
+
+    // The search it was saved from, so the product page works after a reload
+    q: {
+      type: String,
+      default: null
+    },
+
+    image: {
+      type: String,
+      default: null
+    },
+
     savedPrice: {
       type: Number,
       required: true
+    },
+
+    savedStore: {
+      type: String,
+      default: null
     },
 
     targetPrice: {
@@ -65,6 +89,23 @@ const wishlistItemSchema = new mongoose.Schema(
     lastEmailAt: {
       type: Date,
       default: null
+    },
+
+    // Sleep on it. sleepUntil null = not on hold. The price when the hold started
+    // and whether the user has seen the verdict after it ended.
+    sleepUntil: {
+      type: Date,
+      default: null
+    },
+
+    sleepPriceAtStart: {
+      type: Number,
+      default: null
+    },
+
+    sleepVerdictSeen: {
+      type: Boolean,
+      default: false
     },
 
     savedAt: {

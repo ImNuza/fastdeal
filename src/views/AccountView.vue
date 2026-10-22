@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { toggleEmail, user, authReady, firebaseUser } from '../mock/session.js'
+import { toggleEmail, user, authReady } from '../mock/session.js'
 import { signOutUser } from '../services/auth.js'
 import { updateUser } from '../services/userApi.js'
 
@@ -37,7 +37,7 @@ async function saveTelegram() {
   }
   telegramLoading.value = true
   try {
-    const dbUser = await updateUser(firebaseUser.value.uid, { telegramUsername: handle || null })
+    const dbUser = await updateUser({ telegramUsername: handle || null })
     if (user.value) user.value.telegramUsername = dbUser.telegramUsername || null
     telegramSuccess.value = true
     setTimeout(() => { telegramSuccess.value = false }, 2500)
