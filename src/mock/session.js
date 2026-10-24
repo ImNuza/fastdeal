@@ -30,6 +30,7 @@ export function applyDbUser(dbUser, fbUser) {
     username: dbUser.username || '',
     emailOn: dbUser.emailAlertsOn,
     telegramUsername: dbUser.telegramUsername || '',
+    role: dbUser.role || 'user',
     wishlist: []
   }
   void loadWishlist(fbUser.email)

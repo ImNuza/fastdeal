@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { firebaseUser, user } from '../mock/session.js'
+import { firebaseUser, user } from '../store/auth.js'
 import { updateUser } from '../services/userApi.js'
 
 const router = useRouter()

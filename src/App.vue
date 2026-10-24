@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
-import { user, firebaseUser } from './mock/session.js'
+import { user, firebaseUser } from './store/auth.js'
 
 // Computed so the navbar username updates reactively whenever user logs in, out, or sets a username.
 const username = computed(() => user.value?.username || '')
@@ -177,6 +177,12 @@ watch([() => route.path, user], maybeShowEntryDialog)
               <FdIcon name="bell" />
               <span class="fd-icon-label">Notifications</span>
               <span v-if="unreadCount" class="badge rounded-pill bg-danger" style="position: absolute; top: 0; right: 0; font-family: var(--fd-font-body);">{{ unreadCount }}</span>
+            </router-link>
+          </li>
+          <li v-if="user?.role === 'admin'" class="nav-item">
+            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/admin') }" active-class="" exact-active-class="" to="/admin">
+              <FdIcon name="account" />
+              <span class="fd-icon-label">Admin</span>
             </router-link>
           </li>
           <li v-if="!user" class="nav-item">

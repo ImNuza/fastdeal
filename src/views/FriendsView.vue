@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { user, firebaseUser, authReady } from '../mock/session.js'
+import { user, firebaseUser, authReady } from '../store/auth.js'
 import {
   getFriends,
   getIncomingRequests,

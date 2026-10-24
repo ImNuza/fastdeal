@@ -1,6 +1,6 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { user } from '../mock/session.js'
+import { user } from '../store/auth.js'
 import { ref, nextTick, onMounted } from 'vue'
 import axios from 'axios'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
