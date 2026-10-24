@@ -86,6 +86,12 @@ const wishlistItemSchema = new mongoose.Schema(
       default: null
     },
 
+    // Target threshold for which an email has already been sent.
+    targetEmailFor: {
+      type: Number,
+      default: null
+    },
+
     lastEmailAt: {
       type: Date,
       default: null
