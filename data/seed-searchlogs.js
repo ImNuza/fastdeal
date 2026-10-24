@@ -130,9 +130,19 @@ const { default: SearchLog } = await import('../models/search-log-model.js')
 
 await mongoose.connect(process.env.MONGODB_URI)
 
-// One SerpAPI call per unique product (not per row), then reuse that image.
+// Images already saved on the seeded rows, so a re-run costs 0 SerpAPI credits.
+// This is read before the old seeded rows are deleted below.
+const saved = await SearchLog.find({ sessionId: /^seed-/, image: { $nin: ['', null] } }).select('productKey image')
 const images = {}
+for (const s of saved) images[s.productKey] = s.image
+
+// Only products that appear in the rows need an image. Call SerpAPI only for those with none saved.
+let serpCalls = 0
+const needed = new Set(rows.map(r => r.productKey))
 for (const p of PRODUCTS) {
+  const key = toProductKey(p.name)
+  if (!needed.has(key) || images[key]) continue
+  serpCalls++
   try {
     const json = await getJson({
       engine: 'google_shopping',
@@ -148,13 +158,14 @@ for (const p of PRODUCTS) {
       const title = words_(r.title)
       return words.every(w => title.includes(w)) && !BAD.test(r.title || '')
     })
-    images[toProductKey(p.name)] = (match || results[0])?.thumbnail || ''
+    images[key] = (match || results[0])?.thumbnail || ''
     console.log(match ? 'image ok:' : 'image (first result, no exact match):', p.name)
   } catch (e) {
-    images[toProductKey(p.name)] = ''
+    images[key] = ''
     console.log('image failed:', p.name, e.message)
   }
 }
+console.log('SerpApi calls:', serpCalls)
 for (const r of rows) r.image = images[r.productKey] || ''
 
 const removed = await SearchLog.deleteMany({ sessionId: /^seed-/ })

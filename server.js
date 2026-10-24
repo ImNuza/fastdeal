@@ -397,10 +397,39 @@ app.get('/api/trending' , async (req,res) =>{
     })
   }catch (error){
     console.log(error)
+    res.status(500).json({ error: 'Failed to load trending' })
   }
 
 })
 
+//search with feature
+app.get('/api/searched-with',async (req,res)=>{
+  try{
+    const key=toProductKey(req.query.key)
+    const match= await SearchLog.find({productKey: key})
+    const sessionIds=[]
+    for (const i of match){
+      sessionIds.push(i.sessionId)
+    }
+    const otherSearchesRaw = await SearchLog.find({ sessionId: { $in: sessionIds }, productKey: { $ne: key } })
+
+    const otherSearches={}
+    for (const i of otherSearchesRaw){
+      if (Object.keys(otherSearches).includes(i.productKey)){
+        otherSearches[i.productKey].count++
+      }else{
+        otherSearches[i.productKey]={ _id: i.productKey, query: i.query, name: i.productName, image: i.image, count: 1 }
+      }
+    }
+
+    const end = Object.values(otherSearches)
+    end.sort((a, b) => b.count - a.count)
+    res.json(end)
+  }catch(error){
+    console.log(error)
+    res.status(500).json({ error: 'Failed to load' })
+  }
+})
 
 app.post('/api/notifications/sleep-ended', requireUser, async (req, res) => {
   const firebaseUid = req.uid
