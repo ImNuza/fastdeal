@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  cancelSleep,
   isAsleep,
   isSaved,
   removeSaved,
@@ -13,7 +12,8 @@ import {
   user
 } from '../mock/session.js'
 
-// Save and Sleep on it buttons for one product, each with an undo. Used on the product page.
+// Save and Sleep on it buttons for one product. Used on the product page.
+// Save can be undone. A hold cannot: it is there to stop an impulse buy, so it runs until the timer ends.
 const props = defineProps({
   // Product title, as the wishlist stores it
   name: {
@@ -86,9 +86,6 @@ function onSave() {
 }
 
 function onRemove() {
-  if (asleep.value && !window.confirm('This also cancels Sleep on it. Remove it from your wishlist?')) {
-    return
-  }
   removeSaved(props.name, productId.value)
   note.value = 'Removed from wishlist.'
 }
@@ -106,27 +103,19 @@ function onSleep() {
   sleepOn(props.name, 24, props.listing ? props.listing.price : undefined, productId.value)
   note.value = 'Saved to wishlist and on hold for 1 day.'
 }
-
-function onCancelSleep() {
-  cancelSleep(props.name, productId.value)
-  note.value = 'Hold cancelled. Still in your wishlist.'
-}
 </script>
 
 <template>
   <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
     <template v-if="saved">
       <button class="btn btn-dark" type="button" disabled>Saved</button>
-      <button class="btn btn-link btn-sm px-1" type="button" :aria-label="'Remove ' + name + ' from wishlist'"
-        @click="onRemove">Remove</button>
+      <!-- No Remove while on hold, or removing and saving again would skip the hold. -->
+      <button v-if="!asleep" class="btn btn-link btn-sm px-1" type="button"
+        :aria-label="'Remove ' + name + ' from wishlist'" @click="onRemove">Remove</button>
     </template>
     <button v-else class="btn btn-dark" type="button" :disabled="!listing" @click="onSave">Save</button>
 
-    <template v-if="asleep">
-      <button class="btn btn-outline-dark" type="button" disabled>On hold, {{ leftText }}</button>
-      <button class="btn btn-link btn-sm px-1" type="button" :aria-label="'Cancel the hold on ' + name"
-        @click="onCancelSleep">Cancel hold</button>
-    </template>
+    <button v-if="asleep" class="btn btn-outline-dark" type="button" disabled>On hold, {{ leftText }}</button>
     <button v-else class="btn btn-outline-dark" type="button" :disabled="!listing" @click="onSleep">Sleep on it</button>
 
     <span v-if="note" class="small" role="status">{{ note }}</span>

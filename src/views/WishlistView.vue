@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { fetchCheapestLiveListing } from '../services/livePriceService.js'
 import { productImage, sgd, storeLink } from '../mock/catalog.js'
-import { addSampleWishlist, cancelSleep, isAsleep, missingSamples, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user } from '../mock/session.js'
+import { addSampleWishlist, isAsleep, missingSamples, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user } from '../mock/session.js'
 import FdIcon from '../components/FdIcon.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
 import { planBudget } from '../mock/budget.js'
@@ -753,8 +753,6 @@ function cheapestPlannable() {
               <div>
                 <strong class="d-block">Sleeping on it, {{ leftText(item) }}</strong>
                 <span class="small text-secondary">Back on {{ untilText(item) }}</span>
-                <button class="btn btn-link btn-sm p-0 d-block" type="button"
-                  :aria-label="'Cancel the hold on ' + item.name" @click="cancelSleep(item.name)">Cancel hold</button>
               </div>
             </div>
 

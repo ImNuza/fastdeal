@@ -237,17 +237,6 @@ export function isAsleep(name, now = Date.now(), productId) {
   return Boolean(item.sleepUntil && item.sleepUntil > now)
 }
 
-// Stop the Sleep on it timer early. The item stays in the wishlist.
-export function cancelSleep(name, productId) {
-  const item = findSaved(name, productId)
-  if (!item) {
-    return
-  }
-  item.sleepUntil = 0
-  item.sleepPriceAtStart = null
-  write(function () { return axios.patch(keyPath(item), { sleepUntil: 0, sleepPriceAtStart: null }) })
-}
-
 // When the hold on this product ends, as a timestamp. 0 when it is not on hold.
 export function sleepEndsAt(name, productId) {
   const item = findSaved(name, productId)
