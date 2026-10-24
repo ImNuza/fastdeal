@@ -20,7 +20,8 @@ export async function sendPriceAlertEmail({
     currentPrice,
     store,
     productLink,
-    alertType
+    alertType,
+    targetPrice
 }) {
     const subject = alertType === 'target'
         ? `FastDeal: Target price reached for ${productName}`
@@ -33,11 +34,11 @@ A product on your FastDeal wishlist has triggered a price alert.
 
 Product: ${productName}
 Saved price: S$${Number(savedPrice).toFixed(2)}
+${targetPrice != null && Number.isFinite(Number(targetPrice))
+            ? `Your target: S$${Number(targetPrice).toFixed(2)}`
+            : ''}
 Current price: S$${Number(currentPrice).toFixed(2)}
 Store: ${store}
-
-View product:
-${productLink}
 
 FastDeal Team
 `

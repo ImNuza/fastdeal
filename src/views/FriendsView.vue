@@ -1,7 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { user, firebaseUser, authReady } from '../mock/session.js'
+import { useAuthStore } from '../store/auth.js'
+import { storeToRefs } from 'pinia'
+const { user, firebaseUser, authReady } = storeToRefs(useAuthStore())
 import {
   getFriends,
   getIncomingRequests,

@@ -7,6 +7,7 @@ import { addSampleWishlist, cancelSleep, isAsleep, missingSamples, removeSaved, 
 import FdIcon from '../components/FdIcon.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
 import { planBudget } from '../mock/budget.js'
+import axios from 'axios'
 
 const router = useRouter()
 const route = useRoute()
@@ -45,6 +46,7 @@ function best(item) {
   return livePrices.value[item.name] ?? null
 }
 
+
 async function loadLivePrice(name) {
   if (liveLoading.value[name]) return
 
@@ -53,7 +55,36 @@ async function loadLivePrice(name) {
 
   try {
     const listing = await fetchCheapestLiveListing(name)
+
+    // Display the best price in Wishlist.
     livePrices.value[name] = listing
+
+    // Find the saved product in MongoDB-backed wishlist state.
+    const saved = user.value?.wishlist?.find(
+      item => item.name === name
+    )
+
+    // Only ask the backend to check when the displayed price
+    // meets the user's target threshold.
+    if (
+      saved &&
+      saved.productKey &&
+      Number(saved.targetPrice) > 0 &&
+      listing.price <= Number(saved.targetPrice)
+    ) {
+      void axios.post(
+        '/api/wishlist/' +
+        encodeURIComponent(saved.productKey) +
+        '/check-target'
+      ).then(response => {
+        console.log('[Target email] Check result:', response.data)
+      }).catch(error => {
+        console.warn(
+          '[Target email] Check failed:',
+          error.response?.data?.error || error.message
+        )
+      })
+    }
   } catch (error) {
     delete livePrices.value[name]
     liveErrors.value[name] = error.message || 'Price unavailable'
@@ -61,6 +92,7 @@ async function loadLivePrice(name) {
     liveLoading.value[name] = false
   }
 }
+
 
 watch(
   () => user.value?.wishlist?.map(item => item.name).join('|') ?? '',
@@ -207,8 +239,37 @@ function initials(name) {
   return name.split(/\s+/).slice(0, 2).map(function (word) { return word.charAt(0) }).join('').toUpperCase()
 }
 
-function onTarget(item, event) {
-  setTarget(item.name, event.target.value)
+async function onTarget(item, event) {
+  const nextTarget = Number(event.target.value)
+  const previousTarget = Number(item.targetPrice)
+
+  if (nextTarget === previousTarget) return
+
+  try {
+    await setTarget(item.name, event.target.value)
+
+    const listing = best(item)
+
+    if (
+      item.productKey &&
+      listing &&
+      nextTarget > 0 &&
+      listing.price <= nextTarget
+    ) {
+      const response = await axios.post(
+        '/api/wishlist/' +
+        encodeURIComponent(item.productKey) +
+        '/check-target'
+      )
+
+      console.log('[Target email] Check result:', response.data)
+    }
+  } catch (error) {
+    console.warn(
+      '[Target email] Could not save or check target:',
+      error.response?.data?.error || error.message
+    )
+  }
 }
 
 // Sleep on it pop-up: pick how long to lock the item in days, hours, and minutes, 1 day by default.
@@ -679,7 +740,8 @@ function cheapestPlannable() {
             <div class="fd-wish-cell fd-wish-cell-product" role="cell">
               <router-link class="fd-wish-product" :to="productLink(item)">
                 <span class="fd-wish-image">
-                  <img v-if="item.image || productImage(item.name)" :src="item.image || productImage(item.name)" alt="" />
+                  <img v-if="item.image || productImage(item.name)" :src="item.image || productImage(item.name)"
+                    alt="" />
                   <span v-else>{{ initials(item.name) }}</span>
                 </span>
                 <span class="fd-section-subtitle mb-0">{{ item.name }}</span>

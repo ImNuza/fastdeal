@@ -38,6 +38,12 @@ const userSchema = new mongoose.Schema(
       match: /^[A-Za-z0-9_]{5,32}$/
     },
 
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user'
+    },
+
     // The user's own last 10 searches, newest first. Keep it at 10 with $push, $position 0 and $slice 10.
     recentSearches: [
       {

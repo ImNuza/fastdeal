@@ -20,6 +20,7 @@ import Notification from './models/notification-model.js'
 import WishlistItem from './models/wishlist-item-model.js'
 import { getProduct } from './services/productService.js'
 import { findBuyTogetherFriends, notifyBuyTogether } from './services/buyTogether.js'
+import { checkTargetPrice } from './services/targetPriceEmail.js'
 
 
 
@@ -32,7 +33,8 @@ app.use(express.json())
 
 const PORT = process.env.PORT || 3000
 const proposalPath = path.join(__dirname, 'data', 'proposal.json')
-const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd-v3.html')
+const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd-v4.html')
+const erdV3Path = path.join(__dirname, 'docs', 'fastdeal-erd-v3.html')
 const erdPresentPath = path.join(__dirname, 'docs', 'fastdeal-erd-present.html')
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } })
 
@@ -480,16 +482,16 @@ app.post('/api/notifications/sleep-ended', requireUser, async (req, res) => {
     )
     const notification = result.value
 
-    // Only the first time this countdown ends, so a reload makes no second Buy Together alert.
-    if (!result.lastErrorObject.updatedExisting) {
+    // Only on the first expiry — check if any friends saved the same product.
+    if (!result.lastErrorObject?.updatedExisting) {
       try {
         await notifyBuyTogether(firebaseUid, productName)
-      } catch (error) {
-        console.error('[Buy Together]', error)
+      } catch (btErr) {
+        console.error('[Buy Together] notification failed:', btErr)
       }
     }
 
-    res.json(notification)
+    res.json(result.value)
   } catch (error) {
     console.error('[Sleep On It] Notification error:', error)
 
@@ -498,7 +500,6 @@ app.post('/api/notifications/sleep-ended', requireUser, async (req, res) => {
     })
   }
 })
-
 
 //retrieve notifications
 app.get('/api/notifications', requireUser, async (req, res) => {
@@ -542,6 +543,56 @@ app.get('/api/buy-together', requireUser, async (req, res) => {
   if (!productKey) return res.status(400).json({ error: 'productKey required' })
   try {
     res.json(await findBuyTogetherFriends(req.uid, productKey))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Send group-invite notifications to selected friends. Body: { friendUids, productKey }.
+// Only accepted friends receive invites; others are silently skipped.
+app.post('/api/buy-together/invite', requireUser, async (req, res) => {
+  const myUid = req.uid
+  const friendUids = req.body.friendUids
+  const productKey = text(req.body.productKey)
+  if (!Array.isArray(friendUids) || !friendUids.length || !productKey) {
+    return res.status(400).json({ error: 'friendUids and productKey required' })
+  }
+  try {
+    const me = await User.findOne({ firebaseUid: myUid }).select('username')
+    if (!me) return res.status(404).json({ error: 'User not found' })
+    const myItem = await WishlistItem.findOne({ firebaseUid: myUid, productKey }).select('productName')
+    const productName = myItem?.productName || productKey
+
+    const pairKeys = friendUids.map(uid => toPairKey(myUid, uid))
+    const validFriendships = await Friendship.find({ pairKey: { $in: pairKeys }, status: 'accepted' })
+    const validUids = new Set(validFriendships.map(f => f.requesterUid === myUid ? f.addresseeUid : f.requesterUid))
+
+    const notifs = [...validUids].map(uid => ({
+      firebaseUid: uid,
+      type: 'group-invite',
+      title: `${me.username || 'A friend'} wants to buy together!`,
+      body: `${me.username || 'A friend'} saved ${productName} and wants to split the shipping.`,
+      productKey,
+      fromUid: myUid,
+      link: '/notifications'
+    }))
+    if (notifs.length) await Notification.insertMany(notifs, { ordered: false })
+    res.json({ sent: notifs.length })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Profile of a specific friend (username + telegram). Only works between accepted friends.
+app.get('/api/users/profile/:firebaseUid', requireUser, async (req, res) => {
+  const myUid = req.uid
+  const theirUid = req.params.firebaseUid
+  try {
+    const ok = await Friendship.exists({ pairKey: toPairKey(myUid, theirUid), status: 'accepted' })
+    if (!ok) return res.status(403).json({ error: 'Not friends' })
+    const u = await User.findOne({ firebaseUid: theirUid }).select('-_id username telegramUsername')
+    if (!u) return res.status(404).json({ error: 'User not found' })
+    res.json({ username: u.username, telegramUsername: u.telegramUsername || null })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -632,26 +683,84 @@ app.post('/api/wishlist', requireUser, async (req, res) => {
   }
 })
 
-// Change the target price or the Sleep on it fields of one saved product.
+
+
 app.patch('/api/wishlist/:productKey', requireUser, async (req, res) => {
-  const set = {}
-  if ('targetPrice' in req.body) set.targetPrice = priceOrNull(req.body.targetPrice)
-  if ('sleepUntil' in req.body) set.sleepUntil = dateOrNull(req.body.sleepUntil)
-  if ('sleepPriceAtStart' in req.body) set.sleepPriceAtStart = priceOrNull(req.body.sleepPriceAtStart)
-  if ('sleepVerdictSeen' in req.body) set.sleepVerdictSeen = req.body.sleepVerdictSeen === true
-  if (!Object.keys(set).length) return res.status(400).json({ error: 'Nothing to update' })
   try {
-    const row = await WishlistItem.findOneAndUpdate(
-      { firebaseUid: req.uid, productKey: req.params.productKey },
-      { $set: set },
-      { new: true }
-    )
-    if (!row) return res.status(404).json({ error: 'Not in your wishlist' })
+    const row = await WishlistItem.findOne({
+      firebaseUid: req.uid,
+      productKey: req.params.productKey
+    })
+
+    if (!row) {
+      return res.status(404).json({ error: 'Not in your wishlist' })
+    }
+
+    const set = {}
+
+    if ('targetPrice' in req.body) {
+      const newTarget = priceOrNull(req.body.targetPrice)
+
+      // Reset email state only if the target actually changes.
+      if (row.targetPrice !== newTarget) {
+        set.targetPrice = newTarget
+        set.targetEmailFor = null
+        set.lastCheckedAt = null
+      }
+    }
+
+    if ('sleepUntil' in req.body) {
+      set.sleepUntil = dateOrNull(req.body.sleepUntil)
+    }
+
+    if ('sleepPriceAtStart' in req.body) {
+      set.sleepPriceAtStart = priceOrNull(req.body.sleepPriceAtStart)
+    }
+
+    if ('sleepVerdictSeen' in req.body) {
+      set.sleepVerdictSeen = req.body.sleepVerdictSeen === true
+    }
+
+    // An unchanged target is not an error.
+    if (!Object.keys(set).length) {
+      return res.json(toWishItem(row))
+    }
+
+    Object.assign(row, set)
+    await row.save()
+
     res.json(toWishItem(row))
-  } catch (err) {
-    res.status(500).json({ error: err.message })
+  } catch (error) {
+    console.error('[Wishlist PATCH]', error)
+    res.status(500).json({ error: 'Could not update wishlist' })
   }
 })
+
+
+
+// Check whether a saved product has reached its target price.
+// Firebase authentication is verified by requireUser.
+app.post(
+  '/api/wishlist/:productKey/check-target',
+  requireUser,
+  async (req, res) => {
+    try {
+      const result = await checkTargetPrice(
+        req.uid,
+        req.params.productKey
+      )
+
+      res.json(result)
+    } catch (error) {
+      console.error('[Target email]', error)
+
+      res.status(500).json({
+        error: 'Could not check target price'
+      })
+    }
+  }
+)
+
 
 app.delete('/api/wishlist/:productKey', requireUser, async (req, res) => {
   try {
@@ -665,6 +774,11 @@ app.delete('/api/wishlist/:productKey', requireUser, async (req, res) => {
 // Database ERD for the team and graders
 app.get('/erd', (req, res) => {
   res.sendFile(erdPath)
+})
+
+// The previous version, linked from the v4 page
+app.get('/erd/v3', (req, res) => {
+  res.sendFile(erdV3Path)
 })
 
 // Clean ERD for presenting in class
