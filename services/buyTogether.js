@@ -23,9 +23,9 @@ export async function findBuyTogetherFriends(myUid, productKey) {
   if (!saved.length) return []
 
   const users = await User.find({ firebaseUid: { $in: saved.map(function (item) { return item.firebaseUid }) } })
-    .select('-_id username telegramUsername')
+    .select('-_id firebaseUid username telegramUsername')
   return users.map(function (user) {
-    return { username: user.username, telegramUsername: user.telegramUsername || null }
+    return { firebaseUid: user.firebaseUid, username: user.username, telegramUsername: user.telegramUsername || null }
   })
 }
 

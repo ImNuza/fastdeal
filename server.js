@@ -518,6 +518,56 @@ app.get('/api/buy-together', requireUser, async (req, res) => {
   }
 })
 
+// Send group-invite notifications to selected friends. Body: { friendUids, productKey }.
+// Only accepted friends receive invites; others are silently skipped.
+app.post('/api/buy-together/invite', requireUser, async (req, res) => {
+  const myUid = req.uid
+  const friendUids = req.body.friendUids
+  const productKey = text(req.body.productKey)
+  if (!Array.isArray(friendUids) || !friendUids.length || !productKey) {
+    return res.status(400).json({ error: 'friendUids and productKey required' })
+  }
+  try {
+    const me = await User.findOne({ firebaseUid: myUid }).select('username')
+    if (!me) return res.status(404).json({ error: 'User not found' })
+    const myItem = await WishlistItem.findOne({ firebaseUid: myUid, productKey }).select('productName')
+    const productName = myItem?.productName || productKey
+
+    const pairKeys = friendUids.map(uid => toPairKey(myUid, uid))
+    const validFriendships = await Friendship.find({ pairKey: { $in: pairKeys }, status: 'accepted' })
+    const validUids = new Set(validFriendships.map(f => f.requesterUid === myUid ? f.addresseeUid : f.requesterUid))
+
+    const notifs = [...validUids].map(uid => ({
+      firebaseUid: uid,
+      type: 'group-invite',
+      title: `${me.username || 'A friend'} wants to buy together!`,
+      body: `${me.username || 'A friend'} saved ${productName} and wants to split the shipping.`,
+      productKey,
+      fromUid: myUid,
+      link: '/notifications'
+    }))
+    if (notifs.length) await Notification.insertMany(notifs, { ordered: false })
+    res.json({ sent: notifs.length })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Profile of a specific friend (username + telegram). Only works between accepted friends.
+app.get('/api/users/profile/:firebaseUid', requireUser, async (req, res) => {
+  const myUid = req.uid
+  const theirUid = req.params.firebaseUid
+  try {
+    const ok = await Friendship.exists({ pairKey: toPairKey(myUid, theirUid), status: 'accepted' })
+    if (!ok) return res.status(403).json({ error: 'Not friends' })
+    const u = await User.findOne({ firebaseUid: theirUid }).select('-_id username telegramUsername')
+    if (!u) return res.status(404).json({ error: 'User not found' })
+    res.json({ username: u.username, telegramUsername: u.telegramUsername || null })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // --- Wishlist routes ---
 // One row per saved product per user. The client keeps a copy in memory (src/mock/session.js)
 // and writes every change through these routes.
