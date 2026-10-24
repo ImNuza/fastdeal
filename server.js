@@ -347,6 +347,58 @@ app.get('/api/search', async (req, res) => {
   }
 })
 
+// Read the logged-in user's own last-10 searches (newest first).
+// The user is taken from the checked token (req.uid), never from the URL.
+app.get('/api/me/recent-searches', requireUser, async (req, res) => {
+  try {
+    const user = await User.findOne({ firebaseUid: req.uid }).select('recentSearches')
+    res.json({ recentSearches: (user && user.recentSearches) || [] })
+  } catch (err) {
+    res.status(500).json({ error: String((err && err.message) || err) })
+  }
+})
+
+// Record this search in the logged-in user's own last-10 list (newest first).
+// The user is taken from the checked token (req.uid), never from the body.
+// Dedup is by productKey: an existing entry for the same product is moved to the
+// front instead of duplicated; the list is capped at 10, evicting the oldest.
+app.post('/api/me/recent-searches', requireUser, async (req, res) => {
+  const query = text(req.body.query)
+  if (!query) return res.status(400).json({ error: 'query required' })
+
+  // Prefer the key the client already has from /api/search; else derive it.
+  const productKey = toProductKey(text(req.body.productKey) || query)
+  const entry = { query, productKey, searchedAt: new Date() }
+
+  try {
+    // Step 1: drop any existing entry for this product (the "move to front" half).
+    await User.updateOne(
+      { firebaseUid: req.uid },
+      { $pull: { recentSearches: { productKey } } }
+    )
+
+    // Step 2: prepend the new entry and keep only the newest 10.
+    const updated = await User.findOneAndUpdate(
+      { firebaseUid: req.uid },
+      {
+        $push: {
+          recentSearches: {
+            $each: [entry],
+            $position: 0,
+            $slice: 10
+          }
+        }
+      },
+      { new: true }
+    ).select('recentSearches')
+
+    if (!updated) return res.status(404).json({ error: 'User not found' })
+    res.json({ recentSearches: updated.recentSearches })
+  } catch (err) {
+    res.status(500).json({ error: String((err && err.message) || err) })
+  }
+})
+
 app.post('/api/identify-image', upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'photo required' })

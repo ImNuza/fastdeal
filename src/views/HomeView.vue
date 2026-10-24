@@ -13,6 +13,7 @@ const photoError = ref('')
 const photoBusy = ref(false)
 const trendingToday = ref([])
 const trendingWeek = ref([])
+const recentSearches = ref([])
 
 function go(name) {
   const q = String(name || '').trim()
@@ -303,6 +304,19 @@ onMounted(async function retriveTrending() {
 })
 
 
+// Recent searches: the logged-in user's own last 10. The axios interceptor
+// (src/services/http.js) attaches the Firebase token; a logged-out user gets
+// 401, which we treat as "no history" so the section just stays empty.
+onMounted(async function retrieveRecentSearches() {
+  try {
+    const res = await axios.get('/api/me/recent-searches')
+    recentSearches.value = res.data.recentSearches || []
+  } catch (error) {
+    recentSearches.value = []
+  }
+})
+
+
 
 
 onBeforeUnmount(function () {
@@ -460,9 +474,18 @@ onBeforeUnmount(function () {
       <p v-if="photoError" class="fd-search-text small mt-3 mb-0 text-center">{{ photoError }}</p>
       <p v-if="photoName" class="fd-search-text small mt-3 mb-0 text-center">Identified as {{ photoName }}</p>
 
-      <!-- Search history: placeholder, not built yet. -->
+      <!-- Search history: the logged-in user's own last 10 searches, newest first. -->
       <section class="mt-5">
         <h2 class="fd-section-title">Search history</h2>
+        <ul v-if="recentSearches.length" class="fd-history">
+          <li v-for="item in recentSearches" :key="item.productKey + item.searchedAt">
+            <button type="button" class="fd-history-chip" @click="go(item.query)">
+              <FdIcon name="search" />
+              <span>{{ item.query }}</span>
+            </button>
+          </li>
+        </ul>
+        <p v-else class="fd-search-text small mb-0">No recent searches yet.</p>
       </section>
     </div>
   </section>
@@ -644,6 +667,33 @@ onBeforeUnmount(function () {
 .fd-suggestion-detail {
   display: block;
   font-size: var(--fd-small);
+}
+
+/* Search history: a row of pills on the blue band, matching the search bar's paper look. */
+.fd-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fd-history-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fd-paper);
+  color: var(--fd-text);
+  font-size: var(--fd-small);
+  cursor: pointer;
+}
+
+.fd-history-chip:hover {
+  background: var(--fd-beige);
 }
 
 .fd-landing {

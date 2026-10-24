@@ -6,6 +6,7 @@ import { buildResult, dayLabel, sgd, verdictFor } from '../mock/catalog.js'
 import { isSaved, savedFrom, saveProduct, user } from '../mock/session.js'
 import { itemName } from '../services/itemName.js'
 import { sessionId } from '../services/searchSession.js'
+import axios from 'axios'
 
 const route = useRoute()
 const router = useRouter()
@@ -205,6 +206,13 @@ async function loadLive(q) {
     if (!rowsOut.length) {
       return null
     }
+    // Record this search in the logged-in user's own history (newest first).
+    // Fire-and-forget: axios attaches the Firebase token (src/services/http.js);
+    // a logged-out user gets 401, which we ignore so search is never affected.
+    axios.post('/api/me/recent-searches', {
+      query: data.query || q,
+      productKey: data.productKey
+    }).catch(function () {})
     return { name: itemName(data.searchTerm || q), listings: rowsOut }
   } catch (err) {
     return null
