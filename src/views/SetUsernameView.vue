@@ -1,7 +1,9 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { firebaseUser, user } from '../store/auth.js'
+import { useAuthStore } from '../store/auth.js'
+import { storeToRefs } from 'pinia'
+const { firebaseUser, user } = storeToRefs(useAuthStore())
 import { updateUser } from '../services/userApi.js'
 
 const router = useRouter()

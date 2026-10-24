@@ -1,5 +1,7 @@
 <script setup>
-import { user } from '../store/auth.js'
+import { useAuthStore } from '../store/auth.js'
+import { storeToRefs } from 'pinia'
+const { user } = storeToRefs(useAuthStore())
 </script>
 
 <template>

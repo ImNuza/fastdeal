@@ -3,7 +3,8 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { signInWithGoogle, signUpWithEmail } from '../services/auth.js'
 import { createOrGetUser } from '../services/userApi.js'
-import { startSignup, endSignup, applyDbUser } from '../store/auth.js'
+import { useAuthStore } from '../store/auth.js'
+const { startSignup, endSignup, applyDbUser } = useAuthStore()
 
 const route = useRoute()
 const router = useRouter()

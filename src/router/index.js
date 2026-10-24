@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { watch } from 'vue'
-import { user, authReady } from '../store/auth.js'
+import { useAuthStore } from '../store/auth.js'
 import HomeView from '../views/HomeView.vue'
 import CompareView from '../views/CompareView.vue'
 import TrendingView from '../views/TrendingView.vue'
@@ -38,20 +38,22 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+
   // Wait for Firebase to resolve on page reload before checking auth state.
-  if (!authReady.value) {
+  if (!auth.authReady) {
     await new Promise(resolve => {
-      const stop = watch(authReady, (ready) => {
+      const stop = watch(() => auth.authReady, (ready) => {
         if (ready) { stop(); resolve() }
       })
     })
   }
 
-  if (to.meta.requiresAuth && !user.value) {
+  if (to.meta.requiresAuth && !auth.user) {
     return { path: '/login', query: { next: to.fullPath } }
   }
 
-  if (to.meta.requiresRole === 'admin' && user.value?.role !== 'admin') {
+  if (to.meta.requiresRole === 'admin' && !auth.isAdmin) {
     alert('Access denied. Admins only.')
     return false
   }

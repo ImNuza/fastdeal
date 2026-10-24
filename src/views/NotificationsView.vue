@@ -1,6 +1,8 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { user } from '../store/auth.js'
+import { useAuthStore } from '../store/auth.js'
+import { storeToRefs } from 'pinia'
+const { user } = storeToRefs(useAuthStore())
 import { ref, nextTick, onMounted } from 'vue'
 import axios from 'axios'
 import FdLoadingDots from '../components/FdLoadingDots.vue'

@@ -2,13 +2,16 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
-import { user, firebaseUser } from './store/auth.js'
-
-// Computed so the navbar username updates reactively whenever user logs in, out, or sets a username.
-const username = computed(() => user.value?.username || '')
+import { useAuthStore } from './store/auth.js'
+import { storeToRefs } from 'pinia'
 import FdLogo from './components/FdLogo.vue'
 import FdIcon from './components/FdIcon.vue'
 import FdFooter from './components/FdFooter.vue'
+
+const { user, firebaseUser } = storeToRefs(useAuthStore())
+
+// Computed so the navbar username updates reactively whenever user logs in, out, or sets a username.
+const username = computed(() => user.value?.username || '')
 
 // Remembered for this browser session only, so a guest is asked again on their next visit.
 const ENTRY_CHOICE_KEY = 'fastdeal-entry-choice'
