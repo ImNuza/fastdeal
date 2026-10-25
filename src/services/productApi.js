@@ -11,3 +11,9 @@ export async function fetchProduct(productId, q) {
   }
   return data
 }
+
+//search with feature
+export async function fetchSearchedWith(q) {
+  const res = await fetch('/api/searched-with?key=' + encodeURIComponent(q || ''))
+  return res.json()
+}
