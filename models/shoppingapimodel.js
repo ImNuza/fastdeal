@@ -13,6 +13,7 @@ import { getJson } from 'serpapi'
 import { toProductKey } from './product-key.js'
 import SearchCache from './search-cache-model.js'
 import SearchLog from './search-log-model.js'
+import { recordPrices, storePrices } from '../services/priceHistory.js'
 
 // Keys are read at module scope; server.js does `import 'dotenv/config'` BEFORE it
 // imports this model, so process.env is already populated when these evaluate.
@@ -197,6 +198,9 @@ export async function search(q, sessionId) {
     { upsert: true }
   )
   await logSearch(sessionId, rawQuery, productKey, pre.searchTerm, listings)
+  // Today's price at each store, for price tracking. Only fresh results: a cached one may be
+  // from before midnight. No extra API call, the search already happened.
+  await recordPrices(productKey, storePrices(listings))
 
   return {
     query: rawQuery,

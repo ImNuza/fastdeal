@@ -7,6 +7,7 @@ import { storeToRefs } from 'pinia'
 import FdLogo from './components/FdLogo.vue'
 import FdIcon from './components/FdIcon.vue'
 import FdFooter from './components/FdFooter.vue'
+import FdSearchBar from './components/FdSearchBar.vue'
 
 const { user, firebaseUser } = storeToRefs(useAuthStore())
 
@@ -158,6 +159,8 @@ watch([() => route.path, user], maybeShowEntryDialog)
   <nav ref="navBar" class="navbar navbar-expand-lg navbar-dark fd-nav sticky-top">
     <div class="container">
       <router-link class="navbar-brand" to="/" aria-label="FastDeal home"><FdLogo /></router-link>
+      <!-- Search sits beside the logo on every page except Home, which has its own in the hero. -->
+      <FdSearchBar v-if="!route.meta.heroSearch" compact class="fd-nav-search" />
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#fdNav">
         <span class="navbar-toggler-icon"></span>
       </button>

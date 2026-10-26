@@ -24,11 +24,14 @@ How FastDeal looks and how to keep it consistent when you add or change a page. 
 | `src/assets/app.css` | App-wide styles that use the tokens: type classes, navbar, cards, tables, buttons, forms, welcome prompt. |
 | `src/components/FdLogo.vue` | The FastDeal logo. |
 | `src/components/FdIcon.vue` | Line icons for the navbar and the search bar. |
+| `src/components/FdSearchBar.vue` | The search bar with recent searches, suggestions, and Search by photo. Full size in the Home hero; `compact` in the navbar on every other page. |
+| `src/services/searchHistory.js` | A guest's last 5 searches, kept in the browser. Logged-in users get theirs from their account instead. |
+| `src/services/itemName.js` | Shows a search term as a product name: "samsung galaxy s25" becomes "Samsung Galaxy S25". Use it wherever a search term is shown. |
 | `src/components/FdFooter.vue` | The footer on every page. |
 | `src/App.vue` | Navbar, welcome prompt, page shell. |
 | `src/mock/budget.js` | The Plan a budget logic on Wishlist: finds the best mix of items for a budget. |
 | `src/views/LoginView.vue`, `SignupView.vue` | Log in and Sign up. Their pill-shaped inputs are styled at the bottom of each file. Log in also holds the Forgot password pop-up. |
-| `src/views/HomeView.vue` | The home page at `/`: hero, search band, trending, search history. Its page-only styles sit at the bottom of the file. |
+| `src/views/HomeView.vue` | The home page at `/`: hero with search, values band, Trending Today, Trending This Week. Its page-only styles sit at the bottom of the file. |
 | `index.html` | Loads Bootstrap and the Google Fonts. |
 
 ## Colours
@@ -36,9 +39,10 @@ How FastDeal looks and how to keep it consistent when you add or change a page. 
 | Name | Variable | Hex | Use it for |
 |---|---|---|---|
 | Deep blue (main) | `--fd-blue` | `#27508a` | Navbar, main buttons, all titles and headings, links, chart lines and bars |
-| Blue dark | `--fd-blue-dark` | `#1d3f6e` | Hover state of blue buttons, footer background |
+| Blue dark | `--fd-blue-dark` | `#1d3f6e` | Hover state of blue buttons, footer background, tooltips |
 | Beige | `--fd-beige` | `#f4ede3` | Page background, text on blue |
 | Paper | `--fd-paper` | `#fbf8f3` | Cards, tables, inputs, the welcome prompt, the Home search bar and its suggestions |
+| White | `--fd-white` | `#ffffff` | Only behind product photos (they come with white backgrounds), so the photo and its frame match |
 | Vanilla (accent) | `--fd-vanilla` | `#fae8a4` | Highlights: "DEAL" and speed lines in the logo, active nav underline, the stripe behind "SMARTER" on Home, footer headings, the search bar focus ring |
 | Vanilla soft | `--fd-vanilla-soft` | `#fcf2cc` | Table headers, chart area fill, neutral alerts, the highlighted search suggestion |
 | Vanilla line | `--fd-vanilla-line` | `#e8d9ad` | Borders on cards, tables, inputs, and alerts |
@@ -51,7 +55,7 @@ How FastDeal looks and how to keep it consistent when you add or change a page. 
 | Ink | `--fd-ink` | `#343b1b` | Body text only |
 | Muted text | `--fd-text-muted` | `#585f3e` | Subtitles, captions, labels |
 
-The Worth It / Maybe / Not Worth It verdict box uses its own green, amber, and red border (`#2f6b47`, `#a8741a`, `#a3301f`). Keep those three for verdicts and errors only. The one other use is the green `#2f6b47` dot that marks the 14-day low on the Home hero chart.
+The Worth It / Maybe / Not Worth It verdict box uses its own green, amber, and red border (`#2f6b47`, `#a8741a`, `#a3301f`). Keep those three for verdicts and errors only. The Home hero cards use none of the result colours: only blue, vanilla, and the soft vanilla fill, so they stay calm.
 
 ### Colour rules
 
@@ -59,6 +63,8 @@ The Worth It / Maybe / Not Worth It verdict box uses its own green, amber, and r
 - Green and red mean results: green is "best deal", red is "costs you more". Never use them for decoration.
 - Text on vanilla, green, or red is always ink or blue, never beige or white, because the contrast is too low.
 - `btn-dark` is blue in this app, despite its name. It is the main action button.
+- No black and no ink backgrounds. Ink is for body text only; anything dark behind text (hover states, tooltips) is blue dark. The one place black appears is the soft shadow (`--fd-shadow`).
+- For a see-through version of a colour, mix the token rather than typing an rgb value: `color-mix(in srgb, var(--fd-beige) 80%, transparent)`.
 
 Contrast is checked against WCAG AA (4.5:1 for body text):
 
@@ -109,7 +115,7 @@ The size variables behind this table (in `tokens.css`):
 --fd-button-sm: 0.875rem;
 ```
 
-On Home, two things sit outside this table: the hero headline (`.fd-display`, Anton, blue, 48px growing to 84px on wide screens) and the big analytics numbers on the hero cards (32px and 56px, blue). On the blue search band, titles and text are beige instead of blue or ink.
+On Home, two things sit outside this table: the hero headline (`.fd-display`, Anton, blue, 48px growing to 84px on wide screens) and the big analytics numbers on the hero cards (32px and 56px, blue). On the blue values band, titles and text are beige instead of blue or ink.
 
 ### Type rules
 
@@ -122,7 +128,7 @@ On Home, two things sit outside this table: the hero headline (`.fd-display`, An
 - **Borders:** every border is 2px (`--fd-border`): cards, tables, inputs, buttons, checkboxes, alerts. To show meaning, change the border colour, not its thickness.
 - **Corners:** cards and tables 1rem (`--fd-radius`), inputs 0.625rem, Home hero analytics cards and the welcome prompt 1.25rem, buttons and the Home search bar fully rounded (pill).
 - **Heights:** every button is 48px tall (`--fd-control`), or 36px with `btn-sm` (`--fd-control-sm`). The Home and Wishlist search bars are 48px too, so they line up with the buttons beside them. Never set a height on a single button; change the token so every page moves together.
-- **Shadows:** none on cards. Only things that float get a soft shadow: the welcome prompt, the Home search bar, and its suggestions panel.
+- **Shadows:** none on cards. Only the search bar and its dropdown get a soft shadow, so they pop: `--fd-shadow` (black at 15%). The welcome prompt keeps its own larger shadow.
 
 ## Components
 
@@ -156,10 +162,14 @@ Use at most one main-action button in each area. A minor option (like "Create an
 | Price tag | `tag` | Wishlist, and each Home search suggestion |
 | Bell | `bell` | Notifications |
 | Account | `account` | Log in, and the Account page once logged in (the icon stays the same) |
-| Magnifier | `search` | Search button in the Home search bar |
-| Camera | `camera` | Search by photo in the Home search bar |
+| Magnifier | `search` | Search button in the search bar |
+| Camera | `camera` | Search by photo in the search bar |
+| Clock | `clock` | Each recent search in the search bar's dropdown |
 | Chevron up / down | `chevron-up`, `chevron-down` | The arrows in the Sleep on it time picker |
-| Moon | `moon` | Sleep on it buttons in the Wishlist table |
+| Moon | `moon` | Sleep on it buttons in the Wishlist table, and Decide on the Home values band |
+| Sparkles | `sparkles` | Photo search (AI) on the Home values band |
+| Scales | `scale` | Compare on the Home values band |
+| Wallet | `wallet` | Plan on the Home values band |
 | Trash | `trash` | Remove from Wishlist, Remove friend |
 | Cross | `x` | Decline a friend request |
 | Check | `check` | Target reached, beside the target box on Wishlist |
@@ -171,6 +181,7 @@ Only keep icons something uses. Delete an icon from `FdIcon.vue` when its last u
 Blue, sticky (stays at the top while scrolling), in `App.vue`.
 
 - Left: the logo, which links to Home.
+- Beside the logo, on every page except Home (which has its own in the hero): the compact search bar. It sits faint and narrow on the blue; tapped, it turns paper and stretches across to the icons. Routes with `meta: { heroSearch: true }` hide it.
 - Right: Friends, Wishlist, Notifications, and Account as icons. The label always says Account. Logged out, it goes to Log in. Logged in, the same icon goes to the Account page (`/account`), which holds Log out. On desktop each label shows as a tooltip on hover; in the phone menu each icon shows its text label.
 - Exactly one icon gets the vanilla underline: the page you are on.
 - Friends, Wishlist, Notifications, and Account need a login. A guest who taps one goes to `/login?next=...` and comes back after logging in or signing up. While they are on that login page, the icon they tapped keeps the underline, not Log in.
@@ -198,10 +209,11 @@ On the Log in page, "Forgot password?" opens a pop-up instead of a separate page
 - **Same top gap on every page:** the standard page container (`.fd-page` in `app.css`) puts 40px between the navbar and the page title, and 64px between the end of the page and the footer. Do not add your own top or bottom padding to a page; change `.fd-page` so every page moves together.
 - **Edge-to-edge pages:** add `meta: { fullBleed: true }` to the route in `src/router/index.js` to skip the standard page container (Home does this).
 - **Home (`/`, also `/search`):** everything is in `src/views/HomeView.vue`, top to bottom:
-  - **Hero**, about three quarters of the screen, on beige. Left: the eyebrow "Shop smart, not hard." in ink, the headline "SMARTER BUYS START HERE." with "SMARTER" on a vanilla stripe, a short paragraph, and two buttons. Start comparing scrolls down to the search bar and puts the cursor in it; See what's trending scrolls to Trending products. Right: three analytics cards from the mock catalogue (14-day price chart with hover tooltip, "You save" figure, extra-you'd-pay bars per store). As you scroll, the cards slide out to the right one after another. The motion is off for people who turn on "reduce motion" on their device.
-  - **Search band**, full-width blue. A centred beige title and line, then a white pill search bar the width of the page container (in line with the logo), with Search by photo and Search icons inside it. Typing opens a frosted suggestions panel of matching catalogue products: the typed letters in bold blue, the cheapest price underneath. Arrow keys move through it, Enter opens one, Escape closes it. Under the bar sits the Search history heading.
-  - **Trending products**, on beige, the width of the page container.
-  - Search history and Trending products are placeholders: a heading only, no styles or logic yet.
+  - **Hero**, about three quarters of the screen, on beige. Left: the eyebrow "Shop smart, not hard." in ink, the headline "SMARTER BUYS START HERE!" with "SMARTER" on a vanilla stripe, a short paragraph, and the search bar. Right: three analytics cards about one product, the top trending one this week, all live from `/api/home-stats` (real searches, leaving out `seed-` rows, joined with the store prices the shopping API returned; nothing seeded). The big card is price tracking: the lowest price on each of the last 14 days, from `priceDays`, which every fresh search now writes (no extra API calls). It shows today's price and the change since the first tracked day ("Down S$61 since 21 Oct"), vanilla dot with a blue ring on the lowest, dashed average, hover for the day and price. Until a product has 2 tracked days, the same card shows today's price at every store, cheapest to priciest, with a note that tracking has just started. The other two cards: "You save" (cheapest vs priciest store) and "Extra you'd pay vs cheapest" (up to four stores: the three cheapest and the priciest, each a store name and amount over a full-width blue bar, the cheapest with a vanilla tag). The graph writes its first and last price on the line. Only prices between half and double the product's median count, so accessories in the results do not skew them. With no live data yet, the cards are hidden. As you scroll, the cards slide out to the right one after another. The motion is off for people who turn on "reduce motion" on their device.
+  - **Search bar** (`FdSearchBar`): a paper pill with Search by photo and Search icons inside. Tapped while empty, it shows the last 5 searches (the account's for logged-in users, this browser's for guests). Typing switches to matching catalogue products: the typed letters in bold blue, the cheapest price underneath. Arrow keys move through it, Enter opens one, Escape closes it.
+  - **Values band**, full-width blue, "Why shop with FastDeal" in beige. Four features, each a vanilla icon, an Anton title, and one short line: Photo search (with a small vanilla "AI" tag, since it is the one feature that uses AI), Compare, Plan, Decide. One row of four on wide screens, a list on phones. No boxes; hovering one gives it a vanilla outline. Keep the lines short.
+  - **Trending Today**, on beige: a belt of cards that rolls left nonstop, like a conveyor belt, with no dots or arrows. A short list repeats so the row is always full, and it loops seamlessly. It pauses while hovered, focused, or touched, so a card can be read and tapped, and never moves with reduce motion (the row scrolls by hand instead). Each card is a link to Compare and the same size and look as a Trending This Week card (two, three, then four across; white photo area, then the name); hovering gives it a blue outline and grows it slightly. When nothing is trending yet today, one line says so.
+  - **Trending This Week**, on beige, a grid of product cards. Both trending sections share the same padding and title gap.
 - **Wishlist (`/wishlist`):** the title and subtitle, then a search box and a sort menu side by side (48px pills, like the Home search bar). Search filters by product name as you type. On wide screens (992px and up) the search row uses the table's columns: the search bar spans Product to Best now, and "Sort by" starts in line with the Target price alert heading. A "Sort by" label sits in front of the sort menu: Date added: Latest (the default), Date added: Earliest, Price: Low to High, Price: High to Low, Name: A to Z, Name: Z to A. Price sorts use today's best price. Under them, a 2px vanilla line and a header pill (blue with beige text, table header type) that stay pinned under the navbar together while scrolling, then one card per saved product (paper, 2px vanilla line border, `--fd-radius` corners, 12px apart). The header and cards share the same five columns, so everything lines up:
   - **Product:** the photo (96px square; on phones 72px), or the product's initials on vanilla soft when the catalogue has no `image` for it, then the name as a section subtitle. Both link to Compare.
   - **Saved price:** the price and the store it was saved from.

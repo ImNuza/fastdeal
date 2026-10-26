@@ -1,165 +1,192 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { catalog, dayLabel, nameFromFile } from '../mock/catalog.js'
+import FdSearchBar from '../components/FdSearchBar.vue'
 import FdIcon from '../components/FdIcon.vue'
-import FdLoadingDots from '../components/FdLoadingDots.vue'
+import { itemName } from '../services/itemName.js'
 import axios from 'axios'
 
-const router = useRouter()
-const query = ref('')
-const photoName = ref('')
-const photoError = ref('')
-const photoBusy = ref(false)
+// The values band under the hero: FastDeal's features in four groups. ai marks the AI-powered one.
+const values = [
+  { icon: 'sparkles', title: 'Photo search', text: 'Snap it, AI finds it.', ai: true },
+  { icon: 'scale', title: 'Compare', text: 'Every store, 14-day history, deal check.' },
+  { icon: 'wallet', title: 'Plan', text: 'Wishlist and budget planner.' },
+  { icon: 'moon', title: 'Decide', text: 'Sleep on it, or buy with friends.' }
+]
+
 const trendingToday = ref([])
 const trendingWeek = ref([])
-const recentSearches = ref([])
 
-function go(name) {
-  const q = String(name || '').trim()
-  if (!q) {
-    return
-  }
-  router.push({ path: '/compare', query: { q: q } })
-}
+// Trending Today belt: the cards roll past nonstop, like a conveyor belt. One pass repeats
+// the items until it holds at least BELT_MIN cards (so a short list still fills the screen),
+// and the pass is drawn twice; the animation moves exactly one pass, so it loops seamlessly.
+// It pauses on hover, focus, or touch, and never moves for anyone who asked for reduced motion.
+const BELT_MIN = 8
+const BELT_SECONDS_PER_CARD = 5
 
-function onSearch() {
-  const pick = suggestions.value[activeIndex.value]
-  go(pick ? pick.name : query.value)
-}
-
-// Suggestions under the search bar: catalogue products whose name or alias contains what was typed.
-const searchFocused = ref(false)
-const activeIndex = ref(-1)
-
-const suggestions = computed(function () {
-  const q = query.value.trim().toLowerCase()
-  if (!q) {
+const beltPass = computed(function () {
+  const items = trendingToday.value
+  if (!items.length) {
     return []
   }
-  return catalog.filter(function (item) {
-    return item.name.toLowerCase().includes(q) || item.aliases.some(function (alias) {
-      return alias.includes(q)
-    })
-  }).slice(0, 5).map(function (item) {
-    const start = item.name.toLowerCase().indexOf(q)
-    const best = item.listings.reduce(function (a, b) { return b.price < a.price ? b : a })
-    return {
-      name: item.name,
-      // Split the name so the typed part shows in bold, like the matched letters in a place search.
-      before: start >= 0 ? item.name.slice(0, start) : '',
-      match: start >= 0 ? item.name.slice(start, start + q.length) : '',
-      after: start >= 0 ? item.name.slice(start + q.length) : item.name,
-      detail: 'From S$' + best.price + ' at ' + best.store + ' · ' + item.listings.length + ' stores'
-    }
-  })
+  let pass = []
+  while (pass.length < BELT_MIN) {
+    pass = pass.concat(items)
+  }
+  return pass
 })
 
-const showSuggestions = computed(function () {
-  return searchFocused.value && suggestions.value.length > 0
+const beltSeconds = computed(function () {
+  return beltPass.value.length * BELT_SECONDS_PER_CARD
 })
 
-function onQueryInput() {
-  activeIndex.value = -1
-}
-
-function onQueryKey(event) {
-  const count = suggestions.value.length
-  if (!count) {
-    return
-  }
-  if (event.key === 'ArrowDown') {
-    event.preventDefault()
-    activeIndex.value = (activeIndex.value + 1) % count
-  } else if (event.key === 'ArrowUp') {
-    event.preventDefault()
-    activeIndex.value = activeIndex.value <= 0 ? count - 1 : activeIndex.value - 1
-  } else if (event.key === 'Escape') {
-    searchFocused.value = false
-  }
-}
-
-async function onPhoto(event) {
-  const file = event.target.files[0]
-  if (!file) {
-    return
-  }
-  photoError.value = ''
-  photoName.value = ''
-  photoBusy.value = true
-  try{
-    const form=new FormData()
-    form.append('photo', file)
-    const res = await fetch('/api/identify-image', { method: 'POST', body: form })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Could not identify the photo')
-    photoName.value = data.name
-    router.push({ path: '/compare', query: { q: data.name, from: 'photo' } })
-  } catch (e) {
-    photoError.value = e.message
-  } finally {
-    photoBusy.value = false
-    event.target.value = ''
-  }
-}
-
+// Touch has no hover, so a finger on the belt holds it still until it lifts.
+const beltHeld = ref(false)
 
 // Hero
 
-// The hero analytics all come from one real catalogue product.
-const product = catalog[0]
-const history = product.history
-const listings = product.listings.slice().sort(function (a, b) {
-  return a.price - b.price
+// The hero cards all come from live data (/api/home-stats): what real people searched this
+// week and the store prices the shopping API returned for it. Nothing is seeded. Until it
+// loads, or when there is nothing yet, the cards stay hidden.
+const stats = ref(null)
+
+onMounted(async function loadHomeStats() {
+  try {
+    const res = await axios.get('/api/home-stats')
+    stats.value = res.data
+  } catch (error) {
+    stats.value = null
+  }
 })
 
-const cheapest = listings[0]
-const priciest = listings[listings.length - 1]
-const saving = priciest.price - cheapest.price
-const low = Math.min.apply(null, history)
-const high = Math.max.apply(null, history)
-const average = Math.round(history.reduce(function (sum, n) { return sum + n }, 0) / history.length)
-const today = history[history.length - 1]
-const lowIndex = history.indexOf(low)
-
 function money(n) {
-  return 'S$' + Math.round(n)
+  return 'S$' + Math.round(n).toLocaleString('en-SG')
 }
 
-// Price history chart geometry (SVG units).
+// The top trending product, for all three cards.
+const heroProduct = computed(function () {
+  const product = stats.value && stats.value.product
+  if (!product || product.stores.length < 2) {
+    return null
+  }
+  const stores = product.stores
+  const cheapest = stores[0]
+  const priciest = stores[stores.length - 1]
+  const saving = priciest.price - cheapest.price
+  return {
+    name: itemName(product.name),
+    stores: stores,
+    cheapest: cheapest,
+    priciest: priciest,
+    saving: saving,
+    // Up to four bars: the three cheapest stores and the priciest, so the last bar matches "You save".
+    overpay: (stores.length > 4 ? stores.slice(0, 3).concat([priciest]) : stores).map(function (item) {
+      return {
+        store: item.store,
+        extra: item.price - cheapest.price,
+        width: saving ? ((item.price - cheapest.price) / saving) * 100 : 0
+      }
+    })
+  }
+})
+
+// "YYYY-MM-DD" in Singapore time, like the server's price days.
+function sgDay(time) {
+  return new Date(time + 8 * 3600000).toISOString().slice(0, 10)
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function dayName(day) {
+  if (day === sgDay(Date.now())) {
+    return 'Today'
+  }
+  return Number(day.slice(8, 10)) + ' ' + MONTHS[Number(day.slice(5, 7)) - 1]
+}
+
+// Price tracking: the lowest price on each tracked day, once there are at least two days.
+// Until then the graph shows today's price at every store, cheapest to priciest.
+const tracking = computed(function () {
+  const history = (stats.value && stats.value.product && stats.value.product.history) || []
+  if (history.length < 2) {
+    return null
+  }
+  const first = history[0]
+  const last = history[history.length - 1]
+  return {
+    history: history,
+    today: last.price,
+    change: last.price - first.price,
+    since: dayName(first.day)
+  }
+})
+
+// Graph series: either the tracked days or today's stores. Both are a list of
+// { label, price }, so one line chart draws either.
+const series = computed(function () {
+  if (tracking.value) {
+    return tracking.value.history.map(function (d) { return { label: dayName(d.day), price: d.price } })
+  }
+  if (heroProduct.value) {
+    return heroProduct.value.stores.map(function (item) { return { label: item.store, price: item.price } })
+  }
+  return []
+})
+
+// Price graph (SVG units).
 const chart = { width: 320, height: 150, top: 16, right: 12, bottom: 24, left: 12 }
-const yMin = low - 15
-const yMax = high + 15
 
-function xAt(i) {
-  return chart.left + (i * (chart.width - chart.left - chart.right)) / (history.length - 1)
-}
-
-function yAt(price) {
+const graph = computed(function () {
+  const rows = series.value
+  if (rows.length < 2) {
+    return null
+  }
+  const prices = rows.map(function (row) { return row.price })
+  const low = Math.min.apply(null, prices)
+  const high = Math.max.apply(null, prices)
+  const average = prices.reduce(function (sum, n) { return sum + n }, 0) / prices.length
+  const pad = (high - low) * 0.1 || high * 0.05 || 1
+  const yMin = low - pad
+  const yMax = high + pad
   const plot = chart.height - chart.top - chart.bottom
-  return chart.top + ((yMax - price) * plot) / (yMax - yMin)
-}
-
-const linePath = history.map(function (price, i) {
-  return (i === 0 ? 'M' : 'L') + xAt(i).toFixed(1) + ' ' + yAt(price).toFixed(1)
-}).join(' ')
-
-const areaPath = linePath +
-  ' L' + xAt(history.length - 1).toFixed(1) + ' ' + (chart.height - chart.bottom) +
-  ' L' + xAt(0).toFixed(1) + ' ' + (chart.height - chart.bottom) + ' Z'
-
-const averageY = yAt(average)
+  const points = prices.map(function (price, i) {
+    return {
+      x: chart.left + (i * (chart.width - chart.left - chart.right)) / (prices.length - 1),
+      y: chart.top + ((yMax - price) * plot) / (yMax - yMin)
+    }
+  })
+  const line = points.map(function (pt, i) {
+    return (i === 0 ? 'M' : 'L') + pt.x.toFixed(1) + ' ' + pt.y.toFixed(1)
+  }).join(' ')
+  const lastPoint = points[points.length - 1]
+  const lowIndex = prices.indexOf(low)
+  const name = heroProduct.value.name
+  return {
+    points: points,
+    line: line,
+    area: line + ' L' + lastPoint.x.toFixed(1) + ' ' + (chart.height - chart.bottom) +
+      ' L' + points[0].x.toFixed(1) + ' ' + (chart.height - chart.bottom) + ' Z',
+    average: average,
+    averageY: chart.top + ((yMax - average) * plot) / (yMax - yMin),
+    lowPoint: points[lowIndex],
+    firstLabel: tracking.value ? rows[0].label : 'Cheapest store',
+    lastLabel: tracking.value ? rows[rows.length - 1].label : 'Priciest',
+    summary: tracking.value
+      ? 'Lowest price of ' + name + ' each day from ' + rows[0].label + ' to ' + rows[rows.length - 1].label +
+        ', from ' + money(prices[0]) + ' to ' + money(prices[prices.length - 1]) + '. Lowest ' + money(low) + '.'
+      : 'Price of ' + name + ' at ' + prices.length + ' stores today, from ' + money(low) + ' to ' + money(high) + '.'
+  }
+})
 
 const hoverIndex = ref(null)
 const chartBox = ref(null)
 
 function onChartPointer(event) {
+  const count = series.value.length
   const box = chartBox.value.getBoundingClientRect()
-  const ratio = (event.clientX - box.left) / box.width
-  const svgX = ratio * chart.width
-  const step = (chart.width - chart.left - chart.right) / (history.length - 1)
+  const svgX = ((event.clientX - box.left) / box.width) * chart.width
+  const step = (chart.width - chart.left - chart.right) / (count - 1)
   const index = Math.round((svgX - chart.left) / step)
-  hoverIndex.value = Math.min(Math.max(index, 0), history.length - 1)
+  hoverIndex.value = Math.min(Math.max(index, 0), count - 1)
 }
 
 function clearChartPointer() {
@@ -167,29 +194,12 @@ function clearChartPointer() {
 }
 
 const tooltip = computed(function () {
-  if (hoverIndex.value === null) {
+  if (hoverIndex.value === null || !graph.value) {
     return null
   }
-  const i = hoverIndex.value
-  return {
-    left: (xAt(i) / chart.width) * 100 + '%',
-    x: xAt(i),
-    y: yAt(history[i]),
-    date: dayLabel(history.length - 1 - i),
-    price: money(history[i])
-  }
-})
-
-const chartSummary = 'Price of ' + product.name + ' over the last 14 days, from ' + money(history[0]) +
-  ' to ' + money(today) + ' today. Lowest ' + money(low) + ', average ' + money(average) + '.'
-
-// Extra you would pay at each store compared with the cheapest one.
-const overpay = listings.map(function (item) {
-  return {
-    store: item.store,
-    extra: item.price - cheapest.price,
-    width: saving ? ((item.price - cheapest.price) / saving) * 100 : 0
-  }
+  const pt = graph.value.points[hoverIndex.value]
+  const row = series.value[hoverIndex.value]
+  return { left: (pt.x / chart.width) * 100 + '%', x: pt.x, y: pt.y, label: row.label, price: money(row.price) }
 })
 
 // Cards fly out to the right as the hero scrolls away.
@@ -216,21 +226,6 @@ function readTarget() {
   const maxScroll = document.documentElement.scrollHeight - window.innerHeight
   const distance = Math.max(Math.min(hero.value.offsetHeight, maxScroll), 1)
   return Math.min(Math.max(window.scrollY / distance, 0), 1)
-}
-
-// Glide down to Home's search form and put the cursor in the box.
-function scrollToSection(id) {
-  const section = document.getElementById(id)
-  if (!section) {
-    return null
-  }
-  const smooth = !(reduceMotion && reduceMotion.matches)
-  section.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' })
-  return section
-}
-
-function scrollToSearch() {
-  scrollToSection('fd-search')?.querySelector('input')?.focus({ preventScroll: true })
 }
 
 function smoothstep(t) {
@@ -304,19 +299,6 @@ onMounted(async function retriveTrending() {
 })
 
 
-// Recent searches: the logged-in user's own last 10. The axios interceptor
-// (src/services/http.js) attaches the Firebase token; a logged-out user gets
-// 401, which we treat as "no history" so the section just stays empty.
-onMounted(async function retrieveRecentSearches() {
-  try {
-    const res = await axios.get('/api/me/recent-searches')
-    recentSearches.value = res.data.recentSearches || []
-  } catch (error) {
-    recentSearches.value = []
-  }
-})
-
-
 
 
 onBeforeUnmount(function () {
@@ -339,18 +321,26 @@ onBeforeUnmount(function () {
           <p class="fd-hero-text">
             The same item can cost a lot more at one store than another. FastDeal lines up every price, shows how it moved over 14 days, and points you to the cheapest.
           </p>
-          <div class="fd-hero-actions">
-            <a class="btn btn-dark fd-btn-lg" href="#fd-search" @click.prevent="scrollToSearch">Start comparing</a>
-            <a class="btn btn-outline-dark fd-btn-lg" href="#fd-trending" @click.prevent="scrollToSection('fd-trending')">See what's trending</a>
-          </div>
+          <FdSearchBar />
         </div>
 
-        <div class="fd-cluster">
+        <div v-if="heroProduct && graph" class="fd-cluster">
           <article class="fd-card fd-card--history">
             <header class="fd-card-head">
-              <p class="fd-card-label">{{ product.name }}</p>
-              <p class="fd-card-value">{{ money(today) }} <span class="fd-card-note">today</span></p>
-              <p class="fd-card-meta">14-day low {{ money(low) }} · average {{ money(average) }}</p>
+              <p class="fd-card-label">{{ heroProduct.name }}</p>
+              <template v-if="tracking">
+                <p class="fd-card-value">{{ money(tracking.today) }} <span class="fd-card-note">today</span></p>
+                <p class="fd-card-meta">
+                  <template v-if="tracking.change < 0">Down {{ money(-tracking.change) }} since {{ tracking.since }}</template>
+                  <template v-else-if="tracking.change > 0">Up {{ money(tracking.change) }} since {{ tracking.since }}</template>
+                  <template v-else>No change since {{ tracking.since }}</template>
+                  · lowest price each day
+                </p>
+              </template>
+              <template v-else>
+                <p class="fd-card-value">{{ money(heroProduct.cheapest.price) }} <span class="fd-card-note">cheapest today</span></p>
+                <p class="fd-card-meta">Price tracking just started: the daily line appears once there are 2 days. For now, {{ heroProduct.stores.length }} stores today.</p>
+              </template>
             </header>
             <div
               ref="chartBox"
@@ -359,52 +349,47 @@ onBeforeUnmount(function () {
               @pointerdown="onChartPointer"
               @pointerleave="clearChartPointer"
             >
-              <svg :viewBox="'0 0 ' + chart.width + ' ' + chart.height" role="img" :aria-label="chartSummary">
-                <path class="fd-chart-area" :d="areaPath" />
-                <line
-                  class="fd-chart-average"
-                  :x1="chart.left"
-                  :x2="chart.width - chart.right"
-                  :y1="averageY"
-                  :y2="averageY"
-                />
-                <path class="fd-chart-line" :d="linePath" />
-                <circle class="fd-chart-low" :cx="xAt(lowIndex)" :cy="yAt(low)" r="5" />
-                <circle class="fd-chart-today" :cx="xAt(history.length - 1)" :cy="yAt(today)" r="5" />
+              <svg :viewBox="'0 0 ' + chart.width + ' ' + chart.height" role="img" :aria-label="graph.summary">
+                <path class="fd-chart-area" :d="graph.area" />
+                <line class="fd-chart-average" :x1="chart.left" :x2="chart.width - chart.right" :y1="graph.averageY" :y2="graph.averageY" />
+                <path class="fd-chart-line" :d="graph.line" />
+                <circle class="fd-chart-low" :cx="graph.lowPoint.x" :cy="graph.lowPoint.y" r="5" />
                 <g v-if="tooltip">
                   <line class="fd-chart-cross" :x1="tooltip.x" :x2="tooltip.x" :y1="chart.top" :y2="chart.height - chart.bottom" />
                   <circle class="fd-chart-hover" :cx="tooltip.x" :cy="tooltip.y" r="5" />
                 </g>
-                <text class="fd-chart-axis" :x="chart.left" :y="chart.height - 6">{{ dayLabel(13) }}</text>
-                <text class="fd-chart-axis" :x="chart.width - chart.right" :y="chart.height - 6" text-anchor="end">Today</text>
+                <text class="fd-chart-value" :x="graph.points[0].x" :y="graph.points[0].y - 10">{{ money(series[0].price) }}</text>
+                <text class="fd-chart-value" :x="graph.points[graph.points.length - 1].x" :y="graph.points[graph.points.length - 1].y - 10" text-anchor="end">{{ money(series[series.length - 1].price) }}</text>
+                <text class="fd-chart-axis" :x="chart.left" :y="chart.height - 6">{{ graph.firstLabel }}</text>
+                <text class="fd-chart-axis" :x="chart.width - chart.right" :y="chart.height - 6" text-anchor="end">{{ graph.lastLabel }}</text>
               </svg>
               <div v-if="tooltip" class="fd-tooltip" :style="{ left: tooltip.left }" aria-hidden="true">
-                <span>{{ tooltip.date }}</span>
+                <span>{{ tooltip.label }}</span>
                 <strong>{{ tooltip.price }}</strong>
               </div>
             </div>
             <p class="fd-chart-key">
-              <span class="fd-key fd-key--low"></span>14-day low
+              <span class="fd-key fd-key--low"></span>{{ tracking ? 'Lowest' : 'Cheapest' }}
               <span class="fd-key fd-key--avg"></span>Average
             </p>
           </article>
 
           <article class="fd-card fd-card--saving">
             <p class="fd-card-label">You save</p>
-            <p class="fd-stat">{{ money(saving) }}</p>
-            <p class="fd-card-meta">buying at {{ cheapest.store }} instead of {{ priciest.store }}</p>
-            <p class="fd-chip">Cheapest: {{ cheapest.store }}</p>
+            <p class="fd-stat">{{ money(heroProduct.saving) }}</p>
+            <p class="fd-card-meta">Buy at <strong class="fd-save-store">{{ heroProduct.cheapest.store }}</strong> instead of the priciest store.</p>
           </article>
 
           <article class="fd-card fd-card--stores">
             <p class="fd-card-label">Extra you'd pay vs cheapest</p>
             <ul class="fd-bars">
-              <li v-for="row in overpay" :key="row.store" class="fd-bar-row" :title="row.store + ': +' + money(row.extra)">
+              <li v-for="row in heroProduct.overpay" :key="row.store" class="fd-bar-row">
                 <span class="fd-bar-store">{{ row.store }}</span>
+                <span v-if="row.extra" class="fd-bar-value">+{{ money(row.extra) }}</span>
+                <span v-else class="fd-bar-cheapest">Cheapest</span>
                 <span class="fd-bar-track">
                   <span v-if="row.extra" class="fd-bar" :style="{ width: row.width + '%' }"></span>
                 </span>
-                <span class="fd-bar-value">{{ row.extra ? '+' + money(row.extra) : 'Cheapest' }}</span>
               </li>
             </ul>
           </article>
@@ -413,287 +398,364 @@ onBeforeUnmount(function () {
     </section>
   </div>
 
-  <!-- Search band: blue, full width; the search bar and search history span the container, in line with the logo. -->
-  <section id="fd-search" class="fd-search-band">
+  <!-- Values band: blue, full width; FastDeal's features in a grid, the AI one highlighted. -->
+  <section class="fd-values-band" aria-labelledby="fd-values-title">
     <div class="container">
-      <h2 class="fd-section-title text-center">Compare the price before you buy</h2>
-      <p class="fd-search-text text-center">Type a product name, or upload a photo. FastDeal shows store listings on one page and marks the cheapest.</p>
+      <h2 id="fd-values-title" class="fd-page-title">Why shop with FastDeal</h2>
 
-      <form class="fd-searchbox" role="search" @submit.prevent="onSearch">
-        <label class="visually-hidden" for="q">Product name</label>
-        <div class="fd-searchbar">
-          <input
-            id="q"
-            v-model="query"
-            class="fd-searchbar-input"
-            type="text"
-            placeholder="Search a product, e.g. Sony WH-1000XM5"
-            autocomplete="off"
-            role="combobox"
-            aria-controls="fd-suggestions"
-            :aria-expanded="showSuggestions"
-            :aria-activedescendant="activeIndex >= 0 ? 'fd-suggestion-' + activeIndex : undefined"
-            @input="onQueryInput"
-            @focus="searchFocused = true"
-            @blur="searchFocused = false"
-            @keydown="onQueryKey"
-          />
-          <label class="fd-searchbar-icon" for="photo" title="Search by photo">
-            <span class="visually-hidden">Search by photo</span>
-            <FdIcon name="camera" />
-          </label>
-          <input id="photo" class="visually-hidden" type="file" accept="image/*" @change="onPhoto" />
-          <button class="fd-searchbar-icon" type="submit" aria-label="Search">
-            <FdIcon name="search" />
-          </button>
-        </div>
-
-        <ul v-show="showSuggestions" id="fd-suggestions" class="fd-suggestions" role="listbox">
-          <li
-            v-for="(item, i) in suggestions"
-            :id="'fd-suggestion-' + i"
-            :key="item.name"
-            class="fd-suggestion"
-            :class="{ 'is-active': i === activeIndex }"
-            role="option"
-            :aria-selected="i === activeIndex"
-            @mousedown.prevent="go(item.name)"
-            @mouseenter="activeIndex = i"
-          >
-            <FdIcon name="tag" />
-            <span>
-              <span class="fd-suggestion-name">{{ item.before }}<strong>{{ item.match }}</strong>{{ item.after }}</span>
-              <span class="fd-suggestion-detail">{{ item.detail }}</span>
-            </span>
-          </li>
-        </ul>
-      </form>
-      <p v-if="photoBusy" class="fd-search-text small mt-3 mb-0 text-center">
-        <FdLoadingDots size="inline" message="Identifying your photo" />
-      </p>
-      <p v-if="photoError" class="fd-search-text small mt-3 mb-0 text-center">{{ photoError }}</p>
-      <p v-if="photoName" class="fd-search-text small mt-3 mb-0 text-center">Identified as {{ photoName }}</p>
-
-      <!-- Search history: the logged-in user's own last 10 searches, newest first. -->
-      <section class="mt-5">
-        <h2 class="fd-section-title">Search history</h2>
-        <ul v-if="recentSearches.length" class="fd-history">
-          <li v-for="item in recentSearches" :key="item.productKey + item.searchedAt">
-            <button type="button" class="fd-history-chip" @click="go(item.query)">
-              <FdIcon name="search" />
-              <span>{{ item.query }}</span>
-            </button>
-          </li>
-        </ul>
-        <p v-else class="fd-search-text small mb-0">No recent searches yet.</p>
-      </section>
+      <ul class="fd-values">
+        <li v-for="value in values" :key="value.title" class="fd-value">
+          <span class="fd-value-icon"><FdIcon :name="value.icon" /></span>
+          <div>
+            <h3 class="fd-value-title">{{ value.title }}<span v-if="value.ai" class="fd-ai-badge">AI</span></h3>
+            <p class="fd-value-text">{{ value.text }}</p>
+          </div>
+        </li>
+      </ul>
     </div>
   </section>
 
-  <!-- Trending: left aligned, full container width like the search bar. -->
-  <div class="container py-5">
-    <!-- Trending products: placeholder, not built yet. The id is the hero's "See what's trending" scroll target. -->
-    <section id="fd-trending">
-      <h2 class="fd-section-title">Trending products</h2>
-    </section>
-     <div class="container py-5">
-    <!-- Trending products: placeholder, not built yet. The id is the hero's "See what's trending" scroll target. -->
-      <section id="fd-trending" style="margin-bottom: 10px;">
-        <h2 class="fd-section-title">Trending Today</h2>
-      </section>
-      <div id="trendingCarousel" class="carousel slide" style="background: #fff; border: var(--fd-border) solid var(--fd-vanilla-line); border-radius: var(--fd-radius); padding-bottom: 1rem; overflow: hidden;">
-        <div class="carousel-inner">
-          <div v-for="(item,index) in trendingToday" class="carousel-item" :class="{ active: index === 0 }">
-             <router-link :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
-              <img :src="item.image" class="d-block mx-auto" style="width: 100%; height: 400px; object-fit: contain; background: #fff; border-radius: 8px;">
-              <div class="text-center">
-                <h3>{{ item.query }}</h3>
-              </div>
-             </router-link>
-          </div>
+  <!-- Trending today: cream, with the carousel in the container. -->
+  <section id="fd-trending" class="fd-trending-section fd-trending-today">
+    <div class="container">
+      <h2 class="fd-page-title">Trending Today</h2>
+      <p v-if="!trendingToday.length" class="fd-trending-empty">Nothing trending yet today.</p>
+      <div
+        v-else
+        class="fd-belt"
+        :class="{ 'is-held': beltHeld }"
+        aria-label="Trending today"
+        @touchstart.passive="beltHeld = true"
+        @touchend="beltHeld = false"
+        @touchcancel="beltHeld = false"
+      >
+        <div class="fd-belt-track" :style="{ '--belt-seconds': beltSeconds + 's' }">
+          <template v-for="copy in 2" :key="'pass-' + copy">
+            <router-link
+              v-for="(item, index) in beltPass"
+              :key="copy + '-' + index"
+              :to="{ path: '/compare', query: { q: item.query } }"
+              class="fd-slide"
+              :tabindex="copy === 1 && index < trendingToday.length ? 0 : -1"
+              :aria-hidden="copy === 2 || index >= trendingToday.length"
+            >
+              <img :src="item.image" alt="" class="fd-slide-img" />
+              <span class="fd-slide-name">{{ itemName(item.query) }}</span>
+            </router-link>
+          </template>
         </div>
-        <div class="carousel-indicators" style="position: relative;">
-          <button  v-for="(item,index) in trendingToday" type="button" data-bs-target="#trendingCarousel" :data-bs-slide-to="index" :class="{ active: index === 0 }" aria-label="Slide" style="background-color: #25508c; width: 30px; height: 3px; border-radius: 35%; border: 0; margin: 0 4px;"></button>
-        </div>
-        
-        <button class="carousel-control-prev" type="button" data-bs-target="#trendingCarousel" data-bs-slide="prev">
-          <span aria-hidden="true" style="color: #25508c; font-size: 6rem; line-height: 1;">&lsaquo;</span>
-          <span class="visually-hidden">Previous</span>
-        </button>
-        <button class="carousel-control-next" type="button" data-bs-target="#trendingCarousel" data-bs-slide="next">
-          <span aria-hidden="true" style="color: #25508c; font-size: 6rem; line-height: 1;">&rsaquo;</span>
-          <span class="visually-hidden">Next</span>
-        </button>
       </div>
     </div>
+  </section>
 
-    <h3 class="fd-section-title">Trending This Week</h3>
-    <div class="row g-3 mt-4">
-      <div class="col-6 col-md-4 col-lg-3" v-for="item in trendingWeek" :key="item._id">
-        <router-link :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
-          <div class="card h-100" style="padding: 0.75rem; border-radius: 1rem;">
-            <img :src="item.image"  class="card-img-top" style="display: block; width: 100%; height: 150px; object-fit: contain; border-radius: 0.75rem; background: var(--fd-beige, #f3ede1); margin-bottom: 0.75rem;">
-            <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">{{ item.query }}</h5>
-          </div>
-        </router-link>
+  <!-- Trending this week: stays on the cream page background. -->
+  <section class="fd-trending-section fd-trending-week">
+    <div class="container">
+      <h2 class="fd-page-title">Trending This Week</h2>
+      <div class="row g-3">
+        <div class="col-6 col-md-4 col-lg-3" v-for="item in trendingWeek" :key="item._id">
+          <router-link class="fd-week-link" :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
+            <div class="card h-100 fd-week-card" style="padding: 1.25rem; border-radius: 1rem;">
+              <img :src="item.image"  class="card-img-top" style="display: block; width: 100%; height: 170px; padding: 1.25rem; object-fit: contain; border-radius: 0.75rem; background: var(--fd-white); margin-bottom: 1.25rem;">
+              <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">{{ itemName(item.query) }}</h5>
+            </div>
+          </router-link>
+        </div>
       </div>
     </div>
-
-  </div>
+  </section>
 </template>
 
 <style scoped>
-/* Blue band between the cream header and the rest of the page. */
-.fd-search-band {
+/* Blue band behind Trending Today; the white carousel card sits on it. */
+/* Both trending sections share the same padding and title gap. */
+.fd-trending-section {
   padding: 3rem 0;
-  background: var(--fd-blue);
-  color: var(--fd-beige);
-  /* Start comparing scrolls here; the band's top sits right under the sticky navbar. */
-  scroll-margin-top: var(--fd-nav-height);
 }
 
-.fd-search-band .fd-section-title {
-  color: var(--fd-beige);
+.fd-trending-section .fd-page-title {
+  margin-bottom: 2rem;
 }
 
-.fd-search-text {
-  margin-bottom: 1.5rem;
-  color: var(--fd-beige);
+.fd-trending-empty {
+  margin: 0;
+  color: var(--fd-text-muted);
   font-size: var(--fd-page-subtitle);
 }
 
-/* Search bar: one big pill with the photo and search icons inside it. */
-.fd-searchbox {
-  position: relative;
+/* Trending Today belt: one long row of cards that rolls left nonstop. The track holds the pass
+   twice, so moving it by half its width lands on an identical frame and the loop never jumps. */
+/* Card width matches the Trending This Week grid (two, three, then four across), worked out
+   from the belt's own width with container units, plus the same 1rem gap. */
+.fd-belt {
+  --gap: 1rem;
+  --card: calc((100cqw - var(--gap)) / 2);
+  container-type: inline-size;
+  overflow: hidden;
+  padding: 0.5rem 0 1rem;
 }
 
-.fd-searchbar {
+@media (min-width: 768px) {
+  .fd-belt {
+    --card: calc((100cqw - 2 * var(--gap)) / 3);
+  }
+}
+
+@media (min-width: 992px) {
+  .fd-belt {
+    --card: calc((100cqw - 3 * var(--gap)) / 4);
+  }
+}
+
+.fd-belt-track {
   display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  min-height: var(--fd-control);
-  padding: 0.25rem 0.25rem 0.25rem 1.5rem;
-  border-radius: 999px;
-  background: var(--fd-paper);
-  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 0.18);
+  gap: var(--gap);
+  width: max-content;
+  animation: fd-belt-roll var(--belt-seconds) linear infinite;
 }
 
-.fd-searchbar:focus-within {
+/* Hover, keyboard focus, or a finger on it holds the belt still so a card can be read and tapped. */
+.fd-belt:hover .fd-belt-track,
+.fd-belt:focus-within .fd-belt-track,
+.fd-belt.is-held .fd-belt-track {
+  animation-play-state: paused;
+}
+
+@keyframes fd-belt-roll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    /* Half the track plus half a gap: exactly one pass, including the gap after its last card. */
+    transform: translateX(calc(-50% - var(--gap) / 2));
+  }
+}
+
+/* Reduced motion: no rolling; the row scrolls sideways by hand instead. */
+@media (prefers-reduced-motion: reduce) {
+  .fd-belt {
+    overflow-x: auto;
+  }
+
+  .fd-belt-track {
+    animation: none;
+  }
+}
+
+/* Each card matches a Trending This Week card: white photo area, then the name. The whole card is the link. */
+.fd-slide {
+  display: flex;
+  flex: 0 0 var(--card);
+  flex-direction: column;
+  padding: 1.25rem;
+  border: var(--fd-border) solid var(--fd-vanilla-line);
+  border-radius: 1rem;
+  background: var(--fd-paper);
+  color: var(--fd-text);
+  text-decoration: none;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.fd-slide:hover,
+.fd-slide:focus-visible {
+  border-color: var(--fd-blue);
+  transform: scale(1.03);
+}
+
+.fd-slide:focus-visible {
   outline: 3px solid var(--fd-vanilla);
   outline-offset: 3px;
 }
 
-.fd-searchbar-input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
+/* Photo and name sized like the Trending This Week cards. */
+.fd-slide-img {
+  width: 100%;
+  height: 170px;
+  margin-bottom: 1.25rem;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  /* White behind the photo, matching the photo's own white background. */
+  background: var(--fd-white);
+  object-fit: contain;
+}
+
+.fd-slide-name {
   color: var(--fd-text);
-  /* 16px like every input, so phones do not zoom in when it is tapped. */
-  font-size: var(--fd-body);
-  outline: none;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
-.fd-searchbar-input::placeholder {
-  color: var(--fd-text-muted);
+@media (prefers-reduced-motion: reduce) {
+  .fd-slide {
+    transition: none;
+  }
+
+  .fd-slide:hover,
+  .fd-slide:focus-visible {
+    transform: none;
+  }
 }
 
-.fd-searchbar-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+/* Trending This Week cards: hovering (or tabbing to) one gives it a blue outline and lifts it a little. */
+.fd-week-link {
+  display: block;
+  height: 100%;
+  border-radius: 1rem;
+}
+
+.fd-week-card {
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.fd-week-link:hover .fd-week-card,
+.fd-week-link:focus-visible .fd-week-card {
+  border-color: var(--fd-blue);
+  transform: scale(1.03);
+}
+
+.fd-week-link:focus-visible {
+  outline: 3px solid var(--fd-vanilla);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fd-week-card {
+    transition: none;
+  }
+
+  .fd-week-link:hover .fd-week-card,
+  .fd-week-link:focus-visible .fd-week-card {
+    transform: none;
+  }
+}
+
+/* Trending This Week follows straight on, so only one section's padding sits between them. */
+.fd-trending-section + .fd-trending-section {
+  padding-top: 0;
+}
+
+/* A short gap from the carousel dots down to Trending This Week, then more room before the footer. */
+.fd-trending-today {
+  padding-bottom: 1.5rem;
+}
+
+.fd-trending-week {
+  padding-bottom: 5rem;
+}
+
+/* Values band: blue, centred title, then a feature grid. */
+.fd-values-band {
+  padding: 4rem 0;
+  background: var(--fd-blue);
+  color: var(--fd-beige);
+}
+
+.fd-values-band .fd-page-title {
+  margin-bottom: 2rem;
+  color: var(--fd-beige);
+  text-align: center;
+}
+
+/* Feature grid: icon tile beside a title and one short line. */
+.fd-values {
+  display: grid;
+  gap: 1rem;
   margin: 0;
   padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--fd-blue);
-  cursor: pointer;
-}
-
-.fd-searchbar-icon:hover {
-  background: var(--fd-beige);
-}
-
-/* Suggestions: a frosted panel just under the pill, slightly inset from its ends. */
-.fd-suggestions {
-  position: absolute;
-  z-index: 5;
-  top: calc(100% + 0.75rem);
-  left: 1rem;
-  right: 1rem;
-  margin: 0;
-  padding: 0.5rem 0;
   list-style: none;
-  border-radius: var(--fd-radius);
-  background: rgb(251 248 243 / 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 0.18);
-  color: var(--fd-text);
-  text-align: left;
 }
 
-.fd-suggestion {
+@media (min-width: 576px) {
+  .fd-values {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* One row of four on wide screens; the icon sits above the text there. */
+@media (min-width: 1200px) {
+  .fd-values {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .fd-values .fd-value {
+    flex-direction: column;
+    padding: 1.5rem;
+    text-align: center;
+  }
+}
+
+.fd-value {
   display: flex;
   align-items: center;
   gap: 1rem;
-  margin: 0 0.5rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
-  color: var(--fd-text-muted);
-  cursor: pointer;
+  padding: 1.25rem;
+  border: 1px solid transparent;
+  border-radius: 1.25rem;
+  background: transparent;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.fd-suggestion + .fd-suggestion {
-  border-top: 1px solid var(--fd-vanilla-line);
-}
-
-.fd-suggestion.is-active {
-  background: var(--fd-vanilla-soft);
-}
-
-.fd-suggestion-name {
-  display: block;
-  color: var(--fd-text);
-}
-
-.fd-suggestion-name strong {
-  color: var(--fd-blue);
-}
-
-.fd-suggestion-detail {
-  display: block;
-  font-size: var(--fd-small);
-}
-
-/* Search history: a row of pills on the blue band, matching the search bar's paper look. */
-.fd-history {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 1rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.fd-history-chip {
+.fd-value-icon {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.9rem;
-  border: 0;
-  border-radius: 999px;
-  background: var(--fd-paper);
-  color: var(--fd-text);
-  font-size: var(--fd-small);
-  cursor: pointer;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--fd-beige) 12%, transparent);
+  color: var(--fd-vanilla);
 }
 
-.fd-history-chip:hover {
-  background: var(--fd-beige);
+.fd-value-icon .fd-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke-width: 1.5;
+}
+
+.fd-value-title {
+  margin-bottom: 0.25rem;
+  color: var(--fd-beige);
+  font-family: var(--fd-font-display);
+  font-size: var(--fd-section-title);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Hovering a card lights it up with a vanilla outline. */
+.fd-value:hover {
+  border-color: var(--fd-vanilla);
+  background: color-mix(in srgb, var(--fd-paper) 10%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fd-value {
+    transition: none;
+  }
+}
+
+/* Small AI tag beside the photo search title. */
+.fd-ai-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--fd-vanilla);
+  color: var(--fd-ink);
+  font-family: var(--fd-font-body);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+/* Same size as the hero paragraph: both are the page subtitle size. */
+.fd-value-text {
+  margin: 0;
+  color: color-mix(in srgb, var(--fd-beige) 85%, transparent);
+  font-size: var(--fd-page-subtitle);
 }
 
 .fd-landing {
@@ -772,12 +834,6 @@ onBeforeUnmount(function () {
   color: var(--fd-text-muted);
   font-size: var(--fd-page-subtitle);
   line-height: 1.6;
-}
-
-.fd-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
 }
 
 /* Analytics cards */
@@ -889,7 +945,7 @@ onBeforeUnmount(function () {
   font-size: var(--fd-small);
 }
 
-/* Price history chart */
+/* Price graph */
 
 .fd-chart {
   position: relative;
@@ -925,17 +981,17 @@ onBeforeUnmount(function () {
 }
 
 .fd-chart-low,
-.fd-chart-today,
 .fd-chart-hover {
   stroke: var(--fd-paper);
   stroke-width: 2;
 }
 
+/* The lowest point: vanilla with a blue ring, so it stands out on the blue line. */
 .fd-chart-low {
-  fill: #2f6b47;
+  fill: var(--fd-vanilla);
+  stroke: var(--fd-blue);
 }
 
-.fd-chart-today,
 .fd-chart-hover {
   fill: var(--fd-blue);
 }
@@ -949,7 +1005,15 @@ onBeforeUnmount(function () {
 .fd-chart-axis {
   fill: var(--fd-text-muted);
   font-family: var(--fd-font-body);
-  font-size: 11px;
+  font-size: 12px;
+}
+
+/* The first and last price, written on the line so the graph reads without hovering. */
+.fd-chart-value {
+  fill: var(--fd-blue);
+  font-family: var(--fd-font-body);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .fd-tooltip {
@@ -959,7 +1023,7 @@ onBeforeUnmount(function () {
   display: grid;
   padding: 0.375rem 0.625rem;
   border-radius: 0.5rem;
-  background: var(--fd-ink);
+  background: var(--fd-blue-dark);
   color: var(--fd-beige);
   font-size: var(--fd-small);
   line-height: 1.3;
@@ -985,7 +1049,8 @@ onBeforeUnmount(function () {
 }
 
 .fd-key--low {
-  background: #2f6b47;
+  border: 2px solid var(--fd-blue);
+  background: var(--fd-vanilla);
 }
 
 .fd-key--avg {
@@ -1006,23 +1071,15 @@ onBeforeUnmount(function () {
   line-height: 1;
 }
 
-.fd-chip {
-  display: inline-block;
-  white-space: nowrap;
-  margin: 0.75rem 0 0;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  background: var(--fd-green);
-  color: var(--fd-ink);
-  font-size: var(--fd-small);
-  font-weight: 700;
+.fd-save-store {
+  color: var(--fd-blue);
 }
 
-/* Overpay bars */
+/* Overpay bars: store name and amount on one line, a full-width bar under them. */
 
 .fd-bars {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.625rem;
   margin: 0.75rem 0 0;
   padding: 0;
   list-style: none;
@@ -1030,18 +1087,35 @@ onBeforeUnmount(function () {
 
 .fd-bar-row {
   display: grid;
-  grid-template-columns: 5.5rem 1fr 4rem;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 0.75rem;
   align-items: center;
-  gap: 0.5rem;
   font-size: var(--fd-small);
 }
 
 .fd-bar-store {
+  min-width: 0;
   color: var(--fd-text);
+  line-height: 1.3;
+}
+
+.fd-bar-value {
+  color: var(--fd-text);
+  font-weight: 700;
+}
+
+.fd-bar-cheapest {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--fd-vanilla);
+  color: var(--fd-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .fd-bar-track {
-  height: 10px;
+  grid-column: 1 / -1;
+  height: 8px;
   border-radius: 999px;
   background: var(--fd-beige);
 }
@@ -1050,11 +1124,6 @@ onBeforeUnmount(function () {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: var(--fd-red);
-}
-
-.fd-bar-value {
-  color: var(--fd-text-muted);
-  text-align: right;
+  background: var(--fd-blue);
 }
 </style>
