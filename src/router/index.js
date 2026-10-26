@@ -17,8 +17,9 @@ import AdminView from '../views/AdminView.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', component: HomeView, meta: { fullBleed: true } },
-    { path: '/search', component: HomeView, meta: { fullBleed: true } },
+    // heroSearch: the page has its own big search bar, so the navbar one is hidden.
+    { path: '/', component: HomeView, meta: { fullBleed: true, heroSearch: true } },
+    { path: '/search', component: HomeView, meta: { fullBleed: true, heroSearch: true } },
     { path: '/compare', component: CompareView },
     { path: '/product/:productId', component: ProductView },
     { path: '/trending', component: TrendingView },

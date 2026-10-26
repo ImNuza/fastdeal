@@ -1,5 +1,6 @@
 <script setup>
 import { trending } from '../mock/catalog.js'
+import { itemName } from '../services/itemName.js'
 </script>
 
 <template>
@@ -16,7 +17,7 @@ import { trending } from '../mock/catalog.js'
       </thead>
       <tbody>
         <tr v-for="row in trending" :key="row.query">
-          <td>{{ row.query }}</td>
+          <td>{{ itemName(row.query) }}</td>
           <td>{{ row.count }}</td>
           <td>
             <router-link :to="{ path: '/compare', query: { q: row.query } }">Compare</router-link>

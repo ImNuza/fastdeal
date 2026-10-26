@@ -14,6 +14,9 @@ import Friendship from './models/friendship-model.js'
 import { toPairKey } from './models/pair-key.js'
 import { search,identifyImage } from './models/shoppingapimodel.js'
 import SearchLog from './models/search-log-model.js'
+import SearchCache from './models/search-cache-model.js'
+import PriceDay from './models/price-day-model.js'
+import { storePrices, sgDay } from './services/priceHistory.js'
 import { toProductKey } from './models/product-key.js'
 import { error } from 'console'
 import Notification from './models/notification-model.js'
@@ -399,6 +402,24 @@ app.post('/api/me/recent-searches', requireUser, async (req, res) => {
   }
 })
 
+// Remove one search from the logged-in user's list: the x beside it in the search dropdown.
+// Matches the query exactly as the dropdown shows it. The user is taken from the token.
+app.delete('/api/me/recent-searches', requireUser, async (req, res) => {
+  const query = text(req.query.query)
+  if (!query) return res.status(400).json({ error: 'query required' })
+  try {
+    const updated = await User.findOneAndUpdate(
+      { firebaseUid: req.uid },
+      { $pull: { recentSearches: { query } } },
+      { new: true }
+    ).select('recentSearches')
+    if (!updated) return res.status(404).json({ error: 'User not found' })
+    res.json({ recentSearches: updated.recentSearches })
+  } catch (err) {
+    res.status(500).json({ error: String((err && err.message) || err) })
+  }
+})
+
 app.post('/api/identify-image', upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'photo required' })
@@ -425,8 +446,10 @@ async function topSince(since) {
   return SearchLog.aggregate([
     { $match: { searchedAt: { $gte: since } } },
     { $sort: { searchedAt: -1 } },
+    // Group by the product name the shopping API returned, not the words typed, so
+    // "pooh" and "winnie the pooh" (both "Winnie the Pooh") count as one product.
     { $group: {
-        _id: '$productKey',
+        _id: { $toLower: { $trim: { input: { $ifNull: ['$productName', '$productKey'] } } } },
         query: { $first: '$productName' },
         image: { $first: '$image' },
         count: { $sum: 1 }
@@ -435,6 +458,67 @@ async function topSince(since) {
     { $limit: 13 }
   ])
 }
+
+// Home hero stats, all from live data: what real people searched this week (seeded
+// searchLogs rows, sessionId "seed-...", are left out) joined with the store prices the
+// shopping API returned for those searches (searchCache).
+// product: the top trending product with its price at each store, for the hero graph,
+//          "You save", and "Extra you'd pay", plus its tracked price history: the lowest
+//          price on each of the last 14 days (priceDays, written by every fresh search).
+// Prices only count between half and double the median (storePrices), so accessories in
+// the results do not skew them.
+app.get('/api/home-stats', async (req, res) => {
+  try {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 3600000)
+    const trending = await SearchLog.aggregate([
+      { $match: { searchedAt: { $gte: weekAgo }, sessionId: { $not: /^seed-/ } } },
+      { $group: { _id: '$productKey', name: { $first: '$productName' }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 30 }
+    ])
+    const caches = await SearchCache.find({
+      queryKey: { $in: trending.map(function (t) { return t._id }) },
+      expiresAt: { $gt: new Date() }
+    }).lean()
+    const cacheByKey = {}
+    for (const c of caches) cacheByKey[c.queryKey] = c
+
+    // The first trending product with prices from at least two stores.
+    const products = []
+    for (const t of trending) {
+      const cache = cacheByKey[t._id]
+      if (!cache) continue
+      const stores = storePrices(cache.listings || [])
+      if (stores.length < 2) continue
+      products.push({ key: t._id, name: cache.searchTerm || t.name || t._id, stores: stores, fetchedAt: cache.fetchedAt })
+      break
+    }
+
+    const top = products[0] || null
+    if (!top) return res.json({ product: null })
+
+    const since = sgDay(Date.now() - 13 * 24 * 3600000)
+    const history = await PriceDay.aggregate([
+      { $match: { productKey: top.key, day: { $gte: since } } },
+      { $group: { _id: '$day', price: { $min: '$price' } } },
+      { $sort: { _id: 1 } }
+    ])
+    // The current store prices count as a point too, on the day they were fetched.
+    const points = {}
+    for (const d of history) points[d._id] = d.price
+    const fetchedDay = sgDay(new Date(top.fetchedAt).getTime())
+    points[fetchedDay] = Math.min(points[fetchedDay] || Infinity, top.stores[0].price)
+    res.json({
+      product: {
+        name: top.name,
+        stores: top.stores,
+        history: Object.keys(points).sort().map(function (day) { return { day: day, price: points[day] } })
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load home stats' })
+  }
+})
 
 //retrieve data for trending page
 app.get('/api/trending' , async (req,res) =>{

@@ -6,6 +6,7 @@ import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
 import SaveSleepButtons from '../components/SaveSleepButtons.vue'
 import { sgd } from '../mock/catalog.js'
 import { fetchProduct,fetchSearchedWith } from '../services/productApi.js'
+import { itemName } from '../services/itemName.js'
 
 // One product: every store that sells it, cheapest total first, with the Deal check,
 // what buyers say and the product details.
@@ -71,7 +72,7 @@ onMounted(async function () {
 
   <div v-else-if="product">
     <router-link v-if="route.query.q" class="small" :to="{ path: '/compare', query: { q: route.query.q } }">
-      Back to results for "{{ route.query.q }}"</router-link>
+      Back to results for "{{ itemName(route.query.q) }}"</router-link>
 
     <div class="row g-4 align-items-center mt-1 mb-3">
       <div v-if="product.image" class="col-md-3">
@@ -154,7 +155,7 @@ onMounted(async function () {
             <router-link :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
               <div class="card h-100" style="padding: 0.75rem; border-radius: 1rem;">
                 <img :src="item.image"  class="card-img-top" style="display: block; width: 100%; height: 150px; object-fit: contain; border-radius: 0.75rem; background: var(--fd-beige, #f3ede1); margin-bottom: 0.75rem;">
-                <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">{{ item.query }}</h5>
+                <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">{{ itemName(item.query) }}</h5>
               </div>
             </router-link>
           </div>

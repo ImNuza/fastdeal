@@ -13,6 +13,8 @@
   /* Backgrounds */
   --fd-beige: #f4ede3;
   --fd-paper: #fbf8f3;
+  /* Behind product photos only: they come with white backgrounds */
+  --fd-white: #ffffff;
 
   /* Accent */
   --fd-vanilla: #fae8a4;
@@ -53,6 +55,9 @@
   /* Shape */
   --fd-radius: 1rem;
   --fd-border: 2px;
+
+  /* The one soft shadow, for the search bar and its dropdown so they pop */
+  --fd-shadow: 0 0.75rem 2rem rgb(0 0 0 / 0.15);
 
   /* Control heights: every button and search bar is one of these two */
   --fd-control: 3rem;
