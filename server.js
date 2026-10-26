@@ -823,6 +823,68 @@ app.delete('/api/wishlist/:productKey', requireUser, async (req, res) => {
   }
 })
 
+// --- Admin routes ---
+// requireAdmin sits after requireUser so req.uid is already set.
+async function requireAdmin(req, res, next) {
+  const dbUser = await User.findOne({ firebaseUid: req.uid }).select('role')
+  if (!dbUser || dbUser.role !== 'admin') return res.status(403).json({ error: 'Admins only' })
+  next()
+}
+
+// Stat cards: total users, total wishlist items, active this week, top 5 products
+app.get('/api/admin/stats', requireUser, requireAdmin, async (req, res) => {
+  try {
+    const [totalUsers, totalWishlistItems, topProducts] = await Promise.all([
+      User.countDocuments(),
+      WishlistItem.countDocuments(),
+      WishlistItem.aggregate([
+        { $group: { _id: '$productName', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+        { $project: { _id: 0, name: '$_id', count: 1 } }
+      ])
+    ])
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const activeUids = await WishlistItem.distinct('firebaseUid', { savedAt: { $gte: weekAgo } })
+    res.json({ totalUsers, totalWishlistItems, activeThisWeek: activeUids.length, topProducts })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// All users with wishlist count each
+app.get('/api/admin/users', requireUser, requireAdmin, async (req, res) => {
+  try {
+    const [users, wishlistCounts] = await Promise.all([
+      User.find().select('firebaseUid username email role createdAt emailAlertsOn telegramUsername').lean(),
+      WishlistItem.aggregate([{ $group: { _id: '$firebaseUid', count: { $sum: 1 } } }])
+    ])
+    const countMap = {}
+    wishlistCounts.forEach(function (w) { countMap[w._id] = w.count })
+    res.json(users.map(function (u) { return { ...u, wishlistCount: countMap[u.firebaseUid] || 0 } }))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Promote or demote a user — cannot change your own role
+app.put('/api/admin/users/:firebaseUid/role', requireUser, requireAdmin, async (req, res) => {
+  try {
+    const { role } = req.body
+    if (!['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' })
+    if (req.params.firebaseUid === req.uid) return res.status(400).json({ error: 'Cannot change your own role' })
+    const updated = await User.findOneAndUpdate(
+      { firebaseUid: req.params.firebaseUid },
+      { $set: { role } },
+      { new: true }
+    ).select('firebaseUid username role')
+    if (!updated) return res.status(404).json({ error: 'User not found' })
+    res.json(updated)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Database ERD for the team and graders
 app.get('/erd', (req, res) => {
   res.sendFile(erdPath)
