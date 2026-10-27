@@ -93,6 +93,31 @@ async function load() {
 
 onMounted(load)
 
+// New requests show up while the page is open, like the bell in the navbar: every 5 seconds the
+// friends and both request lists are fetched again, so the count bubble on the Requests tab
+// appears by itself, and someone who accepts your request moves into Friends. Search boxes and
+// scrolling are left alone.
+const REQUEST_CHECK_MS = 5000
+let requestTimer = 0
+
+async function refreshRequests() {
+  if (!myUid.value || document.hidden) {
+    return
+  }
+  try {
+    const [f, r, sentList] = await Promise.all([getFriends(), getIncomingRequests(), getSentRequests()])
+    friends.value = f
+    requests.value = r
+    sent.value = sentList
+  } catch (err) {
+    // A missed check is fine: the next one tries again.
+  }
+}
+
+onMounted(function () {
+  requestTimer = window.setInterval(refreshRequests, REQUEST_CHECK_MS)
+})
+
 // Three tabs, like pages of one section: Friends, Add Friend, Requests. A link can open one
 // with ?tab=add or ?tab=requests (friend-request notifications do). Switching tabs stays inside
 // the page: changing the address would rebuild it (App.vue keys the page by its address),
@@ -123,10 +148,12 @@ function onTabKey(event, index) {
 // The sticky bar at the bottom, worded like the Wishlist's total.
 const barText = computed(function () {
   if (activeTab.value === 'add') {
-    return ''
+    const n = sent.value.length
+    return searchQuery.value.trim() ? '' : (n === 1 ? '1 pending' : n + ' pending')
   }
   if (activeTab.value === 'requests') {
-    return requests.value.length + ' waiting for you · ' + sent.value.length + ' sent by you'
+    const n = requests.value.length
+    return n === 1 ? '1 request waiting' : n + ' requests waiting'
   }
   return friendCount.value
 })
@@ -243,6 +270,7 @@ watch(activeTab, function () {
 
 onBeforeUnmount(function () {
   barObserver?.disconnect()
+  window.clearInterval(requestTimer)
 })
 
 // Watch searchQuery and call the API with a 300ms debounce so we don't spam on every keystroke.
@@ -443,8 +471,32 @@ function initials(f) {
 
           <!-- Add Friend -->
           <section v-else-if="activeTab === 'add'" id="fd-tabpanel-add" role="tabpanel" aria-labelledby="fd-tab-add">
+            <!-- Before anything is typed: the requests you sent that are still waiting. -->
+            <template v-if="!searchQuery.trim()">
+              <h2 class="friend-group-title">Pending</h2>
+              <div v-if="sent.length" class="friend-rows">
+                <div v-for="req in sent" :key="req.pairKey" class="friend-card">
+                  <div class="friend-avatar">{{ initials(req) }}</div>
+                  <div class="friend-info">
+                    <div class="friend-username">{{ req.username }}</div>
+                    <div class="friend-email">has not answered yet</div>
+                  </div>
+                  <div class="friend-actions">
+                    <button
+                      class="btn btn-outline-dark btn-sm"
+                      type="button"
+                      :disabled="actionLoading[req.pairKey]"
+                      :aria-label="'Cancel the request to ' + req.username"
+                      @click="onCancel(req)"
+                    >Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <p v-else class="friend-group-empty">No pending requests. Type a username to find someone.</p>
+            </template>
 
-            <div v-if="searchResults.length" class="friend-rows">
+            <!-- Once something is typed: the matching people. -->
+            <div v-else-if="searchResults.length" class="friend-rows">
               <div v-for="r in searchResults" :key="r.pairKey" class="friend-card">
                 <div class="friend-avatar">{{ initials(r) }}</div>
                 <div class="friend-info">
@@ -453,11 +505,9 @@ function initials(f) {
                 <div class="search-action">
                   <span v-if="r.friendshipStatus === 'accepted'" class="badge-friends">Friends</span>
                   <span v-else-if="r.friendshipStatus === 'pending' && r.iRequested" class="badge-pending">Pending</span>
-                  <div v-else-if="r.friendshipStatus === 'pending' && !r.iRequested" class="d-flex gap-1">
+                  <div v-else-if="r.friendshipStatus === 'pending' && !r.iRequested" class="friend-actions">
                     <button class="btn btn-dark btn-sm" type="button" :disabled="actionLoading[r.pairKey]" @click="onAccept(r)">Accept</button>
-                    <button class="btn btn-outline-dark btn-sm fd-icon-btn" type="button" :disabled="actionLoading[r.pairKey]" :aria-label="'Decline ' + r.username" title="Decline" @click="onDecline(r)">
-                      <FdIcon name="x" />
-                    </button>
+                    <button class="btn btn-outline-dark btn-sm" type="button" :disabled="actionLoading[r.pairKey]" :aria-label="'Decline ' + r.username" @click="onDecline(r)">Decline</button>
                   </div>
                   <button
                     v-else
@@ -476,7 +526,6 @@ function initials(f) {
 
           <!-- Requests -->
           <section v-else id="fd-tabpanel-requests" role="tabpanel" aria-labelledby="fd-tab-requests">
-            <h2 class="friend-group-title">Waiting for you</h2>
             <div v-if="requests.length" class="friend-rows">
               <div v-for="req in requests" :key="req.pairKey" class="friend-card">
                 <div class="friend-avatar">{{ initials(req) }}</div>
@@ -484,7 +533,7 @@ function initials(f) {
                   <div class="friend-username">{{ req.username || req.email }}</div>
                   <div class="friend-email">wants to be friends</div>
                 </div>
-                <div class="d-flex gap-1 flex-shrink-0">
+                <div class="friend-actions">
                   <button
                     class="btn btn-dark btn-sm"
                     type="button"
@@ -492,39 +541,19 @@ function initials(f) {
                     @click="onAccept(req)"
                   >Accept</button>
                   <button
-                    class="btn btn-outline-dark btn-sm fd-icon-btn"
+                    class="btn btn-outline-dark btn-sm"
                     type="button"
                     :disabled="actionLoading[req.pairKey]"
                     :aria-label="'Decline ' + (req.username || req.email)"
-                    title="Decline"
                     @click="onDecline(req)"
-                  >
-                    <FdIcon name="x" />
-                  </button>
+                  >Decline</button>
                 </div>
               </div>
             </div>
-            <p v-else class="friend-group-empty">No one is waiting for an answer from you.</p>
-
-            <h2 class="friend-group-title">Sent by you</h2>
-            <div v-if="sent.length" class="friend-rows">
-              <div v-for="req in sent" :key="req.pairKey" class="friend-card">
-                <div class="friend-avatar">{{ initials(req) }}</div>
-                <div class="friend-info">
-                  <div class="friend-username">{{ req.username }}</div>
-                  <div class="friend-email">has not answered yet</div>
-                </div>
-                <span class="badge-pending flex-shrink-0">Pending</span>
-                <button
-                  class="btn btn-outline-dark btn-sm flex-shrink-0"
-                  type="button"
-                  :disabled="actionLoading[req.pairKey]"
-                  :aria-label="'Cancel the request to ' + req.username"
-                  @click="onCancel(req)"
-                >Cancel</button>
-              </div>
+            <div v-else class="empty-state">
+              <FdIcon name="bell" class="empty-icon" />
+              <p class="empty-text">No requests waiting.</p>
             </div>
-            <p v-else class="friend-group-empty">No requests waiting on other people.</p>
           </section>
         </div>
 
@@ -940,6 +969,15 @@ function initials(f) {
 
 .search-result-row:last-child {
   border-bottom: none;
+}
+
+/* The buttons and tags at the end of a card (Accept and Decline, Pending and Cancel): one
+   group, always the same 8px apart. */
+.friend-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .search-action {
