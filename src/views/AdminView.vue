@@ -41,25 +41,25 @@ async function onRoleChange(firebaseUid, newRole) {
       <div class="col-6 col-md-3">
         <div class="card h-100 p-3 text-center">
           <p class="text-secondary small mb-1">Total Users</p>
-          <p class="fw-bold mb-0" style="font-size: 2rem;">{{ stats.totalUsers }}</p>
+          <p class="mb-0" style="font-family: var(--fd-font-display); font-size: var(--fd-page-title); color: var(--fd-blue);">{{ stats.totalUsers }}</p>
         </div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card h-100 p-3 text-center">
           <p class="text-secondary small mb-1">Wishlist Items</p>
-          <p class="fw-bold mb-0" style="font-size: 2rem;">{{ stats.totalWishlistItems }}</p>
+          <p class="mb-0" style="font-family: var(--fd-font-display); font-size: var(--fd-page-title); color: var(--fd-blue);">{{ stats.totalWishlistItems }}</p>
         </div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card h-100 p-3 text-center">
           <p class="text-secondary small mb-1">Active This Week</p>
-          <p class="fw-bold mb-0" style="font-size: 2rem;">{{ stats.activeThisWeek }}</p>
+          <p class="mb-0" style="font-family: var(--fd-font-display); font-size: var(--fd-page-title); color: var(--fd-blue);">{{ stats.activeThisWeek }}</p>
         </div>
       </div>
       <div class="col-6 col-md-3">
         <div class="card h-100 p-3">
           <p class="text-secondary small mb-2">Top Saved Products</p>
-          <ol class="mb-0 ps-3" style="font-size: 0.85rem;">
+          <ol class="mb-0 ps-3" style="font-size: var(--fd-small);">
             <li v-for="p in stats.topProducts" :key="p.name" class="mb-1">
               <span class="fw-semibold">{{ p.name }}</span>
               <span class="text-secondary"> · {{ p.count }}</span>

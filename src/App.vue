@@ -144,7 +144,7 @@ watch([() => route.path, user], maybeShowEntryDialog)
 .nav-username {
   color: var(--fd-beige);
   font-family: var(--fd-font-body);
-  font-size: 0.875rem;
+  font-size: var(--fd-small);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;

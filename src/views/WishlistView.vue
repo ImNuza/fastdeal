@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { fetchCheapestLiveListing } from '../services/livePriceService.js'
 import { productImage, sgd, storeLink } from '../mock/catalog.js'
-import { addSampleWishlist, isAsleep, missingSamples, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user } from '../mock/session.js'
+import { isAsleep, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user } from '../mock/session.js'
 import FdIcon from '../components/FdIcon.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
 import { planBudget } from '../mock/budget.js'
@@ -699,7 +699,8 @@ function cheapestPlannable() {
   <div v-if="user">
     <h1 class="fd-page-title">Wishlist</h1>
     <p class="fd-page-subtitle">Your saved price and store next to the best price now. A cheaper store is marked as a
-      price drop. Not sure yet? Sleep on it and the item rests until you are ready.</p>
+      price drop.<br />
+      Not sure yet? Sleep on it and the item rests until you are ready.</p>
 
     <p v-if="!user.wishlist.length" class="alert alert-secondary">No saved products. Search, then press Save.</p>
 
@@ -846,12 +847,6 @@ function cheapestPlannable() {
       <p v-else class="alert alert-secondary mb-4">No saved products match "{{ query }}".</p>
     </template>
 
-    <p v-if="missingSamples()" class="fd-entry-signup">
-      Want to see how it works?
-      <button class="btn btn-link p-0 fd-sample-link" type="button" @click="addSampleWishlist">Add {{ missingSamples()
-      }}
-        sample products</button>
-    </p>
 
     <!-- Last in the page so it can stick to the bottom of the screen and stop above the footer. -->
     <div v-if="user.wishlist.length" class="fd-budget-bar">
@@ -1102,12 +1097,14 @@ function cheapestPlannable() {
 
 .fd-verdict-prices span {
   color: var(--fd-text-muted);
-  font-size: 0.85rem;
+  font-size: var(--fd-small);
 }
 
 .fd-verdict-prices strong {
   color: var(--fd-blue);
-  font-size: 1.4rem;
+  font-size: var(--fd-section-title);
+  font-family: var(--fd-font-display);
+  font-weight: 400;
 }
 
 .fd-verdict-change {
@@ -1121,7 +1118,9 @@ function cheapestPlannable() {
 }
 
 .fd-verdict-change strong {
-  font-size: 2rem;
+  font-size: var(--fd-page-title);
+  font-family: var(--fd-font-display);
+  font-weight: 400;
 }
 
 .fd-verdict-change.is-lower {
@@ -1135,7 +1134,7 @@ function cheapestPlannable() {
 .fd-verdict-title {
   margin: 1.25rem 0 0.5rem;
   color: var(--fd-blue);
-  font-size: 1.15rem;
+  font-size: var(--fd-body);
   font-weight: 700;
 }
 
@@ -1328,7 +1327,7 @@ function cheapestPlannable() {
   border: 0;
   background: transparent;
   color: var(--fd-blue);
-  font-size: 0.8rem;
+  font-size: var(--fd-small);
   font-weight: 700;
   text-align: left;
   text-decoration: underline;
@@ -1347,16 +1346,19 @@ function cheapestPlannable() {
   height: 6rem;
   overflow: hidden;
   border-radius: 0.75rem;
-  background: var(--fd-vanilla-soft);
+  /* White behind every product photo, like the photos' own backgrounds. */
+  background: var(--fd-white);
   color: var(--fd-blue);
   font-family: var(--fd-font-display);
-  font-size: 2rem;
+  font-size: var(--fd-section-title);
 }
 
+/* The whole photo always shows (contain, never cropped), with a little white space around it. */
 .fd-wish-image img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  padding: 0.5rem;
+  object-fit: contain;
 }
 
 /* ===================================
@@ -1481,7 +1483,7 @@ function cheapestPlannable() {
   border: none;
   background: transparent;
   color: var(--fd-blue);
-  font-size: 0.8rem;
+  font-size: var(--fd-small);
   font-weight: 700;
   text-align: right;
   text-decoration: underline;
@@ -1545,7 +1547,7 @@ function cheapestPlannable() {
   .fd-wish-image {
     width: 4.5rem;
     height: 4.5rem;
-    font-size: 1.5rem;
+    font-size: var(--fd-section-title);
   }
 
   .fd-wish-cell-product .fd-verdict-link {
@@ -1666,13 +1668,7 @@ function cheapestPlannable() {
 
 .fd-budget-total strong {
   color: var(--fd-blue);
-  font-size: 1.25rem;
-}
-
-.fd-sample-link {
-  font-size: inherit;
-  font-weight: 700;
-  vertical-align: baseline;
+  font-size: var(--fd-body);
 }
 
 /* ===================================
@@ -1733,7 +1729,7 @@ function cheapestPlannable() {
   background: var(--fd-beige);
   color: var(--fd-blue);
   font-family: var(--fd-font-display);
-  font-size: 2.25rem;
+  font-size: var(--fd-page-title);
   line-height: 1.1;
   text-align: center;
   appearance: textfield;
@@ -1755,7 +1751,7 @@ function cheapestPlannable() {
   margin-top: 1.75rem;
   color: var(--fd-blue);
   font-family: var(--fd-font-display);
-  font-size: 2.5rem;
+  font-size: var(--fd-page-title);
 }
 
 .fd-hold-end {

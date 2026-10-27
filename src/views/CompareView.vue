@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import FdBreadcrumbs from '../components/FdBreadcrumbs.vue'
 import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
 import { buildResult, dayLabel, sgd, verdictFor } from '../mock/catalog.js'
 import { isSaved, savedFrom, saveProduct, user } from '../mock/session.js'
@@ -258,6 +259,7 @@ onMounted(async function () {
   </div>
 
   <div v-else-if="result">
+    <FdBreadcrumbs :items="[{ label: 'FastDeal', to: '/' }, { label: itemName(route.query.q) }]" />
     <p v-if="route.query.from === 'photo'" class="small text-secondary mb-1">Identified from your photo</p>
     <h1 class="fd-page-title">{{ result.name }}</h1>
     <p class="fd-page-subtitle">{{ result.listings.length }} listings. Cheapest now is {{ sgd(verdict.cheapest) }}.</p>
@@ -340,7 +342,7 @@ onMounted(async function () {
             <h3 class="fd-listing-name" :title="row.name || result.name">
               <!-- stretched-link makes the whole card open the product page -->
               <router-link v-if="row.productId" class="fd-listing-link stretched-link"
-                :to="{ path: '/product/' + row.productId, query: { q: route.query.q } }">{{ row.name || result.name }}</router-link>
+                :to="{ path: '/product/' + row.productId, query: { q: route.query.q, store: row.store } }">{{ row.name || result.name }}</router-link>
               <template v-else>{{ row.name || result.name }}</template>
             </h3>
             <p class="fd-listing-price">
@@ -447,10 +449,13 @@ onMounted(async function () {
   width: 100%;
   height: 150px;
   border-radius: 0.75rem;
-  background: var(--fd-beige, #f3ede1);
+  /* White behind every product photo, like the photos' own backgrounds. */
+  background: var(--fd-white);
 }
 
+/* The whole photo always shows, with a little white space around it. */
 .fd-listing-img {
+  padding: 0.75rem;
   object-fit: contain;
 }
 
@@ -461,7 +466,7 @@ onMounted(async function () {
   justify-content: center;
   color: var(--fd-text-muted, #6b6b6b);
   font-family: var(--fd-font-display, inherit);
-  font-size: 2.5rem;
+  font-size: var(--fd-page-title);
 }
 
 .fd-listing-badge {
@@ -490,7 +495,7 @@ onMounted(async function () {
   margin: 0 0 0.125rem;
   color: var(--fd-blue, #1f4fd8);
   font-family: var(--fd-font-display, inherit);
-  font-size: 1.5rem;
+  font-size: var(--fd-section-title);
   line-height: 1.1;
 }
 

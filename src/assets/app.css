@@ -23,6 +23,22 @@ a {
 
 /* Type scale */
 
+/* Bootstrap's .small is 0.875em, which would track the 17px body; pin it to the small size. */
+.small,
+small {
+  font-size: var(--fd-small);
+}
+
+/* Bootstrap badges are 0.75em; tags are the small size. */
+.badge {
+  font-size: var(--fd-small);
+}
+
+/* The "@" and other input add-ons sit at body size, like the input beside them. */
+.input-group-text {
+  font-size: var(--fd-body);
+}
+
 .fd-page-title {
   margin-bottom: 0.5rem;
   color: var(--fd-blue);
@@ -93,7 +109,8 @@ small {
   display: flex;
   align-items: center;
   padding: 0.25rem 0;
-  font-size: 1.875rem;
+  /* Anton level 3: section title size, same as the footer logo. */
+  font-size: var(--fd-section-title);
   line-height: 1;
 }
 
@@ -141,7 +158,7 @@ small {
 .fd-nav .nav-link {
   color: var(--fd-beige);
   font-family: var(--fd-font-display);
-  font-size: 1.125rem;
+  font-size: var(--fd-section-title);
   font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -392,6 +409,8 @@ tr.cheapest td {
 
 .form-control,
 .form-select {
+  /* Bootstrap sets 1rem (16px); inputs are body size like all normal text. */
+  font-size: var(--fd-body);
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: 0.625rem;
   background-color: var(--fd-paper);

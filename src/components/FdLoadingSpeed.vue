@@ -114,12 +114,13 @@ onBeforeUnmount(function () {
   font-weight: 700;
 }
 
+/* Same as every page title: Anton at the page title size (36px, 48px from 768px). */
 .is-page .fd-load-message {
   font-family: var(--fd-font-display);
-  font-size: 1.75rem;
+  font-size: var(--fd-page-title);
   font-weight: 400;
-  line-height: 1.1;
-  letter-spacing: 0.01em;
+  line-height: 1.05;
+  letter-spacing: 0.005em;
   text-align: left;
   text-transform: uppercase;
   transform: skewX(-6deg);
@@ -135,17 +136,18 @@ onBeforeUnmount(function () {
   grid-column: 1 / -1;
 }
 
+/* The timer and the slow note are body size, like the text on every page. */
 .is-page .fd-load-time {
   color: var(--fd-vanilla);
-  font-size: var(--fd-small);
+  font-size: var(--fd-body);
   font-weight: 500;
   letter-spacing: 0.04em;
 }
 
 .is-page .fd-load-note {
   justify-self: center;
-  max-width: 24rem;
-  font-size: var(--fd-small);
+  max-width: 32rem;
+  font-size: var(--fd-body);
 }
 
 /* Inline takes the colour of its button or cell */

@@ -42,10 +42,12 @@
 
   /* Type scale (phone sizes; larger screens below) */
   --fd-page-title: 2.25rem;
-  --fd-page-subtitle: 1.125rem;
+  /* DM Sans has two sizes only, body and small, so the subtitles are body size. */
+  --fd-page-subtitle: var(--fd-body);
   --fd-section-title: 1.5rem;
-  --fd-section-subtitle: 1.125rem;
-  --fd-body: 1rem;
+  --fd-section-subtitle: var(--fd-body);
+  /* Normal DM Sans text: 17px, the footer tagline size. Small (14px) is the only other DM Sans size. */
+  --fd-body: 1.0625rem;
   --fd-small: 0.875rem;
   --fd-eyebrow: 0.875rem;
   --fd-table-header: 0.875rem;
