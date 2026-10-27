@@ -893,8 +893,11 @@ function onBuyTogether(item) {
   flex: 1 1 16rem;
   align-items: center;
   gap: 0.25rem;
-  min-height: var(--fd-control);
-  padding: 0.25rem 0.25rem 0.25rem 1.5rem;
+  min-height: var(--fd-search);
+  /* 2px less than Home top and bottom: this bar has a border, so the total stays 44px.
+     On the right, the same 16px as a card's padding, so the search icon lines up with the
+     icon buttons (like the trash) at the end of the cards below. */
+  padding: 0.125rem 1rem 0.125rem 1.5rem;
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: 999px;
   background: var(--fd-paper);
@@ -919,6 +922,7 @@ function onBuyTogether(item) {
   color: var(--fd-text-muted);
 }
 
+/* Same size as the Home search bar's icon area: the bar is 48px tall like Home's. */
 .fd-wish-search-icon {
   display: inline-flex;
   align-items: center;
@@ -964,7 +968,8 @@ function onBuyTogether(item) {
 
 .fd-wish-tools .form-select {
   flex: 1 1 auto;
-  min-height: var(--fd-control);
+  /* Same height as the search bar beside it. */
+  min-height: var(--fd-search);
   padding: 0.375rem 3.25rem 0.375rem 1.5rem;
   border-radius: 999px;
   background-position: right 1.25rem center;

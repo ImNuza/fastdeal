@@ -24,6 +24,14 @@ const priceDaySchema = new mongoose.Schema(
       default: null
     },
 
+    // Where this price came from: 'search' (a live search) or 'product' (a live product page).
+    // null for rows the seed script wrote, which are made up for the demo account; the Home
+    // price tracking only plots rows with a source, so it never shows seeded prices.
+    source: {
+      type: String,
+      default: null
+    },
+
     // The crossed-out "was" price the store showed that day (SerpApi extracted_old_price). null if none.
     oldPrice: {
       type: Number,

@@ -258,6 +258,23 @@ app.get('/api/friends/requests', requireUser, async (req, res) => {
 })
 
 // Send a friend request
+// Requests I sent that are still waiting for an answer, for the "Sent by you" list on Friends.
+app.get('/api/friends/sent', requireUser, async (req, res) => {
+  const myUid = req.uid
+  try {
+    const rows = await Friendship.find({ requesterUid: myUid, status: 'pending' })
+    const users = await User.find({ firebaseUid: { $in: rows.map(r => r.addresseeUid) } }).select('firebaseUid username')
+    const uMap = {}
+    for (const u of users) uMap[u.firebaseUid] = u
+    res.json(rows.map(r => {
+      const u = uMap[r.addresseeUid] || {}
+      return { pairKey: r.pairKey, firebaseUid: r.addresseeUid, username: u.username }
+    }))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.post('/api/friends/request', requireUser, async (req, res) => {
   const myUid = req.uid
   const addresseeUid = text(req.body.addresseeUid)
@@ -279,7 +296,7 @@ app.post('/api/friends/request', requireUser, async (req, res) => {
       type: 'friend-request',
       title: 'New friend request',
       body: (me?.username || 'Someone') + ' sent you a friend request.',
-      link: '/friends',
+      link: '/friends?tab=requests',
       fromUid: myUid
     })
 
@@ -499,7 +516,8 @@ app.get('/api/home-stats', async (req, res) => {
 
     const since = sgDay(Date.now() - 13 * 24 * 3600000)
     const history = await PriceDay.aggregate([
-      { $match: { productKey: top.key, day: { $gte: since } } },
+      // Real prices only: seeded rows have no source and are left out.
+      { $match: { productKey: top.key, day: { $gte: since }, source: { $in: ['search', 'product'] } } },
       { $group: { _id: '$day', price: { $min: '$price' } } },
       { $sort: { _id: 1 } }
     ])
@@ -547,7 +565,8 @@ app.get('/api/price-history', async (req, res) => {
   try {
     const since = sgDay(Date.now() - 13 * 24 * 3600000)
     const days = await PriceDay.aggregate([
-      { $match: { productKey: key, day: { $gte: since } } },
+      // Real prices only: seeded rows have no source and are left out.
+      { $match: { productKey: key, day: { $gte: since }, source: { $in: ['search', 'product'] } } },
       { $group: { _id: '$day', price: { $min: '$price' } } },
       { $sort: { _id: 1 } }
     ])

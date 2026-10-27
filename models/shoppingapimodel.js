@@ -200,7 +200,7 @@ export async function search(q, sessionId) {
   await logSearch(sessionId, rawQuery, productKey, pre.searchTerm, listings)
   // Today's price at each store, for price tracking. Only fresh results: a cached one may be
   // from before midnight. No extra API call, the search already happened.
-  await recordPrices(productKey, storePrices(listings))
+  await recordPrices(productKey, storePrices(listings), 'search')
 
   return {
     query: rawQuery,
