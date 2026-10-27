@@ -316,18 +316,7 @@ app.put('/api/friends/:pairKey/accept', requireUser, async (req, res) => {
       { new: true }
     )
     if (!f) return res.status(404).json({ error: 'Request not found' })
-
-    //notification sending
-    const me = await User.findOne({ firebaseUid: myUid }).select('username')
-    await Notification.create({
-      firebaseUid: f.requesterUid,
-      type: 'friend-accepted',
-      title: 'Friend request accepted',
-      body: (me?.username || 'Someone') + ' accepted your friend request.',
-      link: '/friends',
-      fromUid: myUid
-    })
-
+    // No notification back to the sender: only new requests notify, answers do not.
     res.json(f)
   } catch (err) {
     res.status(500).json({ error: err.message })
