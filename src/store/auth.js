@@ -7,8 +7,7 @@ import { getUser, updateUser } from '../services/userApi.js'
 
 const OLD_USERS_KEY = 'fastdeal-users'
 
-// Export the raw refs so mock/session.js (wishlist code) can import them directly.
-// Both paths share the same ref objects — one source of truth.
+// Raw refs, shared with the wishlist store and the Pinia store below: one source of truth.
 export const user = ref(null)
 export const firebaseUser = ref(null)
 export const authReady = ref(false)

@@ -13,7 +13,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
   const now = ref(Date.now())
 
   // ---------------------------------------------------------------
-  // Wishlist (functions copied from src/mock/session.js)
+  // Wishlist
   // user.value.wishlist is the in-memory copy. Every change updates it at once, then is written
   // to MongoDB through /api/wishlist. Writes run one after another.
   // ---------------------------------------------------------------
@@ -177,7 +177,6 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
   // ---------------------------------------------------------------
   // Sleep on it: when a countdown ends, tell the server once so it can notify the user.
-  // (Copied from src/mock/session.js)
   // ---------------------------------------------------------------
   const pendingSleepNotifications = new Set()
   const completedSleepNotifications = new Set()
