@@ -84,12 +84,29 @@ export async function toggleEmail() {
   }
 }
 
+// A refresh while the server is restarting must not look like a logout: only a 404 means the
+// user is really not registered. Any other failure (server down, MongoDB not ready) is retried
+// for about 10 seconds. The router guard waits for this, so the page is not sent to /login.
+const PROFILE_TRIES = 5
+const PROFILE_RETRY_MS = 2000
+
+async function loadDbUser() {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await getUser()
+    } catch (err) {
+      if (err.response?.status === 404 || attempt >= PROFILE_TRIES) throw err
+      await new Promise(function (resolve) { setTimeout(resolve, PROFILE_RETRY_MS) })
+    }
+  }
+}
+
 watchAuthState(async function (fbUser) {
   firebaseUser.value = fbUser
   if (!fbUser) { user.value = null; authReady.value = true; return }
   if (_signupInProgress) { authReady.value = true; return }
   try {
-    const dbUser = await getUser()
+    const dbUser = await loadDbUser()
     applyDbUser(dbUser, fbUser)
   } catch (err) {
     if (err.response?.status === 404) {
