@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import axios from 'axios'
 import { toProductKey } from '../../models/product-key.js'
 import { watchAuthState, signOutUser } from '../services/auth.js'
-import { getUser } from '../services/userApi.js'
+import { getUser, updateUser } from '../services/userApi.js'
 
 const OLD_USERS_KEY = 'fastdeal-users'
 
@@ -73,6 +73,18 @@ async function copyOldWishlist(email) {
   else { localStorage.removeItem(OLD_USERS_KEY) }
 }
 
+export async function toggleEmail() {
+  if (!user.value || !firebaseUser.value) {
+    return
+  }
+  user.value.emailOn = !user.value.emailOn
+  try {
+    await updateUser({ emailAlertsOn: user.value.emailOn })
+  } catch (err) {
+    console.warn('[FastDeal] Could not sync emailAlertsOn to MongoDB:', err.message)
+  }
+}
+
 watchAuthState(async function (fbUser) {
   firebaseUser.value = fbUser
   if (!fbUser) { user.value = null; authReady.value = true; return }
@@ -100,5 +112,5 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
 
-  return { user, authReady, firebaseUser, isLoggedIn, isAdmin, startSignup, endSignup, applyDbUser }
+  return { user, authReady, firebaseUser, isLoggedIn, isAdmin, startSignup, endSignup, applyDbUser, toggleEmail }
 })

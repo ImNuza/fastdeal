@@ -4,6 +4,8 @@ import FdSearchBar from '../components/FdSearchBar.vue'
 import FdIcon from '../components/FdIcon.vue'
 import { itemName } from '../services/itemName.js'
 import axios from 'axios'
+import { storeToRefs } from 'pinia'
+import { useTrendingStore } from '../store/trending.js'
 
 // The values band under the hero: FastDeal's features in four groups. ai marks the AI-powered one.
 const values = [
@@ -13,8 +15,9 @@ const values = [
   { icon: 'moon', title: 'Decide', text: 'Sleep on it, or buy with friends.' }
 ]
 
-const trendingToday = ref([])
-const trendingWeek = ref([])
+// Trending lists come from the trending store, shared with the Trending page and the search bar.
+const trendingStore = useTrendingStore()
+const { topToday: trendingToday, weekExtras: trendingWeek } = storeToRefs(trendingStore)
 
 // Trending Today belt: the cards roll past nonstop, like a conveyor belt. One pass repeats
 // the items until it holds at least BELT_MIN cards (so a short list still fills the screen),
@@ -272,34 +275,7 @@ onMounted(function () {
 
 })
 
-//trending page
-onMounted(async function retriveTrending() {
- try {
-    const res = await axios.get('/api/trending')
-    trendingToday.value = res.data.today.slice(0,5)
-    
-    const shown = []
-    for (const t of trendingToday.value) {
-      shown.push(t._id)
-    }
-
-    trendingWeek.value = []
-    for (const item of res.data.week) {
-      if (!shown.includes(item._id)) {
-        if(trendingWeek.value.length<8){
-        trendingWeek.value.push(item)
-        }else{
-          continue
-        }
-      }
-    }
-  } catch (error) {
-    console.log(error)
-  }
-})
-
-
-
+onMounted(trendingStore.ensureTrending)
 
 onBeforeUnmount(function () {
   window.removeEventListener('scroll', onScroll)

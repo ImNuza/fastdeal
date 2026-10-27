@@ -5,8 +5,9 @@ import DealCheck from '../components/DealCheck.vue'
 import FdBreadcrumbs from '../components/FdBreadcrumbs.vue'
 import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
 import SaveSleepButtons from '../components/SaveSleepButtons.vue'
-import { sgd } from '../mock/catalog.js'
-import { fetchProduct,fetchSearchedWith } from '../services/productApi.js'
+import { sgd } from '../services/format.js'
+import { storeToRefs } from 'pinia'
+import { useProductStore } from '../store/product.js'
 import { itemName } from '../services/itemName.js'
 
 // One product: every store that sells it, cheapest total first, with the Deal check,
@@ -14,22 +15,12 @@ import { itemName } from '../services/itemName.js'
 // URL: /product/:productId?q=<the search it came from>
 const route = useRoute()
 
-const loading = ref(true)
-const errorText = ref('')
-const product = ref(null)
+// The product, its loading state and the cheapest/highest/ratings maths live in the product store.
+const { product, loading, errorText, searchedWith, cheapest, highest } = storeToRefs(useProductStore())
+const { percentOf, loadProduct } = useProductStore()
 
-//searched with feature
-const searchedWith = ref([])
+// "Searched with" list: show only the first few until the shopper asks for more.
 const showAll = ref(false)
-
-const cheapest = computed(function () {
-  return product.value && product.value.stores.length ? product.value.stores[0] : null
-})
-
-const highest = computed(function () {
-  const stores = product.value ? product.value.stores : []
-  return stores.length > 1 ? stores[stores.length - 1] : null
-})
 
 // What the wishlist stores with this product, so it can open this page again.
 const saveInfo = computed(function () {
@@ -39,25 +30,8 @@ const saveInfo = computed(function () {
   return { productId: product.value.productId, q: product.value.q || route.query.q || '', image: product.value.image }
 })
 
-const ratingTotal = computed(function () {
-  return (product.value ? product.value.ratings : []).reduce(function (sum, row) {
-    return sum + row.amount
-  }, 0)
-})
-
-function percentOf(amount) {
-  return ratingTotal.value ? Math.round((amount / ratingTotal.value) * 100) : 0
-}
-
-onMounted(async function () {
-  try {
-    product.value = await fetchProduct(route.params.productId, route.query.q)
-  } catch (error) {
-    errorText.value = error.message
-  } finally {
-    loading.value = false
-  }
-  searchedWith.value = await fetchSearchedWith(product.value.q || route.query.q)
+onMounted(function () {
+  loadProduct(route.params.productId, route.query.q)
 })
 
 // FastDeal / the search (back to its results) / the store the shopper clicked on Compare.

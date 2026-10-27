@@ -3,18 +3,23 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FdBreadcrumbs from '../components/FdBreadcrumbs.vue'
 import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
-import { buildResult, dayLabel, sgd, verdictFor } from '../mock/catalog.js'
-import { isSaved, savedFrom, saveProduct, user } from '../mock/session.js'
+import { dayText, sgd } from '../services/format.js'
+import { storeToRefs } from 'pinia'
+import { useAuthStore } from '../store/auth.js'
+import { useWishlistStore } from '../store/wishlist.js'
 import { itemName } from '../services/itemName.js'
-import { sessionId } from '../services/searchSession.js'
-import axios from 'axios'
+import { useCompareStore } from '../store/compare.js'
 
 const route = useRoute()
+const { user } = storeToRefs(useAuthStore())
+const { isSaved, savedFrom, saveProduct } = useWishlistStore()
 const router = useRouter()
 
-const loading = ref(true)
-const failed = ref(false)
-const result = ref(null)
+// The search results, price history, related products and verdict live in the compare store.
+const compareStore = useCompareStore()
+const { result, loading, failed, verdict, cheapest } = storeToRefs(compareStore)
+const { loadResult, showFailed } = compareStore
+
 const minPrice = ref(0)
 const maxPrice = ref(0)
 const storeName = ref('All')
@@ -45,13 +50,6 @@ function storeInitial(row) {
   const s = String(row.store || '').trim()
   return s ? s.charAt(0).toUpperCase() : '?'
 }
-
-const verdict = computed(function () {
-  if (!result.value) {
-    return null
-  }
-  return verdictFor(result.value)
-})
 
 const stores = computed(function () {
   if (!result.value) {
@@ -120,13 +118,20 @@ const historyMax = computed(function () {
   if (!result.value) {
     return 1
   }
-  let high = result.value.history[0]
-  for (let i = 1; i < result.value.history.length; i++) {
-    if (result.value.history[i] > high) {
-      high = result.value.history[i]
+  let high = 1
+  for (let i = 0; i < result.value.history.length; i++) {
+    if (result.value.history[i].price > high) {
+      high = result.value.history[i].price
     }
   }
   return high
+})
+
+const historyLow = computed(function () {
+  if (!result.value || !result.value.history.length) {
+    return 0
+  }
+  return Math.min.apply(null, result.value.history.map(function (row) { return row.price }))
 })
 
 function loginNext() {
@@ -146,23 +151,6 @@ function onSaveFrom(row) {
   saveProduct(rowName(row), { store: row.store, price: row.price },
     { productId: row.productId, q: String(route.query.q || ''), image: row.image })
   note.value = 'Saved ' + rowName(row) + ' from ' + row.store + '.'
-}
-
-// Map one listing from GET /api/search into the row shape the cards use
-// (name, image, store, price, rating, reviews, freeShipping, onSale, productId).
-function toRow(item, index) {
-  return {
-    id: String(item.productId || '') + '-' + index,
-    productId: item.productId || '',
-    name: item.name || '',
-    image: item.image || '',
-    store: item.store || 'Unknown',
-    price: Number(item.price) || 0,
-    rating: Number(item.rating) || 0,
-    reviews: Number(item.reviews) || 0,
-    freeShipping: Boolean(item.freeShipping),
-    onSale: item.oldPrice != null
-  }
 }
 
 // Seed the price-range filter from whatever listings ended up on the result.
@@ -186,68 +174,16 @@ function seedPriceRange(listings) {
   maxPrice.value = high
 }
 
-// Run the search on the server. It reuses a saved copy from the last 6 hours,
-// so a reload costs no SerpApi credit. Returns { name, listings } built from the
-// first 10 usable results, or null if nothing usable came back.
-async function loadLive(q) {
-  try {
-    const res = await fetch('/api/search?q=' + encodeURIComponent(q) + '&sid=' + encodeURIComponent(sessionId()))
-    if (!res.ok) {
-      return null
-    }
-    const data = await res.json()
-    const listings = Array.isArray(data.listings) ? data.listings : []
-    const rowsOut = []
-    for (let i = 0; i < listings.length && rowsOut.length < 10; i++) {
-      const row = toRow(listings[i], i)
-      if (row.price > 0) {
-        rowsOut.push(row)
-      }
-    }
-    if (!rowsOut.length) {
-      return null
-    }
-    // Record this search in the logged-in user's own history (newest first).
-    // Fire-and-forget: axios attaches the Firebase token (src/services/http.js);
-    // a logged-out user gets 401, which we ignore so search is never affected.
-    axios.post('/api/me/recent-searches', {
-      query: data.query || q,
-      productKey: data.productKey
-    }).catch(function () {})
-    return { name: itemName(data.searchTerm || q), listings: rowsOut }
-  } catch (err) {
-    return null
-  }
-}
-
 onMounted(async function () {
   const q = String(route.query.q || '').trim()
-  if (!q) {
-    loading.value = false
-    failed.value = true
+  if (!q || q.toLowerCase() === 'fail') {
+    showFailed()
     return
   }
-  if (q.toLowerCase() === 'fail') {
-    loading.value = false
-    failed.value = true
-    return
+  await loadResult(q)
+  if (result.value) {
+    seedPriceRange(result.value.listings)
   }
-
-  // Mock supplies the 14-day price history and related items (SerpAPI returns
-  // neither). The product name, the listings table and the verdict all come
-  // from the live search when it has usable results; otherwise the whole
-  // result falls back to mock so the demo never breaks.
-  const built = buildResult(q)
-  const live = await loadLive(q)
-  if (live) {
-    built.name = live.name
-    built.listings = live.listings
-    // verdict is a computed over result.listings + result.history, so it now
-    // reflects the live listings while history/related stay from the mock.
-  }
-  result.value = built
-  seedPriceRange(built.listings)
-  loading.value = false
 })
 </script>
 
@@ -262,13 +198,17 @@ onMounted(async function () {
     <FdBreadcrumbs :items="[{ label: 'FastDeal', to: '/' }, { label: itemName(route.query.q) }]" />
     <p v-if="route.query.from === 'photo'" class="small text-secondary mb-1">Identified from your photo</p>
     <h1 class="fd-page-title">{{ result.name }}</h1>
-    <p class="fd-page-subtitle">{{ result.listings.length }} listings. Cheapest now is {{ sgd(verdict.cheapest) }}.</p>
+    <p class="fd-page-subtitle">{{ result.listings.length }} listings. Cheapest now is {{ sgd(cheapest) }}.</p>
 
-    <div class="card verdict p-3 mb-3" :class="verdict.label === 'Worth It' ? 'worth' : verdict.label === 'Not Worth It' ? 'not' : 'maybe'">
+    <div v-if="verdict" class="card verdict p-3 mb-3" :class="verdict.label === 'Worth It' ? 'worth' : verdict.label === 'Not Worth It' ? 'not' : 'maybe'">
       <p class="mb-1"><strong>{{ verdict.label }}</strong> · {{ verdict.action }}</p>
       <p class="mb-1">{{ verdict.why }}</p>
       <p class="small text-secondary mb-0">14-day low {{ sgd(verdict.low) }}. 14-day average {{ sgd(verdict.avg) }}. Mean rating {{ verdict.rating.toFixed(1) }} from {{ verdict.reviewSum }} reviews.</p>
     </div>
+
+    <p v-else class="alert alert-secondary small mb-3">
+      Price history is still being tracked for this product, so there is no verdict yet. It appears after a few days of searches.
+    </p>
 
     <p v-if="note" class="small mb-3" role="status">{{ note }}</p>
 
@@ -368,26 +308,31 @@ onMounted(async function () {
     </ul>
 
     <h2 class="fd-section-title">Price history</h2>
-    <p class="small text-secondary">Last 14 days. Taller bar means a higher price.</p>
-    <div class="history mb-2">
-      <span
-        v-for="(price, index) in result.history"
-        :key="index"
-        :style="{ height: Math.round((price / historyMax) * 84) + 'px' }"
-        :title="dayLabel(result.history.length - 1 - index) + ' ' + sgd(price)"
-      ></span>
-    </div>
-    <p class="small text-secondary">{{ dayLabel(13) }} to {{ dayLabel(0) }}. Low {{ sgd(verdict.low) }}.</p>
+    <template v-if="result.history.length > 1">
+      <p class="small text-secondary">Last 14 days of tracked prices. Taller bar means a higher price.</p>
+      <div class="history mb-2">
+        <span
+          v-for="row in result.history"
+          :key="row.day"
+          :style="{ height: Math.round((row.price / historyMax) * 84) + 'px' }"
+          :title="dayText(row.day) + ' ' + sgd(row.price)"
+        ></span>
+      </div>
+      <p class="small text-secondary">{{ dayText(result.history[0].day) }} to {{ dayText(result.history[result.history.length - 1].day) }}. Low {{ sgd(historyLow) }}.</p>
+    </template>
+    <p v-else class="small text-secondary">Not enough tracked prices yet. This fills in as people search for this product.</p>
 
-    <h2 class="fd-section-title mt-4">Searched with this</h2>
-    <div class="d-flex flex-wrap gap-2">
-      <router-link
-        v-for="name in result.related"
-        :key="name"
-        class="btn btn-outline-dark btn-sm"
-        :to="{ path: '/compare', query: { q: name } }"
-      >{{ name }}</router-link>
-    </div>
+    <template v-if="result.related.length">
+      <h2 class="fd-section-title mt-4">Searched with this</h2>
+      <div class="d-flex flex-wrap gap-2">
+        <router-link
+          v-for="item in result.related"
+          :key="item._id"
+          class="btn btn-outline-dark btn-sm"
+          :to="{ path: '/compare', query: { q: item.query || item.name } }"
+        >{{ item.name || item.query }}</router-link>
+      </div>
+    </template>
   </div>
 </template>
 

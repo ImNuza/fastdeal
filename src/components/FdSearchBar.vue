@@ -1,7 +1,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { catalog } from '../mock/catalog.js'
+import { storeToRefs } from 'pinia'
+import { useTrendingStore } from '../store/trending.js'
 import FdIcon from './FdIcon.vue'
 import FdLoadingDots from './FdLoadingDots.vue'
 import { addToHistory, readHistory, removeFromHistory } from '../services/searchHistory.js'
@@ -43,7 +44,15 @@ function onSearch() {
 }
 
 // Suggestions under the search bar: recent searches while the box is empty,
-// then catalogue products whose name or alias contains what was typed.
+// then products people searched this week whose name contains what was typed.
+const trendingStore = useTrendingStore()
+const { week } = storeToRefs(trendingStore)
+trendingStore.ensureTrending()
+
+function nameOf(item) {
+  return item.query || item._id
+}
+
 const searchFocused = ref(false)
 const activeIndex = ref(-1)
 
@@ -54,20 +63,18 @@ const suggestions = computed(function () {
       return { name: name, before: '', match: '', after: itemName(name), detail: 'Recent search', icon: 'clock', recent: true }
     })
   }
-  return catalog.filter(function (item) {
-    return item.name.toLowerCase().includes(q) || item.aliases.some(function (alias) {
-      return alias.includes(q)
-    })
+  return week.value.filter(function (item) {
+    return nameOf(item).toLowerCase().includes(q)
   }).slice(0, 5).map(function (item) {
-    const start = item.name.toLowerCase().indexOf(q)
-    const best = item.listings.reduce(function (a, b) { return b.price < a.price ? b : a })
+    const name = nameOf(item)
+    const start = name.toLowerCase().indexOf(q)
     return {
-      name: item.name,
+      name: name,
       // Split the name so the typed part shows in bold, like the matched letters in a place search.
-      before: start >= 0 ? item.name.slice(0, start) : '',
-      match: start >= 0 ? item.name.slice(start, start + q.length) : '',
-      after: start >= 0 ? item.name.slice(start + q.length) : item.name,
-      detail: 'From S$' + best.price + ' at ' + best.store + ' · ' + item.listings.length + ' stores',
+      before: start >= 0 ? name.slice(0, start) : '',
+      match: start >= 0 ? name.slice(start, start + q.length) : '',
+      after: start >= 0 ? name.slice(start + q.length) : name,
+      detail: item.count + (item.count === 1 ? ' search' : ' searches') + ' this week',
       icon: 'tag'
     }
   })

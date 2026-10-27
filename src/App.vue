@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { useAuthStore } from './store/auth.js'
+import { useWishlistStore } from './store/wishlist.js'
 import { storeToRefs } from 'pinia'
 import FdLogo from './components/FdLogo.vue'
 import FdIcon from './components/FdIcon.vue'
@@ -10,6 +11,9 @@ import FdFooter from './components/FdFooter.vue'
 import FdSearchBar from './components/FdSearchBar.vue'
 
 const { user, firebaseUser } = storeToRefs(useAuthStore())
+
+// Creating the wishlist store here keeps its sleep-ended timer running on every page.
+useWishlistStore()
 
 // Computed so the navbar username updates reactively whenever user logs in, out, or sets a username.
 const username = computed(() => user.value?.username || '')

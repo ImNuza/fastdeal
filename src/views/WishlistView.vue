@@ -1,45 +1,38 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { fetchCheapestLiveListing } from '../services/livePriceService.js'
-import { productImage, sgd, storeLink } from '../mock/catalog.js'
-import { isAsleep, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user } from '../mock/session.js'
+import { sgd, storeLink } from '../services/format.js'
 import FdIcon from '../components/FdIcon.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
 import FdTelegramPrompt from '../components/FdTelegramPrompt.vue'
-import { planBudget } from '../mock/budget.js'
 import axios from 'axios'
 import { storeToRefs } from 'pinia'
+import { useAuthStore } from '../store/auth.js'
 import { useWishlistStore } from '../store/wishlist.js'
 
 const router = useRouter()
 const route = useRoute()
 
+// All wishlist data and logic live in the wishlist store. This view keeps only the page layout,
+// the search and sort, and the pop-up handling (focus, openers, the sleep time picker).
+const { user } = storeToRefs(useAuthStore())
+const wishlistStore = useWishlistStore()
+const {
+  now, liveLoading, liveErrors,
+  verdictItem, verdictLoading, verdictError, activeVerdict,
+  budget, included, plan, planIndex, budgetError, plannable, heldCount, option, pickedItems, missedItems,
+  buyItem, selected, inviting, inviteSent, error: buyError
+} = storeToRefs(wishlistStore)
+const {
+  removeSaved, setTarget, sleepOn,
+  best, loadLivePrice, saving, cheaper, savingPercent, reached, asleep,
+  hasFinishedSleep, openVerdict: loadVerdict, closeVerdict,
+  clearPlan, findPlan, nextOption, rankOf, setRank, cheapestPlannable,
+  fetchFriendOverlap, friendsFor, allInvited, openBuyTogether, closeBuyTogether, sendInvites
+} = wishlistStore
+
 if (!user.value) {
   router.replace('/login?next=/wishlist')
-}
-
-// Friends who saved the same product, and the Buy Together pop-up. Both live in the wishlist store.
-const wishlistStore = useWishlistStore()
-const { buyItem, selected, inviting, inviteSent, error: buyError } = storeToRefs(wishlistStore)
-const { fetchFriendOverlap, friendsFor, allInvited, openBuyTogether, closeBuyTogether, sendInvites } = wishlistStore
-
-watch(
-  () => user.value?.wishlist?.map(item => item.productKey).join('|') ?? '',
-  function () {
-    if (user.value) fetchFriendOverlap()
-  },
-  { immediate: true }
-)
-
-const showTelegramPrompt = ref(false)
-
-function onBuyTogether(item) {
-  if (!user.value.telegramUsername) {
-    showTelegramPrompt.value = true
-    return
-  }
-  openBuyTogether(item)
 }
 
 // Products saved from a product page open it again. Older items open a search for the name.
@@ -51,7 +44,6 @@ function productLink(item) {
 }
 
 // Ticks every 30 seconds so the "left" countdown on held items stays current.
-const now = ref(Date.now())
 let clock = 0
 
 onMounted(function () {
@@ -63,62 +55,6 @@ onMounted(function () {
 onBeforeUnmount(function () {
   window.clearInterval(clock)
 })
-
-const livePrices = ref({})
-const liveLoading = ref({})
-const liveErrors = ref({})
-
-function best(item) {
-  return livePrices.value[item.name] ?? null
-}
-
-
-async function loadLivePrice(name) {
-  if (liveLoading.value[name]) return
-
-  liveLoading.value[name] = true
-  liveErrors.value[name] = ''
-
-  try {
-    const listing = await fetchCheapestLiveListing(name)
-
-    // Display the best price in Wishlist.
-    livePrices.value[name] = listing
-
-    // Find the saved product in MongoDB-backed wishlist state.
-    const saved = user.value?.wishlist?.find(
-      item => item.name === name
-    )
-
-    // Only ask the backend to check when the displayed price
-    // meets the user's target threshold.
-    if (
-      saved &&
-      saved.productKey &&
-      Number(saved.targetPrice) > 0 &&
-      listing.price <= Number(saved.targetPrice)
-    ) {
-      void axios.post(
-        '/api/wishlist/' +
-        encodeURIComponent(saved.productKey) +
-        '/check-target'
-      ).then(response => {
-        console.log('[Target email] Check result:', response.data)
-      }).catch(error => {
-        console.warn(
-          '[Target email] Check failed:',
-          error.response?.data?.error || error.message
-        )
-      })
-    }
-  } catch (error) {
-    delete livePrices.value[name]
-    liveErrors.value[name] = error.message || 'Price unavailable'
-  } finally {
-    liveLoading.value[name] = false
-  }
-}
-
 
 watch(
   () => user.value?.wishlist?.map(item => item.name).join('|') ?? '',
@@ -134,44 +70,13 @@ watch(
   { immediate: true }
 )
 
-// A price drop worth flagging: some store now sells it for at least 10% less than the saved price.
-// Smaller drops are left out so the tag only shows for real savings.
-const DROP_PERCENT = 10
-
-function saving(item) {
-  const listing = best(item)
-  return listing ? Number(item.savedPrice) - listing.price : null
-}
-
-function cheaper(item) {
-  const amount = saving(item)
-
-  return amount !== null &&
-    Number(item.savedPrice) > 0 &&
-    (amount / Number(item.savedPrice)) * 100 >= DROP_PERCENT
-}
-
-function savingPercent(item) {
-  const amount = saving(item)
-
-  return amount === null || Number(item.savedPrice) <= 0
-    ? 0
-    : Math.round((amount / Number(item.savedPrice)) * 100)
-}
-
-function reached(item) {
-  const listing = best(item)
-
-  return Boolean(
-    listing &&
-    Number(item.targetPrice) > 0 &&
-    listing.price <= Number(item.targetPrice)
-  )
-}
-
-function asleep(item) {
-  return isAsleep(item.name, now.value)
-}
+watch(
+  () => user.value?.wishlist?.map(item => item.productKey).join('|') ?? '',
+  function () {
+    if (user.value) fetchFriendOverlap()
+  },
+  { immediate: true }
+)
 
 function leftText(item) {
   const ms = item.sleepUntil - now.value
@@ -372,8 +277,6 @@ function closeSleep() {
   nextTick(() => sleepOpener?.focus())
 }
 
-
-
 function confirmSleep() {
   if (!sleepItem.value || !holdMs.value) {
     return
@@ -404,155 +307,15 @@ function confirmSleep() {
   closeSleep()
 }
 
-
-
-// =====================================
-// SLEEP ON IT - PURCHASE VERDICT
-// =====================================
-
-// Which product's verdict is currently displayed?
-const verdictItem = ref(null)
+// Purchase verdict pop-up: the price lookup and maths are in the store; the view only moves focus.
 const verdictDialog = ref(null)
-const verdictLatestPrice = ref(null)
-const verdictLoading = ref(false)
-const verdictError = ref('')
 
-// Prevent an older API response from changing a newer verdict.
-let verdictRequestId = 0
-
-// Check whether the Sleep On It timer has expired
-function hasFinishedSleep(item) {
-  return Boolean(
-    item.sleepUntil &&
-    item.sleepUntil <= now.value &&
-    Number.isFinite(item.sleepPriceAtStart) &&
-    item.sleepPriceAtStart > 0
-  )
-}
-
-// Calculate the percentage change and purchase verdict
-function verdictData(item) {
-  const start = Number(item.sleepPriceAtStart)
-  const latest = verdictLatestPrice.value
-
-  if (
-    !Number.isFinite(start) ||
-    start <= 0 ||
-    !Number.isFinite(latest) ||
-    latest <= 0
-  ) {
-    return null
-  }
-
-  // Percentage change formula
-  const percent = ((latest - start) / start) * 100
-
-  // Absolute price difference
-  const difference = latest - start
-
-  let title = ''
-  let message = ''
-
-  if (percent <= -10) {
-    title = 'A better deal is available!'
-    message =
-      'The cheapest matching listing found is at least 10% below your saved price. ' +
-      'You may be able to save money by choosing this offer.'
-
-  } else if (percent < 0) {
-    title = 'A small saving is available'
-    message =
-      'The cheapest matching listing found is slightly cheaper than your saved price. ' +
-      'Consider whether the savings are worthwhile.'
-
-  } else if (percent === 0) {
-    title = 'No better deal found yet'
-    message =
-      'The cheapest matching listing found is the same as your saved price.'
-
-  } else {
-    title = 'No cheaper deal found'
-    message =
-      'The cheapest matching listing found costs more than your saved price. ' +
-      'Your original saved offer may still be better, if it remains available.'
-  }
-
-  return {
-    start,
-    latest,
-    percent,
-    difference,
-    title,
-    message
-  }
-}
-
-// Automatically calculate the currently displayed verdict
-const activeVerdict = computed(() => {
-  return verdictItem.value
-    ? verdictData(verdictItem.value)
-    : null
-})
-
-// Open the Purchase Verdict pop-up
-
-async function openVerdict(item) {
-  const requestId = ++verdictRequestId
-
-  verdictItem.value = item
-  verdictLatestPrice.value = null
-  verdictLoading.value = true
-  verdictError.value = ''
-
+function openVerdict(item) {
   nextTick(() => {
     verdictDialog.value?.querySelector('button')?.focus()
   })
-
-  try {
-    // Get the cheapest comparable price from SerpApi
-    const listing = await fetchCheapestLiveListing(item.name)
-    console.log('[Purchase Verdict] Selected listing:', listing)
-
-    // Ignore outdated responses if the dialog has changed
-    if (requestId !== verdictRequestId) return
-
-    verdictLatestPrice.value = listing.price
-
-    console.log('[Sleep On It] Live ending price:', {
-      product: item.name,
-      store: listing.store,
-      price: listing.price
-    })
-  } catch (error) {
-    if (requestId !== verdictRequestId) return
-
-    verdictError.value =
-      error.message || 'Unable to retrieve the latest product price'
-
-    console.error('[Sleep On It] Verdict price lookup failed:', error)
-  } finally {
-    if (requestId === verdictRequestId) {
-      verdictLoading.value = false
-    }
-  }
+  return loadVerdict(item)
 }
-
-
-// Close the pop-up and mark the verdict as viewed
-function closeVerdict() {
-  // Invalidate any pending API response
-  verdictRequestId++
-
-  if (verdictItem.value) {
-    markSleepVerdictSeen(verdictItem.value.name)
-  }
-
-  verdictItem.value = null
-  verdictLatestPrice.value = null
-  verdictLoading.value = false
-  verdictError.value = ''
-}
-
 
 watch(
   [() => route.query.verdict, () => user.value?.wishlist],
@@ -584,28 +347,10 @@ watch(
   { immediate: true }
 )
 
-
-
-// Plan a budget pop-up: enter a budget, tick and rank
-// the items to include, then see the best mix at today's best prices.
-// Items on hold are left out, since they are still being slept on.
+// Plan a budget pop-up: the numbers are in the store; the view keeps the open/close and focus.
 const showBudget = ref(false)
-const budget = ref('')
-const included = ref([])
-const plan = ref(null)
-const planIndex = ref(0)
 const budgetInput = ref(null)
 let budgetOpener = null
-
-const plannable = computed(function () {
-  return user.value ? user.value.wishlist.filter(function (item) { return !asleep(item) }) : []
-})
-
-const heldCount = computed(function () {
-  return user.value ? user.value.wishlist.length - plannable.value.length : 0
-})
-
-const budgetError = ref('')
 
 function openBudget(event) {
   budgetOpener = event.currentTarget
@@ -623,101 +368,15 @@ function closeBudget() {
   nextTick(() => budgetOpener?.focus())
 }
 
-// Any change to the budget or the ticked items clears the old answer, so it never shows a stale mix.
-function clearPlan() {
-  plan.value = null
-  budgetError.value = ''
-}
+// Buy Together: friends who saved the same product. The pop-up state lives in the store.
+const showTelegramPrompt = ref(false)
 
-function findPlan() {
-  const amount = Number(budget.value)
-  if (!amount || amount <= 0) {
-    budgetError.value = 'Enter a budget above S$0.'
-    plan.value = null
+function onBuyTogether(item) {
+  if (!user.value.telegramUsername) {
+    showTelegramPrompt.value = true
     return
   }
-  if (!included.value.length) {
-    budgetError.value = 'Tick at least one item you want.'
-    plan.value = null
-    return
-  }
-  // Only the ticked items go into the search; nothing else from the wishlist is added.
-  const selected = plannable.value.filter(item =>
-    rankOf(item.name) > 0
-  )
-
-  if (selected.some(item => !best(item))) {
-    budgetError.value =
-      'Some selected products do not have live prices yet. Please retry their price lookup.'
-    plan.value = null
-    return
-  }
-
-  const items = selected.map(item => {
-    const listing = best(item)
-
-    return {
-      name: item.name,
-      price: listing.price,
-      store: listing.store,
-      rank: included.value.indexOf(item.name) + 1
-    }
-  })
-  plan.value = planBudget(items, amount, 5)
-  planIndex.value = 0
-  budgetError.value = ''
-}
-
-function nextOption() {
-  planIndex.value = (planIndex.value + 1) % plan.value.options.length
-}
-
-const option = computed(function () {
-  return plan.value && plan.value.options.length ? plan.value.options[planIndex.value] : null
-})
-
-// Ticked items are ranked by their place in included: ticking one adds it at the bottom,
-// and picking a number moves it to that place, so no two share a rank.
-function rankOf(name) {
-  return included.value.indexOf(name) + 1
-}
-
-function setRank(name, event) {
-  const list = included.value.filter(function (other) { return other !== name })
-  list.splice(Number(event.target.value) - 1, 0, name)
-  included.value = list
-  clearPlan()
-}
-
-// The picked items in priority order. Only ticked items are planned, so every one has a rank.
-const pickedItems = computed(function () {
-  if (!option.value) {
-    return []
-  }
-  return option.value.items.slice().sort(function (a, b) {
-    return a.rank - b.rank
-  })
-})
-
-// Ticked items that did not make it into this option, when they could not all fit together.
-const missedItems = computed(function () {
-  if (!option.value) {
-    return []
-  }
-  return included.value.filter(function (name) {
-    return !option.value.items.some(function (item) { return item.name === name })
-  })
-})
-
-// The cheapest ticked item, for the "Nothing fits" message.
-function cheapestPlannable() {
-  return plannable.value
-    .filter(item => rankOf(item.name) > 0 && best(item))
-    .reduce((low, item) => {
-      return !low || best(item).price < best(low).price
-        ? item
-        : low
-    }, null)
+  openBuyTogether(item)
 }
 </script>
 
@@ -767,7 +426,7 @@ function cheapestPlannable() {
             <div class="fd-wish-cell fd-wish-cell-product" role="cell">
               <router-link class="fd-wish-product" :to="productLink(item)">
                 <span class="fd-wish-image">
-                  <img v-if="item.image || productImage(item.name)" :src="item.image || productImage(item.name)"
+                  <img v-if="item.image" :src="item.image"
                     alt="" />
                   <span v-else>{{ initials(item.name) }}</span>
                 </span>

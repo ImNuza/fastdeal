@@ -540,6 +540,23 @@ app.get('/api/trending' , async (req,res) =>{
 
 })
 
+// Lowest price on each of the last 14 days for one searched product (priceDays, written by every fresh search).
+app.get('/api/price-history', async (req, res) => {
+  const key = toProductKey(text(req.query.key))
+  if (!key) return res.status(400).json({ error: 'key required' })
+  try {
+    const since = sgDay(Date.now() - 13 * 24 * 3600000)
+    const days = await PriceDay.aggregate([
+      { $match: { productKey: key, day: { $gte: since } } },
+      { $group: { _id: '$day', price: { $min: '$price' } } },
+      { $sort: { _id: 1 } }
+    ])
+    res.json(days.map(function (d) { return { day: d._id, price: d.price } }))
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load price history' })
+  }
+})
+
 //search with feature
 app.get('/api/searched-with',async (req,res)=>{
   try{

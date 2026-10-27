@@ -1,12 +1,25 @@
 <script setup>
-import { trending } from '../mock/catalog.js'
+import { onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useTrendingStore } from '../store/trending.js'
 import { itemName } from '../services/itemName.js'
+
+const trendingStore = useTrendingStore()
+const { week, error } = storeToRefs(trendingStore)
+
+onMounted(trendingStore.fetchTrending)
+
+function nameOf(row) {
+  return row.query || row._id
+}
 </script>
 
 <template>
   <h1 class="fd-page-title">Trending</h1>
-  <p class="fd-page-subtitle">Anonymised searches on FastDeal. A row opens the same compare table.</p>
-  <div class="table-responsive">
+  <p class="fd-page-subtitle">Anonymised searches on FastDeal this week. A row opens the same compare table.</p>
+  <p v-if="error" class="alert alert-danger">{{ error }}</p>
+  <p v-else-if="!week.length" class="alert alert-secondary">Nothing has been searched yet this week.</p>
+  <div v-else class="table-responsive">
     <table class="table table-bordered">
       <thead>
         <tr>
@@ -16,11 +29,11 @@ import { itemName } from '../services/itemName.js'
         </tr>
       </thead>
       <tbody>
-        <tr v-for="row in trending" :key="row.query">
-          <td>{{ itemName(row.query) }}</td>
+        <tr v-for="row in week" :key="row._id">
+          <td>{{ itemName(nameOf(row)) }}</td>
           <td>{{ row.count }}</td>
           <td>
-            <router-link :to="{ path: '/compare', query: { q: row.query } }">Compare</router-link>
+            <router-link :to="{ path: '/compare', query: { q: nameOf(row) } }">Compare</router-link>
           </td>
         </tr>
       </tbody>

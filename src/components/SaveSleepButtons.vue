@@ -1,16 +1,9 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  isAsleep,
-  isSaved,
-  removeSaved,
-  saveProduct,
-  savedFrom,
-  sleepEndsAt,
-  sleepOn,
-  user
-} from '../mock/session.js'
+import { storeToRefs } from 'pinia'
+import { useAuthStore } from '../store/auth.js'
+import { useWishlistStore } from '../store/wishlist.js'
 
 // Save and Sleep on it buttons for one product. Used on the product page.
 // Save can be undone. A hold cannot: it is there to stop an impulse buy, so it runs until the timer ends.
@@ -35,6 +28,9 @@ const props = defineProps({
 const productId = computed(function () {
   return props.product ? props.product.productId : undefined
 })
+
+const { user } = storeToRefs(useAuthStore())
+const { isAsleep, isSaved, removeSaved, saveProduct, savedFrom, sleepEndsAt, sleepOn } = useWishlistStore()
 
 const route = useRoute()
 const router = useRouter()
