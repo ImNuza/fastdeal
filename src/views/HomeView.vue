@@ -880,10 +880,11 @@ onBeforeUnmount(function () {
     z-index: 2;
   }
 
+  /* Same width as the card above it, so it sits the same 1rem from the graph. */
   .fd-card--saving {
     bottom: 0;
     right: 0;
-    width: 36%;
+    width: calc(41% - 1rem);
     z-index: 3;
   }
 }
