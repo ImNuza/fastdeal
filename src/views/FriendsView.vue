@@ -123,7 +123,7 @@ function onTabKey(event, index) {
 // The sticky bar at the bottom, worded like the Wishlist's total.
 const barText = computed(function () {
   if (activeTab.value === 'add') {
-    return 'Search by username to send a request'
+    return ''
   }
   if (activeTab.value === 'requests') {
     return requests.value.length + ' waiting for you · ' + sent.value.length + ' sent by you'
@@ -360,7 +360,7 @@ function initials(f) {
   <div v-if="user" class="friends-page">
 
     <h1 class="fd-page-title">Friend List</h1>
-    <p class="fd-page-subtitle">Your friends on FastDeal, people to add, and requests waiting for you.</p>
+    <p class="fd-page-subtitle">Shop with friends. Add them by username, then buy together to split the shipping.</p>
 
     <div class="friend-tabs" role="tablist" aria-label="Friends">
       <button
@@ -550,7 +550,7 @@ function initials(f) {
 
     <!-- Sticks to the bottom of the screen while scrolling, like the Wishlist's total bar. -->
     <div class="friend-bar">
-      <p class="friend-bar-count" aria-live="polite">{{ barText }}</p>
+      <p v-if="barText" class="friend-bar-count" aria-live="polite">{{ barText }}</p>
     </div>
   </div>
 </template>
@@ -616,10 +616,9 @@ function initials(f) {
 
 /* Folder tabs: Friends, Add Friend, Requests. No strip behind them: the others sit on the page,
    and the open one is a raised paper tab joined to the card below it, with a short blue line
-   under its label. */
+   under its label. No extra top margin: the subtitle's own 1rem gap, like Wishlist and Trending. */
 .friend-tabs {
   display: flex;
-  margin-top: 1.5rem;
 }
 
 .friend-tab {
