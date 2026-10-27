@@ -69,14 +69,15 @@ const year = new Date().getFullYear()
 .fd-footer-logo {
   display: flex;
   width: fit-content;
-  font-size: 2rem;
+  /* Anton level 3, same as the navbar logo. */
+  font-size: var(--fd-section-title);
   line-height: 1;
   text-decoration: none;
 }
 
 .fd-footer-tagline {
   margin: 0.75rem 0 1.25rem;
-  font-size: 1.0625rem;
+  font-size: var(--fd-body);
 }
 
 .fd-footer-course {

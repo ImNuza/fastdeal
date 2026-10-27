@@ -457,7 +457,7 @@ onBeforeUnmount(function () {
           <router-link class="fd-week-link" :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
             <div class="card h-100 fd-week-card" style="padding: 1.25rem; border-radius: 1rem;">
               <img :src="item.image"  class="card-img-top" style="display: block; width: 100%; height: 170px; padding: 1.25rem; object-fit: contain; border-radius: 0.75rem; background: var(--fd-white); margin-bottom: 1.25rem;">
-              <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">{{ itemName(item.query) }}</h5>
+              <h5 class="card-title" style="margin: 0; font-size: var(--fd-body); font-weight: 600; line-height: 1.3;">{{ itemName(item.query) }}</h5>
             </div>
           </router-link>
         </div>
@@ -581,7 +581,7 @@ onBeforeUnmount(function () {
 
 .fd-slide-name {
   color: var(--fd-text);
-  font-size: 1rem;
+  font-size: var(--fd-body);
   font-weight: 600;
   line-height: 1.3;
 }
@@ -714,6 +714,7 @@ onBeforeUnmount(function () {
   stroke-width: 1.5;
 }
 
+/* Same size as "The team" heading in the footer: the section title size. */
 .fd-value-title {
   margin-bottom: 0.25rem;
   color: var(--fd-beige);
@@ -745,17 +746,17 @@ onBeforeUnmount(function () {
   background: var(--fd-vanilla);
   color: var(--fd-ink);
   font-family: var(--fd-font-body);
-  font-size: 0.75rem;
+  font-size: var(--fd-small);
   font-weight: 700;
   letter-spacing: 0.04em;
   vertical-align: middle;
 }
 
-/* Same size as the hero paragraph: both are the page subtitle size. */
+/* Same size as the hero paragraph: both are body size. */
 .fd-value-text {
   margin: 0;
   color: color-mix(in srgb, var(--fd-beige) 85%, transparent);
-  font-size: var(--fd-page-subtitle);
+  font-size: var(--fd-body);
 }
 
 .fd-landing {
@@ -828,11 +829,12 @@ onBeforeUnmount(function () {
   color: var(--fd-text);
 }
 
+/* Same size as the team member names in the footer: body size. */
 .fd-hero-text {
   max-width: 32rem;
   margin-bottom: 2rem;
   color: var(--fd-text-muted);
-  font-size: var(--fd-page-subtitle);
+  font-size: var(--fd-body);
   line-height: 1.6;
 }
 
@@ -929,7 +931,8 @@ onBeforeUnmount(function () {
   margin-bottom: 0.125rem;
   color: var(--fd-blue);
   font-family: var(--fd-font-display);
-  font-size: 2rem;
+  /* Anton level 3: section title size. */
+  font-size: var(--fd-section-title);
   line-height: 1.1;
 }
 
@@ -1005,14 +1008,14 @@ onBeforeUnmount(function () {
 .fd-chart-axis {
   fill: var(--fd-text-muted);
   font-family: var(--fd-font-body);
-  font-size: 12px;
+  font-size: var(--fd-small);
 }
 
 /* The first and last price, written on the line so the graph reads without hovering. */
 .fd-chart-value {
   fill: var(--fd-blue);
   font-family: var(--fd-font-body);
-  font-size: 12px;
+  font-size: var(--fd-small);
   font-weight: 700;
 }
 
@@ -1067,7 +1070,8 @@ onBeforeUnmount(function () {
   margin-bottom: 0.25rem;
   color: var(--fd-blue);
   font-family: var(--fd-font-display);
-  font-size: 3.5rem;
+  /* Anton level 2: page title size. */
+  font-size: var(--fd-page-title);
   line-height: 1;
 }
 
@@ -1109,7 +1113,7 @@ onBeforeUnmount(function () {
   border-radius: 999px;
   background: var(--fd-vanilla);
   color: var(--fd-ink);
-  font-size: 0.75rem;
+  font-size: var(--fd-small);
   font-weight: 700;
 }
 

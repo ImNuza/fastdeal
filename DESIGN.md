@@ -25,6 +25,7 @@ How FastDeal looks and how to keep it consistent when you add or change a page. 
 | `src/components/FdLogo.vue` | The FastDeal logo. |
 | `src/components/FdIcon.vue` | Line icons for the navbar and the search bar. |
 | `src/components/FdSearchBar.vue` | The search bar with recent searches, suggestions, and Search by photo. Full size in the Home hero; `compact` in the navbar on every other page. |
+| `src/components/FdBreadcrumbs.vue` | The trail above a page title, body size: "FastDeal / Sony WH-1000XM5" on Compare, "FastDeal / Sony WH-1000XM5 / Shopee" on a product (the last item is the store the shopper clicked on Compare, or the product title without one). Every item but the last is a link. |
 | `src/services/searchHistory.js` | A guest's last 5 searches, kept in the browser. Logged-in users get theirs from their account instead. |
 | `src/services/itemName.js` | Shows a search term as a product name: "samsung galaxy s25" becomes "Samsung Galaxy S25". Use it wherever a search term is shown. |
 | `src/components/FdFooter.vue` | The footer on every page. |
@@ -42,7 +43,7 @@ How FastDeal looks and how to keep it consistent when you add or change a page. 
 | Blue dark | `--fd-blue-dark` | `#1d3f6e` | Hover state of blue buttons, footer background, tooltips |
 | Beige | `--fd-beige` | `#f4ede3` | Page background, text on blue |
 | Paper | `--fd-paper` | `#fbf8f3` | Cards, tables, inputs, the welcome prompt, the Home search bar and its suggestions |
-| White | `--fd-white` | `#ffffff` | Only behind product photos (they come with white backgrounds), so the photo and its frame match |
+| White | `--fd-white` | `#ffffff` | Only behind product photos (they come with white backgrounds), so the photo and its frame match. Every product photo uses `object-fit: contain` with a little padding, so it always shows whole and is never cropped |
 | Vanilla (accent) | `--fd-vanilla` | `#fae8a4` | Highlights: "DEAL" and speed lines in the logo, active nav underline, the stripe behind "SMARTER" on Home, footer headings, the search bar focus ring |
 | Vanilla soft | `--fd-vanilla-soft` | `#fcf2cc` | Table headers, chart area fill, neutral alerts, the highlighted search suggestion |
 | Vanilla line | `--fd-vanilla-line` | `#e8d9ad` | Borders on cards, tables, inputs, and alerts |
@@ -91,12 +92,12 @@ Base size is 16px.
 | Level | Use it for | Size (phone / 768px and up) | Font | Colour | Class |
 |---|---|---|---|---|---|
 | Page title | One per page: "Log in", "Trending", "Wishlist" | 36px / 48px | Anton | Blue | `<h1 class="fd-page-title">` |
-| Page subtitle | The line under the page title | 18px | DM Sans 400 | Muted | `<p class="fd-page-subtitle">` |
+| Page subtitle | The line under the page title | 17px (body size) | DM Sans 400 | Muted | `<p class="fd-page-subtitle">` |
 | Section title | Blocks inside a page: "Price history" | 24px / 28px | Anton | Blue | `<h2 class="fd-section-title">` |
-| Section subtitle | Card titles, product names | 18px | DM Sans 700 | Blue | `<h3 class="fd-section-subtitle">` |
+| Section subtitle | Card titles, product names | 17px (body size) | DM Sans 700 | Blue | `<h3 class="fd-section-subtitle">` |
 | Eyebrow | Small capitals above a heading: "Welcome to FastDeal" | 14px | DM Sans 700, uppercase | Blue (Ink in the Home hero) | `<p class="fd-eyebrow">` |
 | Table header | Column headings in every `table` and the Wishlist header pill (and the column labels inside Wishlist cards on smaller screens). Same size as button text | 14px | DM Sans 700, uppercase | Ink (beige on the blue Wishlist pill) | no class needed |
-| Body | Paragraphs, table cells, inputs | 16px | DM Sans 400 | Ink | no class needed |
+| Body | Paragraphs, table cells, inputs, card names, the footer tagline | 17px | DM Sans 400 | Ink | no class needed |
 | Button | Text on every button, 48px tall (36px with `btn-sm`) | 14px, `btn-sm` too | DM Sans 700 | per button | `btn ...` |
 | Small / caption | Hints, timestamps, form labels | 14px | DM Sans 400 | Muted | `class="small text-secondary"` |
 
@@ -104,10 +105,10 @@ The size variables behind this table (in `tokens.css`):
 
 ```css
 --fd-page-title: 2.25rem;      /* 3rem from 768px */
---fd-page-subtitle: 1.125rem;
+--fd-page-subtitle: var(--fd-body);
 --fd-section-title: 1.5rem;    /* 1.75rem from 768px */
---fd-section-subtitle: 1.125rem;
---fd-body: 1rem;
+--fd-section-subtitle: var(--fd-body);
+--fd-body: 1.0625rem;  /* 17px */
 --fd-small: 0.875rem;
 --fd-eyebrow: 0.875rem;
 --fd-table-header: 0.875rem;
@@ -115,12 +116,12 @@ The size variables behind this table (in `tokens.css`):
 --fd-button-sm: 0.875rem;
 ```
 
-On Home, two things sit outside this table: the hero headline (`.fd-display`, Anton, blue, 48px growing to 84px on wide screens) and the big analytics numbers on the hero cards (32px and 56px, blue). On the blue values band, titles and text are beige instead of blue or ink.
+Every page follows these two rules. Bootstrap's `.small`, `.badge`, inputs, and input add-ons are pinned to them in `app.css`, and big numbers (prices, stats, the Sleep on it timer, verdict amounts) are Anton at a title size, never large DM Sans. Avatar initials are DM Sans, because the smallest Anton size does not fit their circles. Anton has only three sizes anywhere: the Home hero headline (`.fd-display`, 48px growing to 84px on wide screens), the page title size, and the section title size. Everything else in Anton uses one of the two title sizes: the "You save" amount is page title size; the hero graph's price, the values band titles, the footer "The team", and both logos (navbar and footer) are section title size. On the blue values band, titles and text are beige instead of blue or ink.
 
 ### Type rules
 
 - One `<h1>` per page, and do not skip levels (h1, then h2, then h3). To make a heading look smaller, change its class, not its tag.
-- Nothing smaller than 14px. Form inputs stay at 16px so phones do not zoom in when tapped.
+- DM Sans has two sizes only: body (17px) for normal text and small (14px) for everything secondary: captions, labels, tags, chart text, the eyebrow (which is the small size in capitals). Nothing smaller than 14px; inputs are body size, so phones do not zoom in when tapped.
 - Muted text is only for subtitles and captions. Titles use blue, body text uses ink.
 
 ## Shape
@@ -165,7 +166,7 @@ Use at most one main-action button in each area. A minor option (like "Create an
 | Magnifier | `search` | Search button in the search bar |
 | Camera | `camera` | Search by photo in the search bar |
 | Clock | `clock` | Each recent search in the search bar's dropdown |
-| Chevron up / down | `chevron-up`, `chevron-down` | The arrows in the Sleep on it time picker |
+| Chevron up / down | `chevron-up`, `chevron-down` | The arrows in the Sleep on it time picker, and at each end of the Friend List scrollbar (always visible, a small brand-blue handle to drag, slightly wider than its beige track) |
 | Moon | `moon` | Sleep on it buttons in the Wishlist table, and Decide on the Home values band |
 | Sparkles | `sparkles` | Photo search (AI) on the Home values band |
 | Scales | `scale` | Compare on the Home values band |

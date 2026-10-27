@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import DealCheck from '../components/DealCheck.vue'
+import FdBreadcrumbs from '../components/FdBreadcrumbs.vue'
 import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
 import SaveSleepButtons from '../components/SaveSleepButtons.vue'
 import { sgd } from '../mock/catalog.js'
@@ -58,6 +59,17 @@ onMounted(async function () {
   }
   searchedWith.value = await fetchSearchedWith(product.value.q || route.query.q)
 })
+
+// FastDeal / the search (back to its results) / the store the shopper clicked on Compare.
+// Without a store (a shared link), the last item is the product itself.
+const breadcrumbs = computed(function () {
+  const items = [{ label: 'FastDeal', to: '/' }]
+  if (route.query.q) {
+    items.push({ label: itemName(route.query.q), to: { path: '/compare', query: { q: route.query.q } } })
+  }
+  items.push({ label: route.query.store || (product.value && product.value.title) || 'Product' })
+  return items
+})
 </script>
 
 <template>
@@ -71,8 +83,7 @@ onMounted(async function () {
   </div>
 
   <div v-else-if="product">
-    <router-link v-if="route.query.q" class="small" :to="{ path: '/compare', query: { q: route.query.q } }">
-      Back to results for "{{ itemName(route.query.q) }}"</router-link>
+    <FdBreadcrumbs :items="breadcrumbs" />
 
     <div class="row g-4 align-items-center mt-1 mb-3">
       <div v-if="product.image" class="col-md-3">
@@ -154,8 +165,8 @@ onMounted(async function () {
           <div class="col-6 col-md-4 col-lg-3" v-for="item in (showAll ? searchedWith : searchedWith.slice(0, 8))">
             <router-link :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
               <div class="card h-100" style="padding: 0.75rem; border-radius: 1rem;">
-                <img :src="item.image"  class="card-img-top" style="display: block; width: 100%; height: 150px; object-fit: contain; border-radius: 0.75rem; background: var(--fd-beige, #f3ede1); margin-bottom: 0.75rem;">
-                <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">{{ itemName(item.query) }}</h5>
+                <img :src="item.image"  class="card-img-top" style="display: block; width: 100%; height: 150px; padding: 1rem; object-fit: contain; border-radius: 0.75rem; background: var(--fd-white); margin-bottom: 0.75rem;">
+                <h5 class="card-title" style="margin: 0; font-size: var(--fd-body); font-weight: 600; line-height: 1.3;">{{ itemName(item.query) }}</h5>
               </div>
             </router-link>
           </div>
@@ -210,9 +221,11 @@ onMounted(async function () {
   display: block;
   width: 100%;
   max-height: 260px;
+  padding: 1rem;
   border-radius: 1rem;
+  /* White behind every product photo; the whole photo always shows. */
   object-fit: contain;
-  background: var(--fd-beige, #f3ede1);
+  background: var(--fd-white);
 }
 
 .fd-stars {

@@ -79,67 +79,6 @@ export function saveProduct(name, listing, product) {
   write(function () { return axios.post('/api/wishlist', body) })
 }
 
-// Sample wishlist for trying the page: a mix of price drops, reached targets, and items on hold.
-// The prices are invented, so the button only shows in development (npm run dev).
-const SAMPLE_WISHLIST = [
-  { name: 'Sony WH-1000XM5', savedPrice: 499, savedStore: 'Amazon.sg', targetPrice: 430, holdHours: 0 },
-  { name: 'Apple AirPods Pro 2', savedPrice: 319, savedStore: 'Shopee', targetPrice: 290, holdHours: 0 },
-  { name: 'Nintendo Switch OLED', savedPrice: 439, savedStore: 'Qoo10', targetPrice: 400, holdHours: 0 },
-  { name: 'Kindle Paperwhite', savedPrice: 199, savedStore: 'Shopee', targetPrice: 189, holdHours: 0 },
-  { name: 'Bose QuietComfort Ultra', savedPrice: 549, savedStore: 'Courts', targetPrice: 499, holdHours: 24 },
-  { name: 'Dyson V15 Detect', savedPrice: 1149, savedStore: 'Courts', targetPrice: 1050, holdHours: 0 },
-  { name: 'iPad Air (M2)', savedPrice: 859, savedStore: 'Amazon.sg', targetPrice: 799, holdHours: 3 },
-  { name: 'Samsung Galaxy Watch 7', savedPrice: 415, savedStore: 'Lazada', targetPrice: 399, holdHours: 0 }
-]
-
-export function missingSamples() {
-  if (!import.meta.env.DEV) {
-    return 0
-  }
-  return SAMPLE_WISHLIST.filter(function (item) {
-    return !findSaved(item.name)
-  }).length
-}
-
-// Adds whichever sample products are not already saved; products already saved are left alone.
-export function addSampleWishlist() {
-  if (!user.value) {
-    return
-  }
-  const now = Date.now()
-  SAMPLE_WISHLIST.forEach(function (sample, i) {
-    if (findSaved(sample.name)) {
-      return
-    }
-    const item = {
-      name: sample.name,
-      productKey: toProductKey(sample.name),
-      productId: null,
-      q: null,
-      image: null,
-      savedPrice: sample.savedPrice,
-      savedStore: sample.savedStore,
-      targetPrice: sample.targetPrice,
-      savedAt: now - (i + 1) * 86400000,
-      sleepUntil: sample.holdHours ? now + sample.holdHours * 3600000 : 0,
-      sleepPriceAtStart: sample.holdHours ? sample.savedPrice : null,
-      sleepVerdictSeen: false
-    }
-    user.value.wishlist.push(item)
-    write(function () {
-      return axios.post('/api/wishlist', {
-        name: item.name,
-        store: item.savedStore,
-        price: item.savedPrice,
-        targetPrice: item.targetPrice,
-        savedAt: item.savedAt,
-        sleepUntil: item.sleepUntil,
-        sleepPriceAtStart: item.sleepPriceAtStart
-      })
-    })
-  })
-}
-
 // The store a saved product was saved from, or '' if it is not saved or the store was not recorded.
 export function savedFrom(name, productId) {
   const saved = findSaved(name, productId)
