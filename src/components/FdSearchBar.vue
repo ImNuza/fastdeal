@@ -259,8 +259,10 @@ async function onPhoto(event) {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  min-height: var(--fd-control);
-  padding: 0.25rem 0.25rem 0.25rem 1.5rem;
+  min-height: var(--fd-search);
+  /* The right gap matches the bordered search bars (2px border plus 16px), so the icons sit
+     the same distance from the edge on every page. */
+  padding: 0.25rem calc(1rem + var(--fd-border)) 0.25rem 1.5rem;
   border-radius: 999px;
   background: var(--fd-paper);
   box-shadow: var(--fd-shadow);
@@ -290,8 +292,8 @@ async function onPhoto(event) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
   margin: 0;
   padding: 0;
   border: 0;

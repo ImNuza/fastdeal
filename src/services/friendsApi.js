@@ -14,6 +14,12 @@ export async function getIncomingRequests() {
   return data
 }
 
+// Returns requests I sent that are still pending (people I asked who have not answered yet).
+export async function getSentRequests() {
+  const { data } = await axios.get('/api/friends/sent')
+  return data
+}
+
 // Search for users by username (partial match). Each result includes the
 // friendship status between that user and me so the UI knows which button to show.
 export async function searchUsers(q) {

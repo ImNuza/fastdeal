@@ -871,10 +871,12 @@ onBeforeUnmount(function () {
     z-index: 1;
   }
 
+  /* Narrower than the space beside the graph, leaving a 1rem gap so the two never overlap
+     (the graph keeps its 59% and stays the big card). */
   .fd-card--stores {
     top: 0;
     right: 0;
-    width: 44%;
+    width: calc(41% - 1rem);
     z-index: 2;
   }
 

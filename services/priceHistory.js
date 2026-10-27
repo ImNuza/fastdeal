@@ -37,9 +37,10 @@ export function storePrices(listings) {
 }
 
 // Save today's price for each store. rows: [{ store, price, oldPrice, productId }].
+// source: 'search' or 'product', saved on the row so real prices can be told from seeded ones.
 // A store listed twice keeps its lowest price. Errors are logged, never thrown,
 // so a search never fails because of price history.
-export async function recordPrices(productKey, rows) {
+export async function recordPrices(productKey, rows, source) {
   const lowest = {}
   for (const row of rows) {
     if (!row.store || !(row.price > 0)) {
@@ -57,6 +58,7 @@ export async function recordPrices(productKey, rows) {
         filter: { productKey: productKey, store: row.store, day: day },
         update: {
           $min: { price: row.price },
+          $set: { source: source || null },
           $setOnInsert: { oldPrice: row.oldPrice || null, productId: row.productId || null }
         },
         upsert: true

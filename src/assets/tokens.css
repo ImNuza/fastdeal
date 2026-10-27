@@ -64,6 +64,9 @@
   /* Control heights: every button and search bar is one of these two */
   --fd-control: 3rem;
   --fd-control-sm: 2.25rem;
+  /* Full-size search bars (Home, Wishlist, Friends) and the sort box beside one: a little
+     shorter than a button. */
+  --fd-search: 2.75rem;
 
   /* Layout: fallback only, App.vue overwrites this with the measured navbar height */
   --fd-nav-height: 71px;
