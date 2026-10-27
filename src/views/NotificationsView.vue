@@ -6,6 +6,9 @@ const { user } = storeToRefs(useAuthStore())
 import { ref, nextTick, onMounted } from 'vue'
 import axios from 'axios'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
+import FdTelegramPrompt from '../components/FdTelegramPrompt.vue'
+
+const showTelegramPrompt = ref(false)
 
 const router = useRouter()
 const notifications = ref([])
@@ -68,6 +71,10 @@ function isGroupInvite(n) { return n.type === 'group-invite' }
 
 // Initiator opens checklist popup
 async function openBuyTogether(n) {
+  if (!user.value.telegramUsername) {
+    showTelegramPrompt.value = true
+    return
+  }
   buyItem.value = n
   buyFriends.value = []
   buyError.value = ''
@@ -229,6 +236,8 @@ onMounted(load)
         </div>
       </div>
     </div>
+
+    <FdTelegramPrompt v-if="showTelegramPrompt" @close="showTelegramPrompt = false" />
 
     <!-- Popup A: initiator picks friends to invite -->
     <div v-if="buyItem" class="fd-entry-backdrop" @click.self="closeBuyTogether" @keydown.esc="closeBuyTogether">

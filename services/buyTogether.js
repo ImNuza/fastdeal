@@ -46,3 +46,47 @@ export async function notifyBuyTogether(myUid, productName) {
     productKey
   })
 }
+
+// For my whole wishlist at once: which accepted friends saved the same products.
+// Returns { [productKey]: [{ firebaseUid, username }] }. Products no friend saved are left out.
+export async function findFriendOverlap(myUid) {
+  const mine = await WishlistItem.find({ firebaseUid: myUid }).select('productKey')
+  if (!mine.length) return {}
+
+  const rows = await Friendship.find({
+    $or: [{ requesterUid: myUid }, { addresseeUid: myUid }],
+    status: 'accepted'
+  })
+  const friendUids = rows.map(function (row) {
+    return row.requesterUid === myUid ? row.addresseeUid : row.requesterUid
+  })
+  if (!friendUids.length) return {}
+
+  const saved = await WishlistItem.find({
+    firebaseUid: { $in: friendUids },
+    productKey: { $in: mine.map(function (item) { return item.productKey }) }
+  }).select('firebaseUid productKey')
+  if (!saved.length) return {}
+
+  const users = await User.find({ firebaseUid: { $in: friendUids } }).select('-_id firebaseUid username')
+  const nameOf = {}
+  for (const user of users) nameOf[user.firebaseUid] = user.username
+
+  const sent = await Notification.find({
+    fromUid: myUid,
+    type: 'group-invite',
+    productKey: { $in: saved.map(function (item) { return item.productKey }) }
+  }).select('firebaseUid productKey')
+  const invited = new Set(sent.map(function (n) { return n.firebaseUid + ':' + n.productKey }))
+
+  const overlap = {}
+  for (const item of saved) {
+    if (!overlap[item.productKey]) overlap[item.productKey] = []
+    overlap[item.productKey].push({
+      firebaseUid: item.firebaseUid,
+      username: nameOf[item.firebaseUid] || '',
+      invited: invited.has(item.firebaseUid + ':' + item.productKey)
+    })
+  }
+  return overlap
+}

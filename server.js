@@ -22,7 +22,7 @@ import { error } from 'console'
 import Notification from './models/notification-model.js'
 import WishlistItem from './models/wishlist-item-model.js'
 import { getProduct } from './services/productService.js'
-import { findBuyTogetherFriends, notifyBuyTogether } from './services/buyTogether.js'
+import { findBuyTogetherFriends, findFriendOverlap, notifyBuyTogether } from './services/buyTogether.js'
 import { checkTargetPrice } from './services/targetPriceEmail.js'
 
 
@@ -694,14 +694,21 @@ app.post('/api/buy-together/invite', requireUser, async (req, res) => {
     return res.status(400).json({ error: 'friendUids and productKey required' })
   }
   try {
-    const me = await User.findOne({ firebaseUid: myUid }).select('username')
+    const me = await User.findOne({ firebaseUid: myUid }).select('username telegramUsername')
     if (!me) return res.status(404).json({ error: 'User not found' })
+    if (!me.telegramUsername) {
+      return res.status(400).json({ error: 'Please set your Telegram ID first before Buy Together.' })
+    }
     const myItem = await WishlistItem.findOne({ firebaseUid: myUid, productKey }).select('productName')
     const productName = myItem?.productName || productKey
 
     const pairKeys = friendUids.map(uid => toPairKey(myUid, uid))
     const validFriendships = await Friendship.find({ pairKey: { $in: pairKeys }, status: 'accepted' })
     const validUids = new Set(validFriendships.map(f => f.requesterUid === myUid ? f.addresseeUid : f.requesterUid))
+
+    // Skip friends I already invited for this product, so pressing twice never sends twice.
+    const already = await Notification.find({ fromUid: myUid, type: 'group-invite', productKey }).select('firebaseUid')
+    for (const n of already) validUids.delete(n.firebaseUid)
 
     const notifs = [...validUids].map(uid => ({
       firebaseUid: uid,
@@ -770,6 +777,15 @@ app.get('/api/wishlist', requireUser, async (req, res) => {
   try {
     const rows = await WishlistItem.find({ firebaseUid: req.uid }).sort({ savedAt: 1 })
     res.json(rows.map(toWishItem))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Friends who saved the same products as me, for the friend count on each wishlist row.
+app.get('/api/wishlist/friends', requireUser, async (req, res) => {
+  try {
+    res.json(await findFriendOverlap(req.uid))
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

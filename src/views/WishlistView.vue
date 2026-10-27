@@ -6,14 +6,40 @@ import { productImage, sgd, storeLink } from '../mock/catalog.js'
 import { isAsleep, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user } from '../mock/session.js'
 import FdIcon from '../components/FdIcon.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
+import FdTelegramPrompt from '../components/FdTelegramPrompt.vue'
 import { planBudget } from '../mock/budget.js'
 import axios from 'axios'
+import { storeToRefs } from 'pinia'
+import { useWishlistStore } from '../store/wishlist.js'
 
 const router = useRouter()
 const route = useRoute()
 
 if (!user.value) {
   router.replace('/login?next=/wishlist')
+}
+
+// Friends who saved the same product, and the Buy Together pop-up. Both live in the wishlist store.
+const wishlistStore = useWishlistStore()
+const { buyItem, selected, inviting, inviteSent, error: buyError } = storeToRefs(wishlistStore)
+const { fetchFriendOverlap, friendsFor, allInvited, openBuyTogether, closeBuyTogether, sendInvites } = wishlistStore
+
+watch(
+  () => user.value?.wishlist?.map(item => item.productKey).join('|') ?? '',
+  function () {
+    if (user.value) fetchFriendOverlap()
+  },
+  { immediate: true }
+)
+
+const showTelegramPrompt = ref(false)
+
+function onBuyTogether(item) {
+  if (!user.value.telegramUsername) {
+    showTelegramPrompt.value = true
+    return
+  }
+  openBuyTogether(item)
 }
 
 // Products saved from a product page open it again. Older items open a search for the name.
@@ -820,6 +846,16 @@ function cheapestPlannable() {
 
                   <!-- Moon and trash buttons -->
                   <div class="fd-wish-actions">
+                    <div v-if="friendsFor(item.productKey).length" class="fd-friends-wrap">
+                      <button class="fd-friends-btn" type="button" :disabled="allInvited(item.productKey)"
+                        :aria-label="friendsFor(item.productKey).length + ' friends saved ' + item.name + '. Buy together'"
+                        title="Friends who saved this. Buy together" @click="onBuyTogether(item)">
+                        <FdIcon name="friends" />
+                        <span>+{{ friendsFor(item.productKey).length }}</span>
+                      </button>
+                      <span v-if="allInvited(item.productKey)" class="fd-sent">Sent!</span>
+                    </div>
+
                     <button class="btn btn-outline-dark btn-sm fd-icon-btn" type="button"
                       :aria-label="'Sleep on ' + item.name" title="Sleep on it" @click="openSleep(item, $event)">
                       <FdIcon name="moon" />
@@ -931,6 +967,44 @@ function cheapestPlannable() {
       </section>
 
       <button class="btn btn-outline-dark fd-btn-lg w-100 mt-2" type="button" @click="closeBudget">Close</button>
+    </section>
+  </div>
+
+  <FdTelegramPrompt v-if="showTelegramPrompt" @close="showTelegramPrompt = false" />
+
+  <!-- Buy Together pop-up: same as the one on the Notifications page -->
+  <div v-if="buyItem" class="fd-entry-backdrop" @click.self="closeBuyTogether" @keydown.esc="closeBuyTogether">
+    <section class="fd-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-buy-title">
+      <h2 id="fd-buy-title" class="fd-page-title">Buy together</h2>
+      <p class="fd-entry-description">Select the friends you want to invite. They'll get a notification and can reach
+        out to you.</p>
+
+      <p v-if="buyError" class="alert alert-danger" role="alert">{{ buyError }}</p>
+
+      <ul class="list-unstyled text-start mb-4">
+        <li v-for="f in friendsFor(buyItem.productKey)" :key="f.firebaseUid"
+          class="d-flex align-items-center gap-3 py-2 border-bottom">
+          <input :id="'chk-' + f.firebaseUid" v-model="selected" type="checkbox" class="form-check-input mt-0 flex-shrink-0"
+            :value="f.firebaseUid" :disabled="f.invited" />
+          <label :for="'chk-' + f.firebaseUid" class="mb-0 flex-grow-1" style="cursor: pointer;">
+            <span class="fw-bold" style="font-family: var(--fd-font-display); letter-spacing: 0.04em;">{{
+              f.username.toUpperCase() }}</span>
+          </label>
+          <span v-if="f.invited" class="small text-secondary">Sent!</span>
+        </li>
+      </ul>
+
+      <div v-if="inviteSent" class="alert alert-success mb-3">Invites sent!</div>
+
+      <div class="fd-entry-actions">
+        <button v-if="!inviteSent" class="btn btn-dark" type="button" :disabled="inviting || !selected.length"
+          @click="sendInvites">
+          {{ inviting ? 'Sending…' : 'Send Invites' }}
+        </button>
+        <button class="btn btn-outline-dark" type="button" @click="closeBuyTogether">
+          {{ inviteSent ? 'Done' : 'Cancel' }}
+        </button>
+      </div>
     </section>
   </div>
 
@@ -1472,6 +1546,48 @@ function cheapestPlannable() {
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
+}
+
+.fd-friends-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.fd-sent {
+  color: #187447;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.fd-friends-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Friend count beside the moon button: profile icon with "+N" */
+.fd-friends-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border: var(--fd-border) solid var(--fd-blue);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fd-blue);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fd-friends-btn .fd-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.fd-friends-btn:hover {
+  background: var(--fd-vanilla-soft);
 }
 
 /* Right-align the verdict text */
