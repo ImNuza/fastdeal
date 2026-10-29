@@ -6,6 +6,9 @@ const { user } = storeToRefs(useAuthStore())
 import { ref, nextTick, onMounted } from 'vue'
 import axios from 'axios'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
+import FdTelegramPrompt from '../components/FdTelegramPrompt.vue'
+
+const showTelegramPrompt = ref(false)
 
 const router = useRouter()
 const notifications = ref([])
@@ -68,6 +71,10 @@ function isGroupInvite(n) { return n.type === 'group-invite' }
 
 // Initiator opens checklist popup
 async function openBuyTogether(n) {
+  if (!user.value.telegramUsername) {
+    showTelegramPrompt.value = true
+    return
+  }
   buyItem.value = n
   buyFriends.value = []
   buyError.value = ''
@@ -136,14 +143,14 @@ onMounted(load)
 
 <template>
   <div v-if="user">
-    <div class="d-flex justify-content-between gap-3">
-      <h1 class="fd-section-title m-0">Notifications</h1>
+    <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+      <h1 class="fd-page-title" style="margin: 0;">Notifications</h1>
       <button class="btn btn-sm btn-outline-dark" type="button" @click="markAllRead">Mark all as read</button>
     </div>
 
     <!-- Unread -->
     <div>
-      <h2 class="fd-section-subtitle">Unread</h2>
+      <h2 class="fd-section-title">Unread</h2>
       <div class="row g-3">
         <div class="col-12" v-for="n in unread" :key="n._id">
 
@@ -195,7 +202,7 @@ onMounted(load)
 
     <!-- Read -->
     <div>
-      <h2 class="fd-section-subtitle">Read</h2>
+      <h2 class="fd-section-title">Read</h2>
       <div class="row g-3">
         <div class="col-12" v-for="n in read" :key="n._id">
           <div v-if="isBuyTogether(n)" class="card h-100 fd-item">
@@ -229,6 +236,8 @@ onMounted(load)
         </div>
       </div>
     </div>
+
+    <FdTelegramPrompt v-if="showTelegramPrompt" @close="showTelegramPrompt = false" />
 
     <!-- Popup A: initiator picks friends to invite -->
     <div v-if="buyItem" class="fd-entry-backdrop" @click.self="closeBuyTogether" @keydown.esc="closeBuyTogether">
@@ -280,7 +289,7 @@ onMounted(load)
         <p v-else-if="inviterError" class="alert alert-danger" role="alert">{{ inviterError }}</p>
 
         <div v-else-if="inviterProfile" class="d-flex align-items-center justify-content-between gap-3 py-3 mb-4 border-bottom border-top">
-          <span class="fw-bold" style="font-family: var(--fd-font-display); letter-spacing: 0.04em; font-size: 1.1rem;">
+          <span class="fw-bold" style="font-family: var(--fd-font-display); letter-spacing: 0.04em; font-size: var(--fd-section-title);">
             {{ inviterProfile.username.toUpperCase() }}
           </span>
           <a v-if="inviterProfile.telegramUsername"

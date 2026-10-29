@@ -14,12 +14,15 @@ import Friendship from './models/friendship-model.js'
 import { toPairKey } from './models/pair-key.js'
 import { search,identifyImage } from './models/shoppingapimodel.js'
 import SearchLog from './models/search-log-model.js'
+import SearchCache from './models/search-cache-model.js'
+import PriceDay from './models/price-day-model.js'
+import { storePrices, sgDay } from './services/priceHistory.js'
 import { toProductKey } from './models/product-key.js'
 import { error } from 'console'
 import Notification from './models/notification-model.js'
 import WishlistItem from './models/wishlist-item-model.js'
 import { getProduct } from './services/productService.js'
-import { findBuyTogetherFriends, notifyBuyTogether } from './services/buyTogether.js'
+import { findBuyTogetherFriends, findFriendOverlap, notifyBuyTogether } from './services/buyTogether.js'
 import { checkTargetPrice } from './services/targetPriceEmail.js'
 
 
@@ -255,6 +258,23 @@ app.get('/api/friends/requests', requireUser, async (req, res) => {
 })
 
 // Send a friend request
+// Requests I sent that are still waiting for an answer, for the "Sent by you" list on Friends.
+app.get('/api/friends/sent', requireUser, async (req, res) => {
+  const myUid = req.uid
+  try {
+    const rows = await Friendship.find({ requesterUid: myUid, status: 'pending' })
+    const users = await User.find({ firebaseUid: { $in: rows.map(r => r.addresseeUid) } }).select('firebaseUid username')
+    const uMap = {}
+    for (const u of users) uMap[u.firebaseUid] = u
+    res.json(rows.map(r => {
+      const u = uMap[r.addresseeUid] || {}
+      return { pairKey: r.pairKey, firebaseUid: r.addresseeUid, username: u.username }
+    }))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.post('/api/friends/request', requireUser, async (req, res) => {
   const myUid = req.uid
   const addresseeUid = text(req.body.addresseeUid)
@@ -276,7 +296,7 @@ app.post('/api/friends/request', requireUser, async (req, res) => {
       type: 'friend-request',
       title: 'New friend request',
       body: (me?.username || 'Someone') + ' sent you a friend request.',
-      link: '/friends',
+      link: '/friends?tab=requests',
       fromUid: myUid
     })
 
@@ -296,18 +316,7 @@ app.put('/api/friends/:pairKey/accept', requireUser, async (req, res) => {
       { new: true }
     )
     if (!f) return res.status(404).json({ error: 'Request not found' })
-
-    //notification sending
-    const me = await User.findOne({ firebaseUid: myUid }).select('username')
-    await Notification.create({
-      firebaseUid: f.requesterUid,
-      type: 'friend-accepted',
-      title: 'Friend request accepted',
-      body: (me?.username || 'Someone') + ' accepted your friend request.',
-      link: '/friends',
-      fromUid: myUid
-    })
-
+    // No notification back to the sender: only new requests notify, answers do not.
     res.json(f)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -399,6 +408,24 @@ app.post('/api/me/recent-searches', requireUser, async (req, res) => {
   }
 })
 
+// Remove one search from the logged-in user's list: the x beside it in the search dropdown.
+// Matches the query exactly as the dropdown shows it. The user is taken from the token.
+app.delete('/api/me/recent-searches', requireUser, async (req, res) => {
+  const query = text(req.query.query)
+  if (!query) return res.status(400).json({ error: 'query required' })
+  try {
+    const updated = await User.findOneAndUpdate(
+      { firebaseUid: req.uid },
+      { $pull: { recentSearches: { query } } },
+      { new: true }
+    ).select('recentSearches')
+    if (!updated) return res.status(404).json({ error: 'User not found' })
+    res.json({ recentSearches: updated.recentSearches })
+  } catch (err) {
+    res.status(500).json({ error: String((err && err.message) || err) })
+  }
+})
+
 app.post('/api/identify-image', upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'photo required' })
@@ -425,8 +452,10 @@ async function topSince(since) {
   return SearchLog.aggregate([
     { $match: { searchedAt: { $gte: since } } },
     { $sort: { searchedAt: -1 } },
+    // Group by the product name the shopping API returned, not the words typed, so
+    // "pooh" and "winnie the pooh" (both "Winnie the Pooh") count as one product.
     { $group: {
-        _id: '$productKey',
+        _id: { $toLower: { $trim: { input: { $ifNull: ['$productName', '$productKey'] } } } },
         query: { $first: '$productName' },
         image: { $first: '$image' },
         count: { $sum: 1 }
@@ -435,6 +464,68 @@ async function topSince(since) {
     { $limit: 13 }
   ])
 }
+
+// Home hero stats, all from live data: what real people searched this week (seeded
+// searchLogs rows, sessionId "seed-...", are left out) joined with the store prices the
+// shopping API returned for those searches (searchCache).
+// product: the top trending product with its price at each store, for the hero graph,
+//          "You save", and "Extra you'd pay", plus its tracked price history: the lowest
+//          price on each of the last 14 days (priceDays, written by every fresh search).
+// Prices only count between half and double the median (storePrices), so accessories in
+// the results do not skew them.
+app.get('/api/home-stats', async (req, res) => {
+  try {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 3600000)
+    const trending = await SearchLog.aggregate([
+      { $match: { searchedAt: { $gte: weekAgo }, sessionId: { $not: /^seed-/ } } },
+      { $group: { _id: '$productKey', name: { $first: '$productName' }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 30 }
+    ])
+    const caches = await SearchCache.find({
+      queryKey: { $in: trending.map(function (t) { return t._id }) },
+      expiresAt: { $gt: new Date() }
+    }).lean()
+    const cacheByKey = {}
+    for (const c of caches) cacheByKey[c.queryKey] = c
+
+    // The first trending product with prices from at least two stores.
+    const products = []
+    for (const t of trending) {
+      const cache = cacheByKey[t._id]
+      if (!cache) continue
+      const stores = storePrices(cache.listings || [])
+      if (stores.length < 2) continue
+      products.push({ key: t._id, name: cache.searchTerm || t.name || t._id, stores: stores, fetchedAt: cache.fetchedAt })
+      break
+    }
+
+    const top = products[0] || null
+    if (!top) return res.json({ product: null })
+
+    const since = sgDay(Date.now() - 13 * 24 * 3600000)
+    const history = await PriceDay.aggregate([
+      // Real prices only: seeded rows have no source and are left out.
+      { $match: { productKey: top.key, day: { $gte: since }, source: { $in: ['search', 'product'] } } },
+      { $group: { _id: '$day', price: { $min: '$price' } } },
+      { $sort: { _id: 1 } }
+    ])
+    // The current store prices count as a point too, on the day they were fetched.
+    const points = {}
+    for (const d of history) points[d._id] = d.price
+    const fetchedDay = sgDay(new Date(top.fetchedAt).getTime())
+    points[fetchedDay] = Math.min(points[fetchedDay] || Infinity, top.stores[0].price)
+    res.json({
+      product: {
+        name: top.name,
+        stores: top.stores,
+        history: Object.keys(points).sort().map(function (day) { return { day: day, price: points[day] } })
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load home stats' })
+  }
+})
 
 //retrieve data for trending page
 app.get('/api/trending' , async (req,res) =>{
@@ -454,6 +545,24 @@ app.get('/api/trending' , async (req,res) =>{
     res.status(500).json({ error: 'Failed to load trending' })
   }
 
+})
+
+// Lowest price on each of the last 14 days for one searched product (priceDays, written by every fresh search).
+app.get('/api/price-history', async (req, res) => {
+  const key = toProductKey(text(req.query.key))
+  if (!key) return res.status(400).json({ error: 'key required' })
+  try {
+    const since = sgDay(Date.now() - 13 * 24 * 3600000)
+    const days = await PriceDay.aggregate([
+      // Real prices only: seeded rows have no source and are left out.
+      { $match: { productKey: key, day: { $gte: since }, source: { $in: ['search', 'product'] } } },
+      { $group: { _id: '$day', price: { $min: '$price' } } },
+      { $sort: { _id: 1 } }
+    ])
+    res.json(days.map(function (d) { return { day: d._id, price: d.price } }))
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load price history' })
+  }
 })
 
 //search with feature
@@ -611,14 +720,21 @@ app.post('/api/buy-together/invite', requireUser, async (req, res) => {
     return res.status(400).json({ error: 'friendUids and productKey required' })
   }
   try {
-    const me = await User.findOne({ firebaseUid: myUid }).select('username')
+    const me = await User.findOne({ firebaseUid: myUid }).select('username telegramUsername')
     if (!me) return res.status(404).json({ error: 'User not found' })
+    if (!me.telegramUsername) {
+      return res.status(400).json({ error: 'Please set your Telegram ID first before Buy Together.' })
+    }
     const myItem = await WishlistItem.findOne({ firebaseUid: myUid, productKey }).select('productName')
     const productName = myItem?.productName || productKey
 
     const pairKeys = friendUids.map(uid => toPairKey(myUid, uid))
     const validFriendships = await Friendship.find({ pairKey: { $in: pairKeys }, status: 'accepted' })
     const validUids = new Set(validFriendships.map(f => f.requesterUid === myUid ? f.addresseeUid : f.requesterUid))
+
+    // Skip friends I already invited for this product, so pressing twice never sends twice.
+    const already = await Notification.find({ fromUid: myUid, type: 'group-invite', productKey }).select('firebaseUid')
+    for (const n of already) validUids.delete(n.firebaseUid)
 
     const notifs = [...validUids].map(uid => ({
       firebaseUid: uid,
@@ -687,6 +803,15 @@ app.get('/api/wishlist', requireUser, async (req, res) => {
   try {
     const rows = await WishlistItem.find({ firebaseUid: req.uid }).sort({ savedAt: 1 })
     res.json(rows.map(toWishItem))
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Friends who saved the same products as me, for the friend count on each wishlist row.
+app.get('/api/wishlist/friends', requireUser, async (req, res) => {
+  try {
+    res.json(await findFriendOverlap(req.uid))
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

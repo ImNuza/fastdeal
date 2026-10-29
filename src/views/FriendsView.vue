@@ -1,12 +1,13 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth.js'
 import { storeToRefs } from 'pinia'
 const { user, firebaseUser, authReady } = storeToRefs(useAuthStore())
 import {
   getFriends,
   getIncomingRequests,
+  getSentRequests,
   searchUsers,
   sendRequest,
   acceptRequest,
@@ -16,6 +17,7 @@ import FdIcon from '../components/FdIcon.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 // Wait for Firebase to finish restoring session before deciding to redirect.
 // Immediate: true means this runs right away AND again when authReady flips to true.
@@ -25,7 +27,33 @@ watch(authReady, (ready) => {
 
 const friends = ref([])
 const requests = ref([])
+// Requests I sent that have not been answered yet, shown as Pending under Requests.
+const sent = ref([])
 const searchQuery = ref('')
+
+// Filters the Friend List as you type, like the Wishlist search: a friend shows when the
+// typed text appears in their username or email, ignoring capitals.
+const friendQuery = ref('')
+const shownFriends = computed(function () {
+  const words = friendQuery.value.trim().toLowerCase()
+  if (!words) {
+    return friends.value
+  }
+  return friends.value.filter(function (f) {
+    return (f.username || '').toLowerCase().includes(words) || (f.email || '').toLowerCase().includes(words)
+  })
+})
+
+// The count under the list, worded like the Wishlist's: "Total: 5 friends", or
+// "2 of 5 friends shown" while searching.
+const friendCount = computed(function () {
+  const total = friends.value.length
+  const noun = total === 1 ? 'friend' : 'friends'
+  if (friendQuery.value.trim()) {
+    return shownFriends.value.length + ' of ' + total + ' ' + noun + ' shown'
+  }
+  return 'Total: ' + total + ' ' + noun
+})
 const allSearchResults = ref([]) // full results from the last API call
 const searching = ref(false)
 let searchTimer = null
@@ -47,12 +75,14 @@ async function load() {
   if (!myUid.value) return
   loadingFriends.value = true
   try {
-    const [f, r] = await Promise.all([
+    const [f, r, sentList] = await Promise.all([
       getFriends(),       // GET /api/friends
-      getIncomingRequests() // GET /api/friends/requests
+      getIncomingRequests(), // GET /api/friends/requests
+      getSentRequests()   // GET /api/friends/sent
     ])
     friends.value = f
     requests.value = r
+    sent.value = sentList
     console.log('[Friends] loaded', f.length, 'friends,', r.length, 'pending requests')
   } catch (err) {
     console.warn('[Friends] load failed:', err.message)
@@ -62,7 +92,186 @@ async function load() {
 }
 
 onMounted(load)
+
+// New requests show up while the page is open, like the bell in the navbar: every 5 seconds the
+// friends and both request lists are fetched again, so the count bubble on the Requests tab
+// appears by itself, and someone who accepts your request moves into Friends. Search boxes and
+// scrolling are left alone.
+const REQUEST_CHECK_MS = 5000
+let requestTimer = 0
+
+async function refreshRequests() {
+  if (!myUid.value || document.hidden) {
+    return
+  }
+  try {
+    const [f, r, sentList] = await Promise.all([getFriends(), getIncomingRequests(), getSentRequests()])
+    friends.value = f
+    requests.value = r
+    sent.value = sentList
+  } catch (err) {
+    // A missed check is fine: the next one tries again.
+  }
+}
+
+onMounted(function () {
+  requestTimer = window.setInterval(refreshRequests, REQUEST_CHECK_MS)
+})
+
+// Three tabs, like pages of one section: Friends, Add Friend, Requests. A link can open one
+// with ?tab=add or ?tab=requests (friend-request notifications do). Switching tabs stays inside
+// the page: changing the address would rebuild it (App.vue keys the page by its address),
+// reloading the lists and clearing the search boxes.
+const TABS = [
+  { id: 'friends', label: 'Friends' },
+  { id: 'add', label: 'Add Friend' },
+  { id: 'requests', label: 'Requests' }
+]
+
+const activeTab = ref(TABS.some(function (t) { return t.id === route.query.tab }) ? route.query.tab : 'friends')
+
+function openTab(id) {
+  activeTab.value = id
+}
+
+// Arrow keys move between tabs, as tab lists do.
+function onTabKey(event, index) {
+  const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+  if (!step) {
+    return
+  }
+  const next = TABS[(index + step + TABS.length) % TABS.length]
+  openTab(next.id)
+  document.getElementById('fd-tab-' + next.id)?.focus()
+}
+
+// The sticky bar at the bottom, worded like the Wishlist's total.
+const barText = computed(function () {
+  if (activeTab.value === 'add') {
+    const n = sent.value.length
+    return searchQuery.value.trim() ? '' : (n === 1 ? '1 pending' : n + ' pending')
+  }
+  if (activeTab.value === 'requests') {
+    const n = requests.value.length
+    return n === 1 ? '1 request waiting' : n + ' requests waiting'
+  }
+  return friendCount.value
+})
+
 watch(myUid, load)
+
+// Scrollbar inside the card: always visible, with arrows that jump to the top or bottom and a
+// brand-blue handle to drag, since browsers on a Mac hide their own until you scroll. The card's
+// contents scroll natively (wheel, trackpad, touch, keyboard) and the bar follows; the bar can
+// also drive them. With nothing to scroll, the handle still slides but moves nothing.
+const listEl = ref(null)
+const trackEl = ref(null)
+const canScroll = ref(false)
+const thumbSize = ref(20)
+const thumbTop = ref(0)
+
+function updateBar() {
+  const el = listEl.value
+  if (!el) {
+    canScroll.value = false
+    return
+  }
+  const room = el.scrollHeight - el.clientHeight
+  canScroll.value = room > 1
+  // A small handle: its share of the track, kept between 12% and 40%; 20% with nothing to scroll.
+  thumbSize.value = canScroll.value
+    ? Math.min(Math.max((el.clientHeight / el.scrollHeight) * 100, 12), 40)
+    : 20
+  thumbTop.value = canScroll.value
+    ? (el.scrollTop / room) * (100 - thumbSize.value)
+    : Math.min(thumbTop.value, 100 - thumbSize.value)
+}
+
+function moveIdleThumb(top) {
+  thumbTop.value = Math.min(Math.max(top, 0), 100 - thumbSize.value)
+}
+
+// The arrows jump straight to the very top (-1) or the very bottom (1).
+function scrollStep(direction) {
+  if (!canScroll.value) {
+    moveIdleThumb(direction < 0 ? 0 : 100)
+    return
+  }
+  const el = listEl.value
+  el.scrollTo({ top: direction < 0 ? 0 : el.scrollHeight, behavior: 'smooth' })
+}
+
+// A press on the empty track jumps one page toward the press.
+function onTrackPress(event) {
+  const el = listEl.value
+  const thumb = trackEl.value.querySelector('.fd-scrollbar-thumb').getBoundingClientRect()
+  const direction = event.clientY < thumb.top ? -1 : 1
+  if (!canScroll.value) {
+    moveIdleThumb(thumbTop.value + direction * thumbSize.value)
+    return
+  }
+  el.scrollBy({ top: direction * el.clientHeight * 0.9, behavior: 'smooth' })
+}
+
+// Dragging the handle: moving it the full free length of the track scrolls everything.
+let dragStartY = 0
+let dragStartScroll = 0
+let dragStartTop = 0
+
+function onThumbDown(event) {
+  event.preventDefault()
+  dragStartY = event.clientY
+  dragStartScroll = listEl.value.scrollTop
+  dragStartTop = thumbTop.value
+  event.currentTarget.setPointerCapture(event.pointerId)
+}
+
+function onThumbMove(event) {
+  if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+    return
+  }
+  const el = listEl.value
+  if (!canScroll.value) {
+    moveIdleThumb(dragStartTop + ((event.clientY - dragStartY) / trackEl.value.clientHeight) * 100)
+    return
+  }
+  const free = trackEl.value.clientHeight * (1 - thumbSize.value / 100)
+  if (free > 0) {
+    el.scrollTop = dragStartScroll + ((event.clientY - dragStartY) * (el.scrollHeight - el.clientHeight)) / free
+  }
+}
+
+// Re-measure when the card or its contents change size: a new tab, search results, friends.
+let barObserver = null
+
+watch(listEl, function (el) {
+  barObserver?.disconnect()
+  if (el) {
+    barObserver = new ResizeObserver(updateBar)
+    barObserver.observe(el)
+    if (el.firstElementChild) {
+      barObserver.observe(el.firstElementChild)
+    }
+    nextTick(updateBar)
+  }
+})
+
+watch(activeTab, function () {
+  if (listEl.value) {
+    listEl.value.scrollTop = 0
+  }
+  nextTick(function () {
+    if (listEl.value?.firstElementChild) {
+      barObserver?.observe(listEl.value.firstElementChild)
+    }
+    updateBar()
+  })
+})
+
+onBeforeUnmount(function () {
+  barObserver?.disconnect()
+  window.clearInterval(requestTimer)
+})
 
 // Watch searchQuery and call the API with a 300ms debounce so we don't spam on every keystroke.
 // The computed searchResults then filters the API response locally with .includes() in real time.
@@ -93,11 +302,27 @@ async function onSendRequest(result) {
     await sendRequest(result.firebaseUid)
     const hit = allSearchResults.value.find(r => r.pairKey === result.pairKey)
     if (hit) { hit.friendshipStatus = 'pending'; hit.iRequested = true }
+    sent.value.push({ pairKey: result.pairKey, firebaseUid: result.firebaseUid, username: result.username })
     console.log('[Friends] request sent to', result.username)
   } catch (err) {
     console.warn('[Friends] send request failed:', err.message)
   } finally {
     actionLoading.value[result.pairKey] = false
+  }
+}
+
+// DELETE /api/friends/:pairKey on a request I sent: takes it back.
+async function onCancel(req) {
+  actionLoading.value[req.pairKey] = true
+  try {
+    await declineOrRemove(req.pairKey)
+    sent.value = sent.value.filter(r => r.pairKey !== req.pairKey)
+    const hit = allSearchResults.value.find(r => r.pairKey === req.pairKey)
+    if (hit) { hit.friendshipStatus = null; hit.iRequested = null }
+  } catch (err) {
+    console.warn('[Friends] cancel request failed:', err.message)
+  } finally {
+    actionLoading.value[req.pairKey] = false
   }
 }
 
@@ -159,78 +384,130 @@ function initials(f) {
 </script>
 
 <template>
-  <div v-if="user" class="fd-page">
-    <div class="container-xl">
+  <!-- App.vue already wraps every page in the standard container (.fd-page), so no extra one here. -->
+  <div v-if="user" class="friends-page">
 
-      <div class="friends-layout">
+    <h1 class="fd-page-title">Friend List</h1>
+    <p class="fd-page-subtitle">Shop with friends. Add them by username, then buy together to split the shipping.</p>
 
-        <!-- ── Main: friends list ── -->
-        <div class="friends-main">
-          <h1 class="fd-page-title mb-1">Friend List</h1>
-          <p class="fd-page-subtitle mb-4">
-            {{ friends.length }} {{ friends.length === 1 ? 'friend' : 'friends' }}
-          </p>
+    <div class="friend-tabs" role="tablist" aria-label="Friends">
+      <button
+        v-for="(tab, i) in TABS"
+        :id="'fd-tab-' + tab.id"
+        :key="tab.id"
+        class="friend-tab"
+        :class="{ 'is-active': activeTab === tab.id }"
+        type="button"
+        role="tab"
+        :aria-selected="activeTab === tab.id"
+        :aria-controls="'fd-tabpanel-' + tab.id"
+        :tabindex="activeTab === tab.id ? 0 : -1"
+        @click="openTab(tab.id)"
+        @keydown="onTabKey($event, i)"
+      >
+        {{ tab.label }}
+        <span v-if="tab.id === 'requests' && requests.length" class="request-badge">{{ requests.length }}</span>
+      </button>
+    </div>
 
-          <div v-if="loadingFriends" class="text-secondary">
-            <FdLoadingDots size="inline" message="Loading friends" />
-          </div>
+    <!-- The open tab and this card are one piece, like a folder tab. -->
+    <div class="friend-tabpanel" :class="{ 'is-first-open': activeTab === 'friends' }">
+      <!-- The search sits above the scrolling list, so the list and its scrollbar start together
+           under it. Same pill as the Wishlist search. -->
+      <div v-if="activeTab === 'friends' && !loadingFriends && friends.length" class="friend-search">
+        <input v-model="friendQuery" class="friend-search-input" type="text" placeholder="Search your friends"
+          aria-label="Search your friends by username or email" autocomplete="off" />
+        <span class="friend-search-icon" aria-hidden="true">
+          <FdIcon name="search" />
+        </span>
+      </div>
+      <div v-else-if="activeTab === 'add'" class="friend-search">
+        <input v-model="searchQuery" class="friend-search-input" type="text" placeholder="Type a username"
+          aria-label="Search people by username" autocomplete="off" />
+        <FdLoadingDots v-if="searching" size="inline" message="Searching" class="text-secondary" />
+        <span v-else class="friend-search-icon" aria-hidden="true">
+          <FdIcon name="search" />
+        </span>
+      </div>
 
-          <div v-else-if="friends.length === 0" class="empty-state">
-            <FdIcon name="friends" class="empty-icon" />
-            <p class="empty-text">No friends yet. Search for someone by username.</p>
-          </div>
+      <div class="friend-body">
+        <div ref="listEl" class="friend-scroll" tabindex="0" aria-label="Friends content" @scroll="updateBar">
+          <!-- Friends -->
+          <section v-if="activeTab === 'friends'" id="fd-tabpanel-friends" role="tabpanel" aria-labelledby="fd-tab-friends">
+            <div v-if="loadingFriends" class="text-secondary">
+              <FdLoadingDots size="inline" message="Loading friends" />
+            </div>
 
-          <div v-else class="friends-grid">
-            <div v-for="f in friends" :key="f.pairKey" class="friend-card">
-              <div class="friend-avatar">{{ initials(f) }}</div>
-              <div class="friend-info">
-                <div class="friend-username">{{ f.username || '(no username)' }}</div>
-                <div class="friend-email">{{ f.email }}</div>
+            <div v-else-if="friends.length === 0" class="empty-state">
+              <FdIcon name="friends" class="empty-icon" />
+              <p class="empty-text">No friends yet. Open Add Friend to find someone by username.</p>
+            </div>
+
+            <template v-else>
+
+              <p v-if="!shownFriends.length" class="alert alert-secondary">No friends match "{{ friendQuery }}".</p>
+
+              <div v-else class="friend-rows">
+                <div v-for="f in shownFriends" :key="f.pairKey" class="friend-card">
+                  <div class="friend-avatar">{{ initials(f) }}</div>
+                  <div class="friend-info">
+                    <div class="friend-username">{{ f.username || '(no username)' }}</div>
+                    <div class="friend-email">{{ f.email }}</div>
+                  </div>
+                  <button
+                    class="btn btn-sm btn-outline-danger fd-icon-btn flex-shrink-0"
+                    type="button"
+                    :disabled="actionLoading[f.pairKey]"
+                    :aria-label="'Remove ' + (f.username || f.email) + ' as a friend'"
+                    title="Remove friend"
+                    @click="onRemove(f)"
+                  >
+                    <FdIcon name="trash" />
+                  </button>
+                </div>
               </div>
-              <button
-                class="btn btn-sm btn-outline-danger fd-icon-btn flex-shrink-0"
-                type="button"
-                :disabled="actionLoading[f.pairKey]"
-                :aria-label="'Remove ' + (f.username || f.email) + ' as a friend'"
-                title="Remove friend"
-                @click="onRemove(f)"
-              >
-                <FdIcon name="trash" />
-              </button>
-            </div>
-          </div>
-        </div>
+            </template>
+          </section>
 
-        <!-- ── Sidebar: search + pending requests ── -->
-        <aside class="friends-sidebar">
+          <!-- Add Friend -->
+          <section v-else-if="activeTab === 'add'" id="fd-tabpanel-add" role="tabpanel" aria-labelledby="fd-tab-add">
+            <!-- Before anything is typed: the requests you sent that are still waiting. -->
+            <template v-if="!searchQuery.trim()">
+              <h2 class="friend-group-title">Pending</h2>
+              <div v-if="sent.length" class="friend-rows">
+                <div v-for="req in sent" :key="req.pairKey" class="friend-card">
+                  <div class="friend-avatar">{{ initials(req) }}</div>
+                  <div class="friend-info">
+                    <div class="friend-username">{{ req.username }}</div>
+                    <div class="friend-email">has not answered yet</div>
+                  </div>
+                  <div class="friend-actions">
+                    <button
+                      class="btn btn-outline-dark btn-sm"
+                      type="button"
+                      :disabled="actionLoading[req.pairKey]"
+                      :aria-label="'Cancel the request to ' + req.username"
+                      @click="onCancel(req)"
+                    >Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <p v-else class="friend-group-empty">No pending requests. Type a username to find someone.</p>
+            </template>
 
-          <!-- Search -->
-          <div class="sidebar-section">
-            <h2 class="fd-section-subtitle mb-2">Add Friend</h2>
-            <div class="search-row">
-              <input
-                v-model="searchQuery"
-                class="form-control"
-                type="text"
-                placeholder="Type a username…"
-              />
-              <FdLoadingDots v-if="searching" size="inline" message="Searching" class="text-secondary ms-1" />
-            </div>
-
-            <div v-if="searchResults.length" class="search-results mt-2">
-              <div v-for="r in searchResults" :key="r.pairKey" class="search-result-row">
-                <div class="search-avatar">{{ initials(r) }}</div>
-                <div class="search-info">
-                  <div class="search-username">{{ r.username }}</div>
+            <!-- Once something is typed: the matching people. -->
+            <div v-else-if="searchResults.length" class="friend-rows">
+              <div v-for="r in searchResults" :key="r.pairKey" class="friend-card">
+                <div class="friend-avatar">{{ initials(r) }}</div>
+                <div class="friend-info">
+                  <div class="friend-username">{{ r.username }}</div>
                 </div>
                 <div class="search-action">
                   <span v-if="r.friendshipStatus === 'accepted'" class="badge-friends">Friends</span>
                   <span v-else-if="r.friendshipStatus === 'pending' && r.iRequested" class="badge-pending">Pending</span>
-                  <div v-else-if="r.friendshipStatus === 'pending' && !r.iRequested" class="d-flex gap-1">
+                  <div v-else-if="r.friendshipStatus === 'pending' && !r.iRequested" class="friend-actions">
                     <button class="btn btn-dark btn-sm" type="button" :disabled="actionLoading[r.pairKey]" @click="onAccept(r)">Accept</button>
-                    <button class="btn btn-outline-dark btn-sm fd-icon-btn" type="button" :disabled="actionLoading[r.pairKey]" :aria-label="'Decline ' + r.username" title="Decline" @click="onDecline(r)">
-                      <FdIcon name="x" />
-                    </button>
+                    <button class="btn btn-outline-dark btn-sm" type="button" :disabled="actionLoading[r.pairKey]" :aria-label="'Decline ' + r.username" @click="onDecline(r)">Decline</button>
                   </div>
                   <button
                     v-else
@@ -244,71 +521,384 @@ function initials(f) {
                 </div>
               </div>
             </div>
+            <p v-else-if="searchQuery.trim() && !searching" class="alert alert-secondary">No one matches "{{ searchQuery }}".</p>
+          </section>
 
-            <!-- Pending incoming requests — always shown below search results -->
-            <div>
-              <hr class="my-3" />
-              <p class="fd-section-subtitle mb-2">
-                Friend Requests
-                <span class="request-badge">{{ requests.length }}</span>
-              </p>
-              <div v-if="requests.length" class="request-list">
-                <div v-for="req in requests" :key="req.pairKey" class="request-row">
-                  <div class="friend-avatar small-avatar">{{ initials(req) }}</div>
-                  <div class="friend-info">
-                    <div class="friend-username">{{ req.username || req.email }}</div>
-                    <div class="friend-email">wants to be friends</div>
-                  </div>
-                  <div class="d-flex gap-1 flex-shrink-0">
-                    <button
-                      class="btn btn-dark btn-sm"
-                      type="button"
-                      :disabled="actionLoading[req.pairKey]"
-                      @click="onAccept(req)"
-                    >Accept</button>
-                    <button
-                      class="btn btn-outline-dark btn-sm fd-icon-btn"
-                      type="button"
-                      :disabled="actionLoading[req.pairKey]"
-                      :aria-label="'Decline ' + (req.username || req.email)"
-                      title="Decline"
-                      @click="onDecline(req)"
-                    >
-                      <FdIcon name="x" />
-                    </button>
-                  </div>
+          <!-- Requests -->
+          <section v-else id="fd-tabpanel-requests" role="tabpanel" aria-labelledby="fd-tab-requests">
+            <div v-if="requests.length" class="friend-rows">
+              <div v-for="req in requests" :key="req.pairKey" class="friend-card">
+                <div class="friend-avatar">{{ initials(req) }}</div>
+                <div class="friend-info">
+                  <div class="friend-username">{{ req.username || req.email }}</div>
+                  <div class="friend-email">wants to be friends</div>
+                </div>
+                <div class="friend-actions">
+                  <button
+                    class="btn btn-dark btn-sm"
+                    type="button"
+                    :disabled="actionLoading[req.pairKey]"
+                    @click="onAccept(req)"
+                  >Accept</button>
+                  <button
+                    class="btn btn-outline-dark btn-sm"
+                    type="button"
+                    :disabled="actionLoading[req.pairKey]"
+                    :aria-label="'Decline ' + (req.username || req.email)"
+                    @click="onDecline(req)"
+                  >Decline</button>
                 </div>
               </div>
-              <p v-else class="small text-secondary mb-0">No pending requests.</p>
             </div>
+            <div v-else class="empty-state">
+              <FdIcon name="bell" class="empty-icon" />
+              <p class="empty-text">No requests waiting.</p>
+            </div>
+          </section>
+        </div>
+
+        <!-- Hidden from screen readers: the content itself scrolls with the keyboard. -->
+        <div class="fd-scrollbar" aria-hidden="true">
+          <button class="fd-scrollbar-arrow" type="button" tabindex="-1" @click="scrollStep(-1)">
+            <FdIcon name="chevron-up" />
+          </button>
+          <div ref="trackEl" class="fd-scrollbar-track" @pointerdown.self="onTrackPress">
+            <div
+              class="fd-scrollbar-thumb"
+              :style="{ top: thumbTop + '%', height: thumbSize + '%' }"
+              @pointerdown="onThumbDown"
+              @pointermove="onThumbMove"
+            ></div>
           </div>
-
-        </aside>
+          <button class="fd-scrollbar-arrow" type="button" tabindex="-1" @click="scrollStep(1)">
+            <FdIcon name="chevron-down" />
+          </button>
+        </div>
       </div>
+    </div>
 
+    <!-- Sticks to the bottom of the screen while scrolling, like the Wishlist's total bar. -->
+    <div class="friend-bar">
+      <p v-if="barText" class="friend-bar-count" aria-live="polite">{{ barText }}</p>
     </div>
   </div>
 </template>
 
 <style scoped>
-.friends-layout {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 2rem;
-  align-items: start;
+/* Friend search: the same pill as the Wishlist search. */
+.friend-search {
+  display: flex;
+  margin-bottom: 1rem;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: var(--fd-search);
+  /* 2px less than Home top and bottom: this bar has a border, so the total stays 44px.
+     On the right, the same 16px as a card's padding, so the search icon lines up with the
+     icon buttons (like the trash) at the end of the cards below. */
+  padding: 0.125rem 1rem 0.125rem 1.5rem;
+  border: var(--fd-border) solid var(--friends-line);
+  border-radius: 999px;
+  background: var(--fd-paper);
 }
 
-@media (max-width: 768px) {
-  .friends-layout {
-    grid-template-columns: 1fr;
+.friend-search:focus-within {
+  border-color: var(--fd-blue);
+  box-shadow: 0 0 0 0.25rem rgb(39 80 138 / 35%);
+}
+
+.friend-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fd-text);
+  font-size: var(--fd-body);
+  outline: none;
+}
+
+.friend-search-input::placeholder {
+  color: var(--fd-text-muted);
+}
+
+/* Same size as the Home search bar's icon area: the bar is 48px tall like Home's. */
+.friend-search-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--fd-blue);
+}
+
+/* The page fills the screen below the navbar (minus the standard top gap), so the tab card can
+   stretch down and the total bar always sits at the bottom of the screen, like the Wishlist's.
+   Every outline on the page is the vanilla line, like the rest of the app's components. */
+.friends-page {
+  --friends-line: var(--fd-vanilla-line);
+  display: flex;
+  flex-direction: column;
+  /* Exactly the screen, so the card's contents scroll inside it and the page itself does not.
+     Very short windows keep enough room and let the page scroll instead. */
+  height: calc(100svh - var(--fd-nav-height) - 2.5rem);
+  min-height: 32rem;
+}
+
+/* Folder tabs: Friends, Add Friend, Requests. No strip behind them: the others sit on the page,
+   and the open one is a raised paper tab joined to the card below it, with a short blue line
+   under its label. No extra top margin: the subtitle's own 1rem gap, like Wishlist and Trending. */
+.friend-tabs {
+  display: flex;
+}
+
+.friend-tab {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 3.5rem;
+  padding: 0 1.75rem;
+  border: var(--fd-border) solid transparent;
+  border-bottom: 0;
+  border-radius: var(--fd-radius) var(--fd-radius) 0 0;
+  background: transparent;
+  color: var(--fd-text-muted);
+  /* Table header type: small, bold capitals, spaced out. */
+  font-size: var(--fd-table-header);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.friend-tab:hover {
+  color: var(--fd-blue);
+}
+
+/* The open tab: paper, outlined like the card, and sitting over the card's top edge so the
+   two join with no line between them. */
+.friend-tab.is-active {
+  z-index: 1;
+  border-color: var(--friends-line);
+  background: var(--fd-paper);
+  color: var(--fd-text);
+}
+
+.friend-tab.is-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0.625rem;
+  left: 1.75rem;
+  right: 1.75rem;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--fd-blue);
+}
+
+.friend-tab:focus-visible {
+  outline: 3px solid var(--fd-blue);
+  outline-offset: -3px;
+}
+
+/* The card under the tabs holds the open tab's content. It tucks up under the tabs by its
+   border width, so the open tab (paper, above it) covers that line and the two join. */
+.friend-tabpanel {
+  position: relative;
+  margin-top: calc(var(--fd-border) * -1);
+  padding: 1.25rem;
+  border: var(--fd-border) solid var(--friends-line);
+  border-radius: var(--fd-radius);
+  /* Fills the screen down to the total bar: the search on top, the scrolling list under it. */
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 1.5rem;
+  background: var(--fd-paper);
+}
+
+/* With the first tab open, the card's top-left corner is square so the tab joins it cleanly. */
+.friend-tabpanel.is-first-open {
+  border-top-left-radius: 0;
+}
+
+/* The count bubble on Requests. */
+.friend-tab .request-badge {
+  margin-left: 0.5rem;
+}
+
+/* Phones: the three tabs share the width evenly with tighter padding, so they always fit. */
+@media (max-width: 576px) {
+  .friend-tab {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 0 0.5rem;
+  }
+
+  .friend-tab.is-active::after {
+    left: 0.5rem;
+    right: 0.5rem;
+  }
+
+  .friend-tabpanel {
+    padding: 1rem;
   }
 }
 
-/* Friends grid */
-.friends-grid {
+/* The card's scrolling area: the browser's own scrollbar is hidden for the custom one beside it.
+   tabindex lets keyboard users scroll it. */
+.friend-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.friend-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.friend-scroll:focus-visible {
+  outline: 3px solid var(--fd-blue);
+  outline-offset: 3px;
+}
+
+/* The search ends where the friend cards end, leaving the scrollbar's column (its width plus
+   the gap) free on the right. */
+.friend-tabpanel > .friend-search {
+  margin-right: 1.75rem;
+}
+
+/* Requests: "Waiting for you" and "Sent by you", each with its own small heading. */
+.friend-group-title {
+  margin: 0 0 0.75rem;
+  color: var(--fd-text-muted);
+  font-size: var(--fd-table-header);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.friend-rows + .friend-group-title,
+.friend-group-empty + .friend-group-title {
+  margin-top: 1.5rem;
+}
+
+.friend-group-empty {
+  margin: 0;
+  color: var(--fd-text-muted);
+}
+
+/* Under the search: the scrolling list and its scrollbar side by side, starting at the same
+   line, so the bar begins level with the first friend. */
+.friend-body {
+  display: flex;
+  flex: 1;
+  gap: 0.5rem;
+  min-height: 0;
+}
+
+/* Scrollbar: an arrow at each end and a beige track with a brand-blue handle to drag. */
+.fd-scrollbar {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  width: 1.25rem;
+  user-select: none;
+}
+
+.fd-scrollbar-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fd-text-muted);
+  cursor: pointer;
+}
+
+.fd-scrollbar-arrow:hover {
+  background: var(--fd-beige);
+  color: var(--fd-blue);
+}
+
+.fd-scrollbar-arrow .fd-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.fd-scrollbar-track {
+  position: relative;
+  flex: 1;
+  width: 0.375rem;
+  margin: 0.25rem 0;
+  border-radius: 999px;
+  background: var(--fd-beige);
+  cursor: pointer;
+}
+
+/* The handle is brand blue and a little wider than its track, so it is easy to see and grab. */
+.fd-scrollbar-thumb {
+  position: absolute;
+  left: 50%;
+  width: 0.625rem;
+  border-radius: 999px;
+  background: var(--fd-blue);
+  transform: translateX(-50%);
+  cursor: grab;
+  touch-action: none;
+}
+
+.fd-scrollbar-thumb:hover,
+.fd-scrollbar-thumb:active {
+  background: var(--fd-blue-dark);
+}
+
+.fd-scrollbar-thumb:active {
+  cursor: grabbing;
+}
+
+/* One card per row, 12px apart, like the Wishlist; the page itself scrolls. */
+.friend-rows {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+/* Sticks to the bottom of the screen while scrolling and stops above the footer, like the
+   Wishlist's total bar. */
+.friend-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem 1rem;
+  /* Same height as the Wishlist's bar, which holds a full-size button. */
+  min-height: calc(var(--fd-control) + 1.5rem + var(--fd-border));
+  /* Pushed to the bottom of the screen when the list is short; sticks there when it is long. */
+  margin-top: auto;
+  padding: 0.75rem 0;
+  border-top: var(--fd-border) solid var(--friends-line);
+  background: var(--fd-beige);
+}
+
+/* Same type as the Wishlist's total: small, muted. */
+.friend-bar-count {
+  margin: 0;
+  color: var(--fd-text-muted);
+  font-size: var(--fd-small);
+}
+
+.friend-card {
+  flex-shrink: 0;
 }
 
 .friend-card {
@@ -316,7 +906,7 @@ function initials(f) {
   align-items: center;
   gap: 0.875rem;
   padding: 0.875rem 1rem;
-  border: 2px solid var(--fd-vanilla-line);
+  border: var(--fd-border) solid var(--friends-line);
   border-radius: var(--fd-radius);
   background: var(--fd-paper);
 }
@@ -328,17 +918,13 @@ function initials(f) {
   border-radius: 50%;
   background: var(--fd-blue);
   color: var(--fd-beige);
-  font-family: var(--fd-font-display);
-  font-size: 1rem;
+  /* Initials in DM Sans: the smallest Anton size is too big for a 44px circle. */
+  font-family: var(--fd-font-body);
+  font-size: var(--fd-body);
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.small-avatar {
-  width: 36px;
-  height: 36px;
-  font-size: 0.8rem;
 }
 
 .friend-info {
@@ -348,7 +934,7 @@ function initials(f) {
 
 .friend-username {
   font-weight: 700;
-  font-size: 0.9375rem;
+  font-size: var(--fd-body);
   color: var(--fd-ink);
   white-space: nowrap;
   overflow: hidden;
@@ -381,78 +967,17 @@ function initials(f) {
   font-size: var(--fd-small);
 }
 
-/* Sidebar */
-.friends-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.sidebar-section {
-  padding: 1rem;
-  border: 2px solid var(--fd-vanilla-line);
-  border-radius: var(--fd-radius);
-  background: var(--fd-paper);
-}
-
-.search-row {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.search-results {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.search-result-row {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--fd-vanilla-line);
-}
-
 .search-result-row:last-child {
   border-bottom: none;
 }
 
-.search-avatar {
-  flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--fd-vanilla-soft);
-  color: var(--fd-blue);
-  font-family: var(--fd-font-display);
-  font-size: 0.8rem;
+/* The buttons and tags at the end of a card (Accept and Decline, Pending and Cancel): one
+   group, always the same 8px apart. */
+.friend-actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  justify-content: center;
-  border: 1.5px solid var(--fd-vanilla-line);
-}
-
-.search-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.search-username {
-  font-weight: 700;
-  font-size: 0.875rem;
-  color: var(--fd-ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.search-email {
-  font-size: 0.75rem;
-  color: var(--fd-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  gap: 0.5rem;
 }
 
 .search-action {
@@ -460,7 +985,7 @@ function initials(f) {
 }
 
 .badge-friends {
-  font-size: 0.75rem;
+  font-size: var(--fd-small);
   font-weight: 700;
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
@@ -469,13 +994,13 @@ function initials(f) {
 }
 
 .badge-pending {
-  font-size: 0.75rem;
+  font-size: var(--fd-small);
   font-weight: 700;
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
   background: var(--fd-vanilla-soft);
   color: var(--fd-text-muted);
-  border: 1.5px solid var(--fd-vanilla-line);
+  border: var(--fd-border) solid var(--friends-line);
 }
 
 /* Requests */
@@ -483,26 +1008,16 @@ function initials(f) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.25rem;
   border-radius: 50%;
   background: var(--fd-blue);
   color: var(--fd-beige);
-  font-size: 0.7rem;
+  font-size: var(--fd-small);
   font-weight: 700;
   margin-left: 0.4rem;
   vertical-align: middle;
 }
 
-.request-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-}
-
-.request-row {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-}
 </style>

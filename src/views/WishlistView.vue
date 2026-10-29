@@ -1,16 +1,35 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { fetchCheapestLiveListing } from '../services/livePriceService.js'
-import { productImage, sgd, storeLink } from '../mock/catalog.js'
-import { addSampleWishlist, isAsleep, missingSamples, removeSaved, setTarget, sleepOn, markSleepVerdictSeen, user } from '../mock/session.js'
+import { sgd, storeLink } from '../services/format.js'
 import FdIcon from '../components/FdIcon.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
-import { planBudget } from '../mock/budget.js'
+import FdTelegramPrompt from '../components/FdTelegramPrompt.vue'
 import axios from 'axios'
+import { storeToRefs } from 'pinia'
+import { useAuthStore } from '../store/auth.js'
+import { useWishlistStore } from '../store/wishlist.js'
 
 const router = useRouter()
 const route = useRoute()
+
+// All wishlist data and logic live in the wishlist store. This view keeps only the page layout,
+// the search and sort, and the pop-up handling (focus, openers, the sleep time picker).
+const { user } = storeToRefs(useAuthStore())
+const wishlistStore = useWishlistStore()
+const {
+  now, liveLoading, liveErrors,
+  verdictItem, verdictLoading, verdictError, activeVerdict,
+  budget, included, plan, planIndex, budgetError, plannable, heldCount, option, pickedItems, missedItems,
+  buyItem, selected, inviting, inviteSent, error: buyError
+} = storeToRefs(wishlistStore)
+const {
+  removeSaved, setTarget, sleepOn,
+  best, loadLivePrice, saving, cheaper, savingPercent, reached, asleep,
+  hasFinishedSleep, openVerdict: loadVerdict, closeVerdict,
+  clearPlan, findPlan, nextOption, rankOf, setRank, cheapestPlannable,
+  fetchFriendOverlap, friendsFor, allInvited, openBuyTogether, closeBuyTogether, sendInvites
+} = wishlistStore
 
 if (!user.value) {
   router.replace('/login?next=/wishlist')
@@ -25,7 +44,6 @@ function productLink(item) {
 }
 
 // Ticks every 30 seconds so the "left" countdown on held items stays current.
-const now = ref(Date.now())
 let clock = 0
 
 onMounted(function () {
@@ -37,62 +55,6 @@ onMounted(function () {
 onBeforeUnmount(function () {
   window.clearInterval(clock)
 })
-
-const livePrices = ref({})
-const liveLoading = ref({})
-const liveErrors = ref({})
-
-function best(item) {
-  return livePrices.value[item.name] ?? null
-}
-
-
-async function loadLivePrice(name) {
-  if (liveLoading.value[name]) return
-
-  liveLoading.value[name] = true
-  liveErrors.value[name] = ''
-
-  try {
-    const listing = await fetchCheapestLiveListing(name)
-
-    // Display the best price in Wishlist.
-    livePrices.value[name] = listing
-
-    // Find the saved product in MongoDB-backed wishlist state.
-    const saved = user.value?.wishlist?.find(
-      item => item.name === name
-    )
-
-    // Only ask the backend to check when the displayed price
-    // meets the user's target threshold.
-    if (
-      saved &&
-      saved.productKey &&
-      Number(saved.targetPrice) > 0 &&
-      listing.price <= Number(saved.targetPrice)
-    ) {
-      void axios.post(
-        '/api/wishlist/' +
-        encodeURIComponent(saved.productKey) +
-        '/check-target'
-      ).then(response => {
-        console.log('[Target email] Check result:', response.data)
-      }).catch(error => {
-        console.warn(
-          '[Target email] Check failed:',
-          error.response?.data?.error || error.message
-        )
-      })
-    }
-  } catch (error) {
-    delete livePrices.value[name]
-    liveErrors.value[name] = error.message || 'Price unavailable'
-  } finally {
-    liveLoading.value[name] = false
-  }
-}
-
 
 watch(
   () => user.value?.wishlist?.map(item => item.name).join('|') ?? '',
@@ -108,44 +70,13 @@ watch(
   { immediate: true }
 )
 
-// A price drop worth flagging: some store now sells it for at least 10% less than the saved price.
-// Smaller drops are left out so the tag only shows for real savings.
-const DROP_PERCENT = 10
-
-function saving(item) {
-  const listing = best(item)
-  return listing ? Number(item.savedPrice) - listing.price : null
-}
-
-function cheaper(item) {
-  const amount = saving(item)
-
-  return amount !== null &&
-    Number(item.savedPrice) > 0 &&
-    (amount / Number(item.savedPrice)) * 100 >= DROP_PERCENT
-}
-
-function savingPercent(item) {
-  const amount = saving(item)
-
-  return amount === null || Number(item.savedPrice) <= 0
-    ? 0
-    : Math.round((amount / Number(item.savedPrice)) * 100)
-}
-
-function reached(item) {
-  const listing = best(item)
-
-  return Boolean(
-    listing &&
-    Number(item.targetPrice) > 0 &&
-    listing.price <= Number(item.targetPrice)
-  )
-}
-
-function asleep(item) {
-  return isAsleep(item.name, now.value)
-}
+watch(
+  () => user.value?.wishlist?.map(item => item.productKey).join('|') ?? '',
+  function () {
+    if (user.value) fetchFriendOverlap()
+  },
+  { immediate: true }
+)
 
 function leftText(item) {
   const ms = item.sleepUntil - now.value
@@ -346,8 +277,6 @@ function closeSleep() {
   nextTick(() => sleepOpener?.focus())
 }
 
-
-
 function confirmSleep() {
   if (!sleepItem.value || !holdMs.value) {
     return
@@ -378,155 +307,15 @@ function confirmSleep() {
   closeSleep()
 }
 
-
-
-// =====================================
-// SLEEP ON IT - PURCHASE VERDICT
-// =====================================
-
-// Which product's verdict is currently displayed?
-const verdictItem = ref(null)
+// Purchase verdict pop-up: the price lookup and maths are in the store; the view only moves focus.
 const verdictDialog = ref(null)
-const verdictLatestPrice = ref(null)
-const verdictLoading = ref(false)
-const verdictError = ref('')
 
-// Prevent an older API response from changing a newer verdict.
-let verdictRequestId = 0
-
-// Check whether the Sleep On It timer has expired
-function hasFinishedSleep(item) {
-  return Boolean(
-    item.sleepUntil &&
-    item.sleepUntil <= now.value &&
-    Number.isFinite(item.sleepPriceAtStart) &&
-    item.sleepPriceAtStart > 0
-  )
-}
-
-// Calculate the percentage change and purchase verdict
-function verdictData(item) {
-  const start = Number(item.sleepPriceAtStart)
-  const latest = verdictLatestPrice.value
-
-  if (
-    !Number.isFinite(start) ||
-    start <= 0 ||
-    !Number.isFinite(latest) ||
-    latest <= 0
-  ) {
-    return null
-  }
-
-  // Percentage change formula
-  const percent = ((latest - start) / start) * 100
-
-  // Absolute price difference
-  const difference = latest - start
-
-  let title = ''
-  let message = ''
-
-  if (percent <= -10) {
-    title = 'A better deal is available!'
-    message =
-      'The cheapest matching listing found is at least 10% below your saved price. ' +
-      'You may be able to save money by choosing this offer.'
-
-  } else if (percent < 0) {
-    title = 'A small saving is available'
-    message =
-      'The cheapest matching listing found is slightly cheaper than your saved price. ' +
-      'Consider whether the savings are worthwhile.'
-
-  } else if (percent === 0) {
-    title = 'No better deal found yet'
-    message =
-      'The cheapest matching listing found is the same as your saved price.'
-
-  } else {
-    title = 'No cheaper deal found'
-    message =
-      'The cheapest matching listing found costs more than your saved price. ' +
-      'Your original saved offer may still be better, if it remains available.'
-  }
-
-  return {
-    start,
-    latest,
-    percent,
-    difference,
-    title,
-    message
-  }
-}
-
-// Automatically calculate the currently displayed verdict
-const activeVerdict = computed(() => {
-  return verdictItem.value
-    ? verdictData(verdictItem.value)
-    : null
-})
-
-// Open the Purchase Verdict pop-up
-
-async function openVerdict(item) {
-  const requestId = ++verdictRequestId
-
-  verdictItem.value = item
-  verdictLatestPrice.value = null
-  verdictLoading.value = true
-  verdictError.value = ''
-
+function openVerdict(item) {
   nextTick(() => {
     verdictDialog.value?.querySelector('button')?.focus()
   })
-
-  try {
-    // Get the cheapest comparable price from SerpApi
-    const listing = await fetchCheapestLiveListing(item.name)
-    console.log('[Purchase Verdict] Selected listing:', listing)
-
-    // Ignore outdated responses if the dialog has changed
-    if (requestId !== verdictRequestId) return
-
-    verdictLatestPrice.value = listing.price
-
-    console.log('[Sleep On It] Live ending price:', {
-      product: item.name,
-      store: listing.store,
-      price: listing.price
-    })
-  } catch (error) {
-    if (requestId !== verdictRequestId) return
-
-    verdictError.value =
-      error.message || 'Unable to retrieve the latest product price'
-
-    console.error('[Sleep On It] Verdict price lookup failed:', error)
-  } finally {
-    if (requestId === verdictRequestId) {
-      verdictLoading.value = false
-    }
-  }
+  return loadVerdict(item)
 }
-
-
-// Close the pop-up and mark the verdict as viewed
-function closeVerdict() {
-  // Invalidate any pending API response
-  verdictRequestId++
-
-  if (verdictItem.value) {
-    markSleepVerdictSeen(verdictItem.value.name)
-  }
-
-  verdictItem.value = null
-  verdictLatestPrice.value = null
-  verdictLoading.value = false
-  verdictError.value = ''
-}
-
 
 watch(
   [() => route.query.verdict, () => user.value?.wishlist],
@@ -558,28 +347,10 @@ watch(
   { immediate: true }
 )
 
-
-
-// Plan a budget pop-up: enter a budget, tick and rank
-// the items to include, then see the best mix at today's best prices.
-// Items on hold are left out, since they are still being slept on.
+// Plan a budget pop-up: the numbers are in the store; the view keeps the open/close and focus.
 const showBudget = ref(false)
-const budget = ref('')
-const included = ref([])
-const plan = ref(null)
-const planIndex = ref(0)
 const budgetInput = ref(null)
 let budgetOpener = null
-
-const plannable = computed(function () {
-  return user.value ? user.value.wishlist.filter(function (item) { return !asleep(item) }) : []
-})
-
-const heldCount = computed(function () {
-  return user.value ? user.value.wishlist.length - plannable.value.length : 0
-})
-
-const budgetError = ref('')
 
 function openBudget(event) {
   budgetOpener = event.currentTarget
@@ -597,101 +368,15 @@ function closeBudget() {
   nextTick(() => budgetOpener?.focus())
 }
 
-// Any change to the budget or the ticked items clears the old answer, so it never shows a stale mix.
-function clearPlan() {
-  plan.value = null
-  budgetError.value = ''
-}
+// Buy Together: friends who saved the same product. The pop-up state lives in the store.
+const showTelegramPrompt = ref(false)
 
-function findPlan() {
-  const amount = Number(budget.value)
-  if (!amount || amount <= 0) {
-    budgetError.value = 'Enter a budget above S$0.'
-    plan.value = null
+function onBuyTogether(item) {
+  if (!user.value.telegramUsername) {
+    showTelegramPrompt.value = true
     return
   }
-  if (!included.value.length) {
-    budgetError.value = 'Tick at least one item you want.'
-    plan.value = null
-    return
-  }
-  // Only the ticked items go into the search; nothing else from the wishlist is added.
-  const selected = plannable.value.filter(item =>
-    rankOf(item.name) > 0
-  )
-
-  if (selected.some(item => !best(item))) {
-    budgetError.value =
-      'Some selected products do not have live prices yet. Please retry their price lookup.'
-    plan.value = null
-    return
-  }
-
-  const items = selected.map(item => {
-    const listing = best(item)
-
-    return {
-      name: item.name,
-      price: listing.price,
-      store: listing.store,
-      rank: included.value.indexOf(item.name) + 1
-    }
-  })
-  plan.value = planBudget(items, amount, 5)
-  planIndex.value = 0
-  budgetError.value = ''
-}
-
-function nextOption() {
-  planIndex.value = (planIndex.value + 1) % plan.value.options.length
-}
-
-const option = computed(function () {
-  return plan.value && plan.value.options.length ? plan.value.options[planIndex.value] : null
-})
-
-// Ticked items are ranked by their place in included: ticking one adds it at the bottom,
-// and picking a number moves it to that place, so no two share a rank.
-function rankOf(name) {
-  return included.value.indexOf(name) + 1
-}
-
-function setRank(name, event) {
-  const list = included.value.filter(function (other) { return other !== name })
-  list.splice(Number(event.target.value) - 1, 0, name)
-  included.value = list
-  clearPlan()
-}
-
-// The picked items in priority order. Only ticked items are planned, so every one has a rank.
-const pickedItems = computed(function () {
-  if (!option.value) {
-    return []
-  }
-  return option.value.items.slice().sort(function (a, b) {
-    return a.rank - b.rank
-  })
-})
-
-// Ticked items that did not make it into this option, when they could not all fit together.
-const missedItems = computed(function () {
-  if (!option.value) {
-    return []
-  }
-  return included.value.filter(function (name) {
-    return !option.value.items.some(function (item) { return item.name === name })
-  })
-})
-
-// The cheapest ticked item, for the "Nothing fits" message.
-function cheapestPlannable() {
-  return plannable.value
-    .filter(item => rankOf(item.name) > 0 && best(item))
-    .reduce((low, item) => {
-      return !low || best(item).price < best(low).price
-        ? item
-        : low
-    }, null)
+  openBuyTogether(item)
 }
 </script>
 
@@ -699,7 +384,8 @@ function cheapestPlannable() {
   <div v-if="user">
     <h1 class="fd-page-title">Wishlist</h1>
     <p class="fd-page-subtitle">Your saved price and store next to the best price now. A cheaper store is marked as a
-      price drop. Not sure yet? Sleep on it and the item rests until you are ready.</p>
+      price drop.<br />
+      Not sure yet? Sleep on it and the item rests until you are ready.</p>
 
     <p v-if="!user.wishlist.length" class="alert alert-secondary">No saved products. Search, then press Save.</p>
 
@@ -740,7 +426,7 @@ function cheapestPlannable() {
             <div class="fd-wish-cell fd-wish-cell-product" role="cell">
               <router-link class="fd-wish-product" :to="productLink(item)">
                 <span class="fd-wish-image">
-                  <img v-if="item.image || productImage(item.name)" :src="item.image || productImage(item.name)"
+                  <img v-if="item.image" :src="item.image"
                     alt="" />
                   <span v-else>{{ initials(item.name) }}</span>
                 </span>
@@ -819,6 +505,16 @@ function cheapestPlannable() {
 
                   <!-- Moon and trash buttons -->
                   <div class="fd-wish-actions">
+                    <div v-if="friendsFor(item.productKey).length" class="fd-friends-wrap">
+                      <button class="fd-friends-btn" type="button" :disabled="allInvited(item.productKey)"
+                        :aria-label="friendsFor(item.productKey).length + ' friends saved ' + item.name + '. Buy together'"
+                        title="Friends who saved this. Buy together" @click="onBuyTogether(item)">
+                        <FdIcon name="friends" />
+                        <span>+{{ friendsFor(item.productKey).length }}</span>
+                      </button>
+                      <span v-if="allInvited(item.productKey)" class="fd-sent">Sent!</span>
+                    </div>
+
                     <button class="btn btn-outline-dark btn-sm fd-icon-btn" type="button"
                       :aria-label="'Sleep on ' + item.name" title="Sleep on it" @click="openSleep(item, $event)">
                       <FdIcon name="moon" />
@@ -846,12 +542,6 @@ function cheapestPlannable() {
       <p v-else class="alert alert-secondary mb-4">No saved products match "{{ query }}".</p>
     </template>
 
-    <p v-if="missingSamples()" class="fd-entry-signup">
-      Want to see how it works?
-      <button class="btn btn-link p-0 fd-sample-link" type="button" @click="addSampleWishlist">Add {{ missingSamples()
-      }}
-        sample products</button>
-    </p>
 
     <!-- Last in the page so it can stick to the bottom of the screen and stop above the footer. -->
     <div v-if="user.wishlist.length" class="fd-budget-bar">
@@ -936,6 +626,44 @@ function cheapestPlannable() {
       </section>
 
       <button class="btn btn-outline-dark fd-btn-lg w-100 mt-2" type="button" @click="closeBudget">Close</button>
+    </section>
+  </div>
+
+  <FdTelegramPrompt v-if="showTelegramPrompt" @close="showTelegramPrompt = false" />
+
+  <!-- Buy Together pop-up: same as the one on the Notifications page -->
+  <div v-if="buyItem" class="fd-entry-backdrop" @click.self="closeBuyTogether" @keydown.esc="closeBuyTogether">
+    <section class="fd-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-buy-title">
+      <h2 id="fd-buy-title" class="fd-page-title">Buy together</h2>
+      <p class="fd-entry-description">Select the friends you want to invite. They'll get a notification and can reach
+        out to you.</p>
+
+      <p v-if="buyError" class="alert alert-danger" role="alert">{{ buyError }}</p>
+
+      <ul class="list-unstyled text-start mb-4">
+        <li v-for="f in friendsFor(buyItem.productKey)" :key="f.firebaseUid"
+          class="d-flex align-items-center gap-3 py-2 border-bottom">
+          <input :id="'chk-' + f.firebaseUid" v-model="selected" type="checkbox" class="form-check-input mt-0 flex-shrink-0"
+            :value="f.firebaseUid" :disabled="f.invited" />
+          <label :for="'chk-' + f.firebaseUid" class="mb-0 flex-grow-1" style="cursor: pointer;">
+            <span class="fw-bold" style="font-family: var(--fd-font-display); letter-spacing: 0.04em;">{{
+              f.username.toUpperCase() }}</span>
+          </label>
+          <span v-if="f.invited" class="small text-secondary">Sent!</span>
+        </li>
+      </ul>
+
+      <div v-if="inviteSent" class="alert alert-success mb-3">Invites sent!</div>
+
+      <div class="fd-entry-actions">
+        <button v-if="!inviteSent" class="btn btn-dark" type="button" :disabled="inviting || !selected.length"
+          @click="sendInvites">
+          {{ inviting ? 'Sending…' : 'Send Invites' }}
+        </button>
+        <button class="btn btn-outline-dark" type="button" @click="closeBuyTogether">
+          {{ inviteSent ? 'Done' : 'Cancel' }}
+        </button>
+      </div>
     </section>
   </div>
 
@@ -1102,12 +830,14 @@ function cheapestPlannable() {
 
 .fd-verdict-prices span {
   color: var(--fd-text-muted);
-  font-size: 0.85rem;
+  font-size: var(--fd-small);
 }
 
 .fd-verdict-prices strong {
   color: var(--fd-blue);
-  font-size: 1.4rem;
+  font-size: var(--fd-section-title);
+  font-family: var(--fd-font-display);
+  font-weight: 400;
 }
 
 .fd-verdict-change {
@@ -1121,7 +851,9 @@ function cheapestPlannable() {
 }
 
 .fd-verdict-change strong {
-  font-size: 2rem;
+  font-size: var(--fd-page-title);
+  font-family: var(--fd-font-display);
+  font-weight: 400;
 }
 
 .fd-verdict-change.is-lower {
@@ -1135,7 +867,7 @@ function cheapestPlannable() {
 .fd-verdict-title {
   margin: 1.25rem 0 0.5rem;
   color: var(--fd-blue);
-  font-size: 1.15rem;
+  font-size: var(--fd-body);
   font-weight: 700;
 }
 
@@ -1161,8 +893,11 @@ function cheapestPlannable() {
   flex: 1 1 16rem;
   align-items: center;
   gap: 0.25rem;
-  min-height: var(--fd-control);
-  padding: 0.25rem 0.25rem 0.25rem 1.5rem;
+  min-height: var(--fd-search);
+  /* 2px less than Home top and bottom: this bar has a border, so the total stays 44px.
+     On the right, the same 16px as a card's padding, so the search icon lines up with the
+     icon buttons (like the trash) at the end of the cards below. */
+  padding: 0.125rem 1rem 0.125rem 1.5rem;
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: 999px;
   background: var(--fd-paper);
@@ -1187,6 +922,7 @@ function cheapestPlannable() {
   color: var(--fd-text-muted);
 }
 
+/* Same size as the Home search bar's icon area: the bar is 48px tall like Home's. */
 .fd-wish-search-icon {
   display: inline-flex;
   align-items: center;
@@ -1232,7 +968,8 @@ function cheapestPlannable() {
 
 .fd-wish-tools .form-select {
   flex: 1 1 auto;
-  min-height: var(--fd-control);
+  /* Same height as the search bar beside it. */
+  min-height: var(--fd-search);
   padding: 0.375rem 3.25rem 0.375rem 1.5rem;
   border-radius: 999px;
   background-position: right 1.25rem center;
@@ -1328,7 +1065,7 @@ function cheapestPlannable() {
   border: 0;
   background: transparent;
   color: var(--fd-blue);
-  font-size: 0.8rem;
+  font-size: var(--fd-small);
   font-weight: 700;
   text-align: left;
   text-decoration: underline;
@@ -1347,16 +1084,19 @@ function cheapestPlannable() {
   height: 6rem;
   overflow: hidden;
   border-radius: 0.75rem;
-  background: var(--fd-vanilla-soft);
+  /* White behind every product photo, like the photos' own backgrounds. */
+  background: var(--fd-white);
   color: var(--fd-blue);
   font-family: var(--fd-font-display);
-  font-size: 2rem;
+  font-size: var(--fd-section-title);
 }
 
+/* The whole photo always shows (contain, never cropped), with a little white space around it. */
 .fd-wish-image img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  padding: 0.5rem;
+  object-fit: contain;
 }
 
 /* ===================================
@@ -1472,6 +1212,48 @@ function cheapestPlannable() {
   gap: 0.5rem;
 }
 
+.fd-friends-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.fd-sent {
+  color: #187447;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.fd-friends-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Friend count beside the moon button: profile icon with "+N" */
+.fd-friends-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border: var(--fd-border) solid var(--fd-blue);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fd-blue);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fd-friends-btn .fd-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.fd-friends-btn:hover {
+  background: var(--fd-vanilla-soft);
+}
+
 /* Right-align the verdict text */
 .fd-verdict-link {
   display: block;
@@ -1481,7 +1263,7 @@ function cheapestPlannable() {
   border: none;
   background: transparent;
   color: var(--fd-blue);
-  font-size: 0.8rem;
+  font-size: var(--fd-small);
   font-weight: 700;
   text-align: right;
   text-decoration: underline;
@@ -1545,7 +1327,7 @@ function cheapestPlannable() {
   .fd-wish-image {
     width: 4.5rem;
     height: 4.5rem;
-    font-size: 1.5rem;
+    font-size: var(--fd-section-title);
   }
 
   .fd-wish-cell-product .fd-verdict-link {
@@ -1666,13 +1448,7 @@ function cheapestPlannable() {
 
 .fd-budget-total strong {
   color: var(--fd-blue);
-  font-size: 1.25rem;
-}
-
-.fd-sample-link {
-  font-size: inherit;
-  font-weight: 700;
-  vertical-align: baseline;
+  font-size: var(--fd-body);
 }
 
 /* ===================================
@@ -1733,7 +1509,7 @@ function cheapestPlannable() {
   background: var(--fd-beige);
   color: var(--fd-blue);
   font-family: var(--fd-font-display);
-  font-size: 2.25rem;
+  font-size: var(--fd-page-title);
   line-height: 1.1;
   text-align: center;
   appearance: textfield;
@@ -1755,7 +1531,7 @@ function cheapestPlannable() {
   margin-top: 1.75rem;
   color: var(--fd-blue);
   font-family: var(--fd-font-display);
-  font-size: 2.5rem;
+  font-size: var(--fd-page-title);
 }
 
 .fd-hold-end {

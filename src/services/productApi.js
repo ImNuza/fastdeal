@@ -17,3 +17,8 @@ export async function fetchSearchedWith(q,sid) {
   const res = await fetch('/api/searched-with?key=' + encodeURIComponent(q || '') + '&sid=' + encodeURIComponent(sid || ''))
   return res.json()
 }
+// Lowest price on each of the last 14 days for a searched product: [{ day: 'YYYY-MM-DD', price }].
+export async function fetchPriceHistory(key) {
+  const res = await fetch('/api/price-history?key=' + encodeURIComponent(key || ''))
+  return res.json()
+}

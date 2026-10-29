@@ -113,7 +113,7 @@ onBeforeUnmount(function () {
 
 .is-page .fd-load-message {
   color: var(--fd-blue);
-  font-size: 1.125rem;
+  font-size: var(--fd-body);
   line-height: 1.3;
 }
 

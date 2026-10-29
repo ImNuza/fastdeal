@@ -222,7 +222,7 @@ async function loadFromSerpApi(productId, productKey, q, cached) {
   if (live) {
     await recordPrices(toProductKey(row.title), stores.map(function (store) {
       return Object.assign({ productId: productId }, store)
-    }))
+    }), 'product')
   }
   return row
 }

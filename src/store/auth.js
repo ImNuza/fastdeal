@@ -3,12 +3,11 @@ import { ref, computed } from 'vue'
 import axios from 'axios'
 import { toProductKey } from '../../models/product-key.js'
 import { watchAuthState, signOutUser } from '../services/auth.js'
-import { getUser } from '../services/userApi.js'
+import { getUser, updateUser } from '../services/userApi.js'
 
 const OLD_USERS_KEY = 'fastdeal-users'
 
-// Export the raw refs so mock/session.js (wishlist code) can import them directly.
-// Both paths share the same ref objects — one source of truth.
+// Raw refs, shared with the wishlist store and the Pinia store below: one source of truth.
 export const user = ref(null)
 export const firebaseUser = ref(null)
 export const authReady = ref(false)
@@ -73,12 +72,41 @@ async function copyOldWishlist(email) {
   else { localStorage.removeItem(OLD_USERS_KEY) }
 }
 
+export async function toggleEmail() {
+  if (!user.value || !firebaseUser.value) {
+    return
+  }
+  user.value.emailOn = !user.value.emailOn
+  try {
+    await updateUser({ emailAlertsOn: user.value.emailOn })
+  } catch (err) {
+    console.warn('[FastDeal] Could not sync emailAlertsOn to MongoDB:', err.message)
+  }
+}
+
+// A refresh while the server is restarting must not look like a logout: only a 404 means the
+// user is really not registered. Any other failure (server down, MongoDB not ready) is retried
+// for about 10 seconds. The router guard waits for this, so the page is not sent to /login.
+const PROFILE_TRIES = 5
+const PROFILE_RETRY_MS = 2000
+
+async function loadDbUser() {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await getUser()
+    } catch (err) {
+      if (err.response?.status === 404 || attempt >= PROFILE_TRIES) throw err
+      await new Promise(function (resolve) { setTimeout(resolve, PROFILE_RETRY_MS) })
+    }
+  }
+}
+
 watchAuthState(async function (fbUser) {
   firebaseUser.value = fbUser
   if (!fbUser) { user.value = null; authReady.value = true; return }
   if (_signupInProgress) { authReady.value = true; return }
   try {
-    const dbUser = await getUser()
+    const dbUser = await loadDbUser()
     applyDbUser(dbUser, fbUser)
   } catch (err) {
     if (err.response?.status === 404) {
@@ -100,5 +128,5 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
 
-  return { user, authReady, firebaseUser, isLoggedIn, isAdmin, startSignup, endSignup, applyDbUser }
+  return { user, authReady, firebaseUser, isLoggedIn, isAdmin, startSignup, endSignup, applyDbUser, toggleEmail }
 })

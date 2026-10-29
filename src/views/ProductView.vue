@@ -2,29 +2,33 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import DealCheck from '../components/DealCheck.vue'
+import FdBreadcrumbs from '../components/FdBreadcrumbs.vue'
 import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
 import SaveSleepButtons from '../components/SaveSleepButtons.vue'
+<<<<<<< HEAD
 import { sgd } from '../mock/catalog.js'
 import { fetchProduct } from '../services/productApi.js'
+=======
+import { sgd } from '../services/format.js'
+import { storeToRefs } from 'pinia'
+import { useProductStore } from '../store/product.js'
+import { itemName } from '../services/itemName.js'
+>>>>>>> cb2d593756fbe99e0708d91b93f2359960b71fdb
 
 // One product: every store that sells it, cheapest total first, with the Deal check,
 // what buyers say and the product details.
 // URL: /product/:productId?q=<the search it came from>
 const route = useRoute()
 
-const loading = ref(true)
-const errorText = ref('')
-const product = ref(null)
+// The product, its loading state and the cheapest/highest/ratings maths live in the product store.
+const { product, loading, errorText, searchedWith, cheapest, highest } = storeToRefs(useProductStore())
+const { percentOf, loadProduct } = useProductStore()
 
-
-const cheapest = computed(function () {
-  return product.value && product.value.stores.length ? product.value.stores[0] : null
-})
-
-const highest = computed(function () {
-  const stores = product.value ? product.value.stores : []
-  return stores.length > 1 ? stores[stores.length - 1] : null
-})
+<<<<<<< HEAD
+=======
+// "Searched with" list: show only the first few until the shopper asks for more.
+const showAll = ref(false)
+>>>>>>> cb2d593756fbe99e0708d91b93f2359960b71fdb
 
 // What the wishlist stores with this product, so it can open this page again.
 const saveInfo = computed(function () {
@@ -34,24 +38,22 @@ const saveInfo = computed(function () {
   return { productId: product.value.productId, q: product.value.q || route.query.q || '', image: product.value.image }
 })
 
-const ratingTotal = computed(function () {
-  return (product.value ? product.value.ratings : []).reduce(function (sum, row) {
-    return sum + row.amount
-  }, 0)
+onMounted(function () {
+  loadProduct(route.params.productId, route.query.q)
 })
 
-function percentOf(amount) {
-  return ratingTotal.value ? Math.round((amount / ratingTotal.value) * 100) : 0
-}
-
-onMounted(async function () {
-  try {
-    product.value = await fetchProduct(route.params.productId, route.query.q)
-  } catch (error) {
-    errorText.value = error.message
-  } finally {
-    loading.value = false
+// FastDeal / the search (back to its results) / the store the shopper clicked on Compare.
+// Without a store (a shared link), the last item is the product itself.
+const breadcrumbs = computed(function () {
+  const items = [{ label: 'FastDeal', to: '/' }]
+  if (route.query.q) {
+    items.push({ label: itemName(route.query.q), to: { path: '/compare', query: { q: route.query.q } } })
   }
+<<<<<<< HEAD
+=======
+  items.push({ label: route.query.store || (product.value && product.value.title) || 'Product' })
+  return items
+>>>>>>> cb2d593756fbe99e0708d91b93f2359960b71fdb
 })
 </script>
 
@@ -66,8 +68,7 @@ onMounted(async function () {
   </div>
 
   <div v-else-if="product">
-    <router-link v-if="route.query.q" class="small" :to="{ path: '/compare', query: { q: route.query.q } }">
-      Back to results for "{{ route.query.q }}"</router-link>
+    <FdBreadcrumbs :items="breadcrumbs" />
 
     <div class="row g-4 align-items-center mt-1 mb-3">
       <div v-if="product.image" class="col-md-3">
@@ -141,6 +142,28 @@ onMounted(async function () {
         </tbody>
       </table>
     </div>
+<<<<<<< HEAD
+=======
+
+<!-- searched with feature -->
+      <section v-if="searchedWith.length" class="mb-4">
+        <h2 class="fd-section-title">Customers who viewed this also viewed:</h2>
+        <div class="row g-3">
+          <div class="col-6 col-md-4 col-lg-3" v-for="item in (showAll ? searchedWith : searchedWith.slice(0, 8))">
+            <router-link :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
+              <div class="card h-100" style="padding: 0.75rem; border-radius: 1rem;">
+                <img :src="item.image"  class="card-img-top" style="display: block; width: 100%; height: 150px; padding: 1rem; object-fit: contain; border-radius: 0.75rem; background: var(--fd-white); margin-bottom: 0.75rem;">
+                <h5 class="card-title" style="margin: 0; font-size: var(--fd-body); font-weight: 600; line-height: 1.3;">{{ itemName(item.query) }}</h5>
+              </div>
+            </router-link>
+          </div>
+        </div>
+        <div class="text-center">
+          <button v-if="!showAll && searchedWith.length>8" class="btn btn-outline-dark mt-3" @click="showAll=true">Load More</button>
+          <p v-if="showAll" class="small text-secondary mt-3 mb-0">No more items to show</p>
+        </div>
+      </section>
+>>>>>>> cb2d593756fbe99e0708d91b93f2359960b71fdb
   
     <div class="row g-4">
       <section v-if="product.ratings.length || product.userReviews.length" class="col-lg-6">
@@ -185,9 +208,11 @@ onMounted(async function () {
   display: block;
   width: 100%;
   max-height: 260px;
+  padding: 1rem;
   border-radius: 1rem;
+  /* White behind every product photo; the whole photo always shows. */
   object-fit: contain;
-  background: var(--fd-beige, #f3ede1);
+  background: var(--fd-white);
 }
 
 .fd-stars {

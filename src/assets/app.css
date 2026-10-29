@@ -23,6 +23,22 @@ a {
 
 /* Type scale */
 
+/* Bootstrap's .small is 0.875em, which would track the 17px body; pin it to the small size. */
+.small,
+small {
+  font-size: var(--fd-small);
+}
+
+/* Bootstrap badges are 0.75em; tags are the small size. */
+.badge {
+  font-size: var(--fd-small);
+}
+
+/* The "@" and other input add-ons sit at body size, like the input beside them. */
+.input-group-text {
+  font-size: var(--fd-body);
+}
+
 .fd-page-title {
   margin-bottom: 0.5rem;
   color: var(--fd-blue);
@@ -93,14 +109,56 @@ small {
   display: flex;
   align-items: center;
   padding: 0.25rem 0;
-  font-size: 1.875rem;
+  /* Anton level 3: section title size, same as the footer logo. */
+  font-size: var(--fd-section-title);
   line-height: 1;
+}
+
+/* Navbar search: its own full-width row under the logo on phones, beside the logo on desktop. */
+.fd-nav-search {
+  order: 3;
+  flex: 1 0 100%;
+  margin-top: 0.75rem;
+}
+
+/* The opened phone menu drops below the search row. */
+@media (max-width: 991.98px) {
+  .fd-nav .navbar-collapse {
+    order: 4;
+  }
+}
+
+@media (min-width: 992px) {
+  /* Sits small beside the logo; once tapped it stretches across to the icons.
+     The auto right margin takes the spare space, so the icons stay on the right. */
+  .fd-nav-search {
+    order: 0;
+    flex: 1 1 auto;
+    max-width: 20rem;
+    margin: 0 auto 0 1.5rem;
+    transition: max-width 0.3s ease;
+  }
+
+  .fd-nav-search:focus-within {
+    max-width: 100%;
+  }
+
+  .fd-nav-search ~ .navbar-collapse {
+    flex-grow: 0;
+    margin-left: 1.5rem;
+  }
+}
+
+@media (min-width: 992px) and (prefers-reduced-motion: reduce) {
+  .fd-nav-search {
+    transition: none;
+  }
 }
 
 .fd-nav .nav-link {
   color: var(--fd-beige);
   font-family: var(--fd-font-display);
-  font-size: 1.125rem;
+  font-size: var(--fd-section-title);
   font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -152,7 +210,7 @@ small {
     z-index: 10;
     padding: 0.25rem 0.625rem;
     border-radius: 0.5rem;
-    background: var(--fd-ink);
+    background: var(--fd-blue-dark);
     color: var(--fd-beige);
     font-family: var(--fd-font-body);
     font-size: var(--fd-small);
@@ -351,6 +409,8 @@ tr.cheapest td {
 
 .form-control,
 .form-select {
+  /* Bootstrap sets 1rem (16px); inputs are body size like all normal text. */
+  font-size: var(--fd-body);
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: 0.625rem;
   background-color: var(--fd-paper);

@@ -1,11 +1,15 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { toggleEmail, user, authReady } from '../mock/session.js'
+import { storeToRefs } from 'pinia'
+import { useAuthStore } from '../store/auth.js'
 import { signOutUser } from '../services/auth.js'
 import { updateUser } from '../services/userApi.js'
 
 const router = useRouter()
+const authStore = useAuthStore()
+const { user, authReady } = storeToRefs(authStore)
+const { toggleEmail } = authStore
 
 watch(authReady, (ready) => {
   if (ready && !user.value) router.replace('/login?next=/account')
