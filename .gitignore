@@ -7,3 +7,11 @@ dist
 # Old search output files. Search results now live in the searchCache collection.
 src/mock/tempitem.json
 src/mock/last-search.json
+
+# Agent rules live in AGENTS.md only. Claude Code skips AGENTS.md when this file exists.
+CLAUDE.md
+
+# Playwright
+playwright-report/
+test-results/
+playwright/.auth/
