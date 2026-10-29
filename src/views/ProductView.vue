@@ -5,7 +5,7 @@ import DealCheck from '../components/DealCheck.vue'
 import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
 import SaveSleepButtons from '../components/SaveSleepButtons.vue'
 import { sgd } from '../mock/catalog.js'
-import { fetchProduct,fetchSearchedWith } from '../services/productApi.js'
+import { fetchProduct } from '../services/productApi.js'
 
 // One product: every store that sells it, cheapest total first, with the Deal check,
 // what buyers say and the product details.
@@ -16,9 +16,6 @@ const loading = ref(true)
 const errorText = ref('')
 const product = ref(null)
 
-//searched with feature
-const searchedWith = ref([])
-const showAll = ref(false)
 
 const cheapest = computed(function () {
   return product.value && product.value.stores.length ? product.value.stores[0] : null
@@ -55,7 +52,6 @@ onMounted(async function () {
   } finally {
     loading.value = false
   }
-  searchedWith.value = await fetchSearchedWith(product.value.q || route.query.q)
 })
 </script>
 
@@ -145,27 +141,7 @@ onMounted(async function () {
         </tbody>
       </table>
     </div>
-
-<!-- searched with feature -->
-      <section v-if="searchedWith.length" class="mb-4">
-        <h2 class="fd-section-title">Customers who viewed this also viewed:</h2>
-        <div class="row g-3">
-          <div class="col-6 col-md-4 col-lg-3" v-for="item in (showAll ? searchedWith : searchedWith.slice(0, 8))">
-            <router-link :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
-              <div class="card h-100" style="padding: 0.75rem; border-radius: 1rem;">
-                <img :src="item.image"  class="card-img-top" style="display: block; width: 100%; height: 150px; object-fit: contain; border-radius: 0.75rem; background: var(--fd-beige, #f3ede1); margin-bottom: 0.75rem;">
-                <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">{{ item.query }}</h5>
-              </div>
-            </router-link>
-          </div>
-        </div>
-        <div class="text-center">
-          <button v-if="!showAll && searchedWith.length>8" class="btn btn-outline-dark mt-3" @click="showAll=true">Load More</button>
-          <p v-if="showAll" class="small text-secondary mt-3 mb-0">No more items to show</p>
-        </div>
-      </section>
   
-
     <div class="row g-4">
       <section v-if="product.ratings.length || product.userReviews.length" class="col-lg-6">
         <h2 class="fd-section-title">What buyers say</h2>

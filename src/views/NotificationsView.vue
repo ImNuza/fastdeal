@@ -137,7 +137,7 @@ onMounted(load)
 <template>
   <div v-if="user">
     <div class="d-flex justify-content-between gap-3">
-      <h1 class="fd-section-title" style="margin: 0;">Notifications</h1>
+      <h1 class="fd-section-title m-0">Notifications</h1>
       <button class="btn btn-sm btn-outline-dark" type="button" @click="markAllRead">Mark all as read</button>
     </div>
 
@@ -148,11 +148,11 @@ onMounted(load)
         <div class="col-12" v-for="n in unread" :key="n._id">
 
           <!-- Buy Together card (initiator) -->
-          <div v-if="isBuyTogether(n)" class="card h-100 bt-card" style="padding: 0.75rem;">
+          <div v-if="isBuyTogether(n)" class="card h-100 bt-card fd-item">
             <div class="d-flex justify-content-between align-items-center gap-2">
               <div>
-                <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">🛒 {{ n.title }}</h5>
-                <p class="text-secondary" style="margin: 0;">{{ n.body }}</p>
+                <h5 class="fd-item-title">🛒 {{ n.title }}</h5>
+                <p class="text-secondary fd-item-text">{{ n.body }}</p>
               </div>
               <div class="d-flex gap-2 flex-shrink-0">
                 <button class="btn btn-sm btn-dark" type="button" @click="openBuyTogether(n)">Buy Together</button>
@@ -162,11 +162,11 @@ onMounted(load)
           </div>
 
           <!-- Group invite card (friend) -->
-          <div v-else-if="isGroupInvite(n)" class="card h-100 bt-card" style="padding: 0.75rem;">
+          <div v-else-if="isGroupInvite(n)" class="card h-100 bt-card fd-item">
             <div class="d-flex justify-content-between align-items-center gap-2">
               <div>
-                <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">🛒 {{ n.title }}</h5>
-                <p class="text-secondary" style="margin: 0;">{{ n.body }}</p>
+                <h5 class="fd-item-title">🛒 {{ n.title }}</h5>
+                <p class="text-secondary fd-item-text">{{ n.body }}</p>
               </div>
               <div class="d-flex gap-2 flex-shrink-0">
                 <button class="btn btn-sm btn-dark" type="button" @click="openGroupInvite(n)">Buy Together</button>
@@ -176,12 +176,12 @@ onMounted(load)
           </div>
 
           <!-- Regular notification -->
-          <router-link v-else :to="n.link || '/'" style="text-decoration: none;">
-            <div class="card h-100" style="padding: 0.75rem; border-radius: 1rem;">
+          <router-link v-else :to="n.link || '/'" class="fd-item-link">
+            <div class="card h-100 fd-item">
               <div class="d-flex justify-content-between align-items-center">
                 <div>
-                  <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">{{ n.title }}</h5>
-                  <p style="margin: 0;">{{ n.body }}</p>
+                  <h5 class="fd-item-title">{{ n.title }}</h5>
+                  <p class="fd-item-text">{{ n.body }}</p>
                 </div>
                 <button class="btn btn-sm btn-outline-dark" type="button" @click.prevent="markRead(n)">Mark as read</button>
               </div>
@@ -198,30 +198,30 @@ onMounted(load)
       <h2 class="fd-section-subtitle">Read</h2>
       <div class="row g-3">
         <div class="col-12" v-for="n in read" :key="n._id">
-          <div v-if="isBuyTogether(n)" class="card h-100" style="padding: 0.75rem;">
+          <div v-if="isBuyTogether(n)" class="card h-100 fd-item">
             <div class="d-flex justify-content-between align-items-center gap-2">
               <div>
-                <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">🛒 {{ n.title }}</h5>
-                <p class="text-secondary" style="margin: 0;">{{ n.body }}</p>
+                <h5 class="fd-item-title">🛒 {{ n.title }}</h5>
+                <p class="text-secondary fd-item-text">{{ n.body }}</p>
               </div>
               <button class="btn btn-sm btn-outline-dark flex-shrink-0" type="button" @click="openBuyTogether(n)">Buy Together</button>
             </div>
           </div>
-          <div v-else-if="isGroupInvite(n)" class="card h-100" style="padding: 0.75rem;">
+          <div v-else-if="isGroupInvite(n)" class="card h-100 fd-item">
             <div class="d-flex justify-content-between align-items-center gap-2">
               <div>
-                <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">🛒 {{ n.title }}</h5>
-                <p class="text-secondary" style="margin: 0;">{{ n.body }}</p>
+                <h5 class="fd-item-title">🛒 {{ n.title }}</h5>
+                <p class="text-secondary fd-item-text">{{ n.body }}</p>
               </div>
               <button class="btn btn-sm btn-outline-dark flex-shrink-0" type="button" @click="openGroupInvite(n)">View</button>
             </div>
           </div>
-          <router-link v-else :to="n.link || '/'" style="text-decoration: none;">
-            <div class="card h-100" style="padding: 0.75rem; border-radius: 1rem;">
+          <router-link v-else :to="n.link || '/'" class="fd-item-link">
+            <div class="card h-100 fd-item">
               <div class="d-flex justify-content-between align-items-center">
                 <div>
-                  <h5 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.3;">{{ n.title }}</h5>
-                  <p style="margin: 0;">{{ n.body }}</p>
+                  <h5 class="fd-item-title">{{ n.title }}</h5>
+                  <p class="fd-item-text">{{ n.body }}</p>
                 </div>
               </div>
             </div>

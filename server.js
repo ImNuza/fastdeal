@@ -459,13 +459,14 @@ app.get('/api/trending' , async (req,res) =>{
 //search with feature
 app.get('/api/searched-with',async (req,res)=>{
   try{
+    const sid = String(req.query.sid || '')
     const key=toProductKey(req.query.key)
     const match= await SearchLog.find({productKey: key})
     const sessionIds=[]
     for (const i of match){
       sessionIds.push(i.sessionId)
     }
-    const otherSearchesRaw = await SearchLog.find({ sessionId: { $in: sessionIds }, productKey: { $ne: key } })
+    const otherSearchesRaw = await SearchLog.find({ sessionId: { $in: sessionIds , $ne: sid }, productKey: { $ne: key } })
 
     const otherSearches={}
     for (const i of otherSearchesRaw){

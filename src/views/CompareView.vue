@@ -6,6 +6,7 @@ import { buildResult, dayLabel, sgd, verdictFor } from '../mock/catalog.js'
 import { isSaved, savedFrom, saveProduct, user } from '../mock/session.js'
 import { itemName } from '../services/itemName.js'
 import { sessionId } from '../services/searchSession.js'
+import { fetchSearchedWith } from '../services/productApi.js'
 import axios from 'axios'
 
 const route = useRoute()
@@ -22,6 +23,11 @@ const freeOnly = ref(false)
 const saleOnly = ref(false)
 const sortBy = ref('price')
 const note = ref('')
+
+//searched with feature
+const searchedWith = ref([])
+const showAll = ref(false)
+
 // Image URLs that failed to load, so those cards show the placeholder instead.
 const brokenImages = ref({})
 
@@ -247,6 +253,7 @@ onMounted(async function () {
   result.value = built
   seedPriceRange(built.listings)
   loading.value = false
+  searchedWith.value = await fetchSearchedWith(q,sessionId())
 })
 </script>
 
@@ -377,15 +384,24 @@ onMounted(async function () {
     </div>
     <p class="small text-secondary">{{ dayLabel(13) }} to {{ dayLabel(0) }}. Low {{ sgd(verdict.low) }}.</p>
 
-    <h2 class="fd-section-title mt-4">Searched with this</h2>
-    <div class="d-flex flex-wrap gap-2">
-      <router-link
-        v-for="name in result.related"
-        :key="name"
-        class="btn btn-outline-dark btn-sm"
-        :to="{ path: '/compare', query: { q: name } }"
-      >{{ name }}</router-link>
-    </div>
+    <!-- searched with feature -->
+    <section v-if="searchedWith.length" class="mb-4">
+      <h2 class="fd-section-title">Customers who viewed this also viewed:</h2>
+      <div class="row g-3">
+        <div class="col-6 col-md-4 col-lg-3" v-for="item in (showAll ? searchedWith : searchedWith.slice(0, 8))">
+          <router-link :to="{ path: '/compare', query: { q: item.query } }" class="fd-item-link">
+            <div class="card h-100 fd-item">
+              <img :src="item.image"  class="fd-item-img">
+              <h5 class="fd-item-title">{{ item.query }}</h5>
+            </div>
+          </router-link>
+        </div>
+      </div>
+      <div class="text-center">
+        <button v-if="!showAll && searchedWith.length>8" class="btn btn-outline-dark mt-3" @click="showAll=true">Load More</button>
+        <p v-if="showAll" class="small text-secondary mt-3 mb-0">No more items to show</p>
+      </div>
+    </section>
   </div>
 </template>
 

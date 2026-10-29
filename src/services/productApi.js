@@ -13,7 +13,7 @@ export async function fetchProduct(productId, q) {
 }
 
 //search with feature
-export async function fetchSearchedWith(q) {
-  const res = await fetch('/api/searched-with?key=' + encodeURIComponent(q || ''))
+export async function fetchSearchedWith(q,sid) {
+  const res = await fetch('/api/searched-with?key=' + encodeURIComponent(q || '') + '&sid=' + encodeURIComponent(sid || ''))
   return res.json()
 }
