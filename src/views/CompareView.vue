@@ -9,6 +9,8 @@ import { useAuthStore } from '../store/auth.js'
 import { useWishlistStore } from '../store/wishlist.js'
 import { itemName } from '../services/itemName.js'
 import { sessionId } from '../services/searchSession.js'
+import { fetchSearchedWith } from '../services/productApi.js'
+import { useCompareStore } from '../store/compare.js'
 import axios from 'axios'
 
 const route = useRoute()
@@ -329,15 +331,23 @@ onMounted(async function () {
     </template>
     <p v-else class="small text-secondary">Not enough tracked prices yet. This fills in as people search for this product.</p>
 
-    <h2 class="fd-section-title mt-4">Searched with this</h2>
-    <div class="d-flex flex-wrap gap-2">
-      <router-link
-        v-for="name in result.related"
-        :key="name"
-        class="btn btn-outline-dark btn-sm"
-        :to="{ path: '/compare', query: { q: name } }"
-      >{{ name }}</router-link>
-    </div>
+    <section v-if="searchedWith.length" class="mb-4 mt-4">
+      <h2 class="fd-section-title">Customers who viewed this also viewed:</h2>
+      <div class="row g-3">
+        <div class="col-6 col-md-4 col-lg-3" v-for="item in (showAll ? searchedWith : searchedWith.slice(0, 8))" :key="item._id">
+          <router-link :to="{ path: '/compare', query: { q: item.query } }" class="fd-item-link">
+            <div class="card h-100 fd-item">
+              <img :src="item.image" class="fd-item-img">
+              <h5 class="fd-item-title">{{ itemName(item.query) }}</h5>
+            </div>
+          </router-link>
+        </div>
+      </div>
+      <div class="text-center">
+        <button v-if="!showAll && searchedWith.length > 8" class="btn btn-outline-dark mt-3" @click="showAll = true">Load More</button>
+        <p v-if="showAll" class="small text-secondary mt-3 mb-0">No more items to show</p>
+      </div>
+    </section>
   </div>
 </template>
 

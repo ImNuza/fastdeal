@@ -391,46 +391,6 @@ onBeforeUnmount(function () {
     </div>
   </section>
 
-<<<<<<< HEAD
- 
-    <div class="container py-5">
-    
-      <section id="fd-trending" style="margin-bottom: 10px;">
-        <h2 class="fd-section-title">Trending Today</h2>
-      </section>
-      <div id="trendingCarousel" class="carousel slide fd-carousel">
-        <div class="carousel-inner">
-          <div v-for="(item,index) in trendingToday" class="carousel-item" :class="{ active: index === 0 }">
-             <router-link :to="{ path: '/compare', query: { q: item.query } }" class="fd-item-link">
-              <img :src="item.image" class="d-block mx-auto fd-carousel-img">
-              <div class="text-center">
-                <h3>{{ item.query }}</h3>
-              </div>
-             </router-link>
-          </div>
-        </div>
-        <div class="carousel-indicators">
-          <button  v-for="(item,index) in trendingToday" type="button" data-bs-target="#trendingCarousel" :data-bs-slide-to="index" :class="{ active: index === 0 }" aria-label="Slide"></button>
-        </div>
-        
-        <button class="carousel-control-prev" type="button" data-bs-target="#trendingCarousel" data-bs-slide="prev">
-          <span aria-hidden="true" class="fd-carousel-arrow">&lsaquo;</span>
-          <span class="visually-hidden">Previous</span>
-        </button>
-        <button class="carousel-control-next" type="button" data-bs-target="#trendingCarousel" data-bs-slide="next">
-          <span aria-hidden="true" class="fd-carousel-arrow">&rsaquo;</span>
-          <span class="visually-hidden">Next</span>
-        </button>
-      </div>
-
-      <h3 class="fd-section-title">Trending This Week</h3>
-      <div class="row g-3 mt-4">
-        <div class="col-6 col-md-4 col-lg-3" v-for="item in trendingWeek" :key="item._id">
-          <router-link :to="{ path: '/compare', query: { q: item.query } }" class="fd-item-link">
-            <div class="card h-100 fd-item">
-              <img :src="item.image"  class="fd-item-img">
-              <h5 class="fd-item-title">{{ item.query }}</h5>
-=======
   <!-- Trending today: cream, with the carousel in the container. -->
   <section id="fd-trending" class="fd-trending-section fd-trending-today">
     <div class="container">
@@ -474,16 +434,12 @@ onBeforeUnmount(function () {
             <div class="card h-100 fd-week-card" style="padding: 1.25rem; border-radius: 1rem;">
               <img :src="item.image"  class="card-img-top" style="display: block; width: 100%; height: 170px; padding: 1.25rem; object-fit: contain; border-radius: 0.75rem; background: var(--fd-white); margin-bottom: 1.25rem;">
               <h5 class="card-title" style="margin: 0; font-size: var(--fd-body); font-weight: 600; line-height: 1.3;">{{ itemName(item.query) }}</h5>
->>>>>>> cb2d593756fbe99e0708d91b93f2359960b71fdb
             </div>
           </router-link>
         </div>
       </div>
     </div>
-<<<<<<< HEAD
-=======
   </section>
->>>>>>> cb2d593756fbe99e0708d91b93f2359960b71fdb
 </template>
 
 <style scoped>

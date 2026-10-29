@@ -550,6 +550,6 @@ tr.cheapest td {
   line-height: 1;
 }
 
-.fd-item-link:hover .fd-item-title {
+.fd-week-link:hover .card-title {
   text-decoration: underline;
 }
