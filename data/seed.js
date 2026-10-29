@@ -1,7 +1,8 @@
 // Demo data for the demo@smu.edu.sg account, its friends, price history and Trending.
 // Run: npm run seed. Safe to run again: it deletes its own rows first.
 // It also deletes every friendship and notification of the demo account, so the demo starts clean.
-// Needs MONGODB_URI and DEMO_FIREBASE_UID in .env.
+// Needs MONGODB_URI and DEMO_FIREBASE_UID in .env. demo@smu.edu.sg is an admin.
+// Optional: DEMO_USER_FIREBASE_UID adds demo.user@smu.edu.sg, a normal user with no demo data.
 import dotenv from 'dotenv'
 import mongoose from 'mongoose'
 import Friendship from '../models/friendship-model.js'
@@ -17,6 +18,7 @@ import { toProductKey } from '../models/product-key.js'
 dotenv.config()
 
 const DEMO_EMAIL = 'demo@smu.edu.sg'
+const DEMO_USER_EMAIL = 'demo.user@smu.edu.sg'
 const HOUR = 3600000
 const DAY = 24 * HOUR
 const HISTORY_DAYS = 90
@@ -79,7 +81,8 @@ async function seed() {
 
   const now = Date.now()
   const friendUids = friends.map((friend) => friend.firebaseUid)
-  const allUids = [uid, ...friendUids]
+  const demoUserUid = process.env.DEMO_USER_FIREBASE_UID
+  const allUids = demoUserUid ? [uid, demoUserUid, ...friendUids] : [uid, ...friendUids]
   const sony = toProductKey('Sony WH-1000XM5')
   const kindle = toProductKey('Kindle Paperwhite')
   const switchOled = toProductKey('Nintendo Switch OLED')
@@ -117,7 +120,7 @@ async function seed() {
 
     // Clear the demo account and its friends
     await User.deleteMany({
-      $or: [{ firebaseUid: { $in: allUids } }, { email: { $in: [DEMO_EMAIL, ...friends.map((friend) => friend.email)] } }]
+      $or: [{ firebaseUid: { $in: allUids } }, { email: { $in: [DEMO_EMAIL, DEMO_USER_EMAIL, ...friends.map((friend) => friend.email)] } }]
     })
     await WishlistItem.deleteMany({ firebaseUid: { $in: allUids } })
     await SleepHold.deleteMany({ firebaseUid: uid })
@@ -129,6 +132,7 @@ async function seed() {
       firebaseUid: uid,
       email: DEMO_EMAIL,
       username: 'demo',
+      role: 'admin',
       emailAlertsOn: true,
       recentSearches: [
         { query: 'xm5', productKey: sony, searchedAt: new Date(now - 1 * HOUR) },
@@ -137,6 +141,9 @@ async function seed() {
       ]
     })
     await User.insertMany(friends.map((friend) => ({ ...friend, emailAlertsOn: true })))
+    if (demoUserUid) {
+      await User.create({ firebaseUid: demoUserUid, email: DEMO_USER_EMAIL, username: 'demouser', role: 'user' })
+    }
 
     // Friendships: two accepted, one request waiting for the demo user
     await Friendship.insertMany([

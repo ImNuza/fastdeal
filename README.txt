@@ -3,7 +3,9 @@ FastDeal (IS216 G8-3)
 This site is a frontend reference. Search, compare, login, wishlist, alerts, and Sleep on it run in the browser with sample listings. SerpApi, Gemini, Firebase, and email are not wired.
 The server connects to MongoDB Atlas (database fastdeal). The pages do not read from it yet.
 
-Demo account: demo@smu.edu.sg / demo1234
+Demo accounts (same password for both)
+- Admin: demo@smu.edu.sg / demo1234 (has the demo wishlist, friends and the Admin dashboard)
+- Normal user: demo.user@smu.edu.sg / demo1234 (no admin access)
 A search for "fail" shows the error state.
 
 Setup
@@ -30,10 +32,17 @@ Database (MongoDB Atlas)
 - productKey = product name in lowercase, trimmed, single spaces. Use toProductKey in models/product-key.js.
 - pairKey = the two friends' uids sorted and joined with "|". Use toPairKey in models/pair-key.js. One friendships row per pair.
 - ERD and the reason for each field: /erd in the app (https://fastdeal-iqzg.onrender.com/erd), file docs/fastdeal-erd-v3.html (v2 kept for the record)
-- Seed: data/seed.js. The demo login itself is a Firebase user. Its UID goes in DEMO_FIREBASE_UID.
+- Seed: data/seed.js. Both demo logins are Firebase users. Their UIDs go in DEMO_FIREBASE_UID (admin) and DEMO_USER_FIREBASE_UID (normal user). The seed keeps demo@smu.edu.sg as admin.
 
 Test
-No automated tests. Open /, /compare?q=Sony%20WH-1000XM5, /trending, /login, and /wishlist.
+End-to-end tests use Playwright (tests/ folder, settings in playwright.config.js).
+1. npx playwright install chromium (once)
+2. Put E2E_DEMO_PASSWORD=demo1234 in .env
+3. npm run seed
+4. npm run test:e2e (starts the API and Vite itself)
+5. npm run test:report to open the HTML report. npx playwright test --ui shows each step.
+Tests never call SerpApi or Gemini. They return saved responses from tests/fixtures/.
+Manual check: open /, /compare?q=Sony%20WH-1000XM5, /trending, /login, and /wishlist.
 On first visit, choose Log in or Continue as guest. Log in opens inside the welcome popup without changing pages. The choice is remembered in this browser.
 
 AI / LLM
