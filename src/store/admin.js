@@ -10,11 +10,11 @@ export const useAdminStore = defineStore('admin', () => {
   const error = ref(null)
 
   // actions
-  async function fetchStats() {
+  async function fetchStats(days = 7) {
     loading.value = true
     error.value = null
     try {
-      const res = await axios.get('/api/admin/stats')
+      const res = await axios.get('/api/admin/stats', { params: { days } })
       stats.value = res.data
     } catch (err) {
       error.value = err.response?.data?.error || 'Could not load stats.'

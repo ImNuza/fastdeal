@@ -171,15 +171,15 @@ watch([() => route.path, user], maybeShowEntryDialog)
       <div class="collapse navbar-collapse" id="fdNav">
         <ul class="navbar-nav ms-auto align-items-lg-center fd-nav-right">
           <li class="nav-item">
-            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/friends') }" active-class="" exact-active-class="" to="/friends">
-              <FdIcon name="friends" />
-              <span class="fd-icon-label">Friends</span>
-            </router-link>
-          </li>
-          <li class="nav-item">
             <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/wishlist') }" active-class="" exact-active-class="" to="/wishlist">
               <FdIcon name="tag" />
               <span class="fd-icon-label">Wishlist</span>
+            </router-link>
+          </li>
+          <li class="nav-item">
+            <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/friends') }" active-class="" exact-active-class="" to="/friends">
+              <FdIcon name="friends" />
+              <span class="fd-icon-label">Friends</span>
             </router-link>
           </li>
           <li class="nav-item">
@@ -191,7 +191,7 @@ watch([() => route.path, user], maybeShowEntryDialog)
           </li>
           <li v-if="user?.role === 'admin'" class="nav-item">
             <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/admin') }" active-class="" exact-active-class="" to="/admin">
-              <FdIcon name="account" />
+              <FdIcon name="dashboard" />
               <span class="fd-icon-label">Admin</span>
             </router-link>
           </li>

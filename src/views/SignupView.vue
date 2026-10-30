@@ -102,7 +102,7 @@ async function onEmailSignUp() {
   <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
       <h1 class="fd-page-title">Sign up</h1>
-      <p class="fd-page-subtitle">Sign up to save products to your wishlist, get alerts when prices drop, and see what your friends are eyeing!</p>
+      <p class="fd-page-subtitle">Make an account to save products, hear when prices drop, and shop with friends.</p>
 
       <div class="card p-4">
         <p v-if="errorText" :class="['alert mb-3', route.query.error === 'not-registered' ? 'alert-warning' : 'alert-danger']">{{ errorText }}</p>

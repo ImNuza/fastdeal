@@ -65,7 +65,7 @@ async function onSubmit() {
   <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
       <h1 class="fd-page-title">Pick a username</h1>
-      <p class="fd-page-subtitle">Friends find you by username. You can change these later in Account settings.</p>
+      <p class="fd-page-subtitle">Your username is how friends find you. You can change these later in Account settings.</p>
 
       <div class="card p-4">
         <p v-if="errorText" class="alert alert-danger mb-3">{{ errorText }}</p>

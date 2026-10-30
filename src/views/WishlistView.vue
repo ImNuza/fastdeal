@@ -383,9 +383,9 @@ function onBuyTogether(item) {
 <template>
   <div v-if="user">
     <h1 class="fd-page-title">Wishlist</h1>
-    <p class="fd-page-subtitle">Your saved price and store next to the best price now. A cheaper store is marked as a
+    <p class="fd-page-subtitle">What you saved, next to the best price right now. If another store is cheaper, it shows as a
       price drop.<br />
-      Not sure yet? Sleep on it and the item rests until you are ready.</p>
+      Not sure yet? Sleep on it and come back when you're ready.</p>
 
     <p v-if="!user.wishlist.length" class="alert alert-secondary">No saved products. Search, then press Save.</p>
 

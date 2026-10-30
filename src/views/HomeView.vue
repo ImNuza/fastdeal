@@ -47,9 +47,10 @@ const beltHeld = ref(false)
 
 // Hero
 
-// The hero cards all come from live data (/api/home-stats): what real people searched this
-// week and the store prices the shopping API returned for it. Nothing is seeded. Until it
-// loads, or when there is nothing yet, the cards stay hidden.
+// The hero cards help a shopper decide where and when to buy, straight from our own data
+// (/api/home-stats): how much comparing stores pays, the next big sale, and real price drops on
+// wishlists. Seed data stays in the database but is left out. A card with no data stays hidden;
+// with none at all, the whole cluster does.
 const stats = ref(null)
 
 onMounted(async function loadHomeStats() {
@@ -65,144 +66,51 @@ function money(n) {
   return 'S$' + Math.round(n).toLocaleString('en-SG')
 }
 
-// The top trending product, for all three cards.
-const heroProduct = computed(function () {
-  const product = stats.value && stats.value.product
-  if (!product || product.stores.length < 2) {
+// Comparing pays: one product (the top trending one with 3 store prices), the saving between its
+// cheapest and priciest store, and three of its stores (cheapest, median, priciest), each bar
+// sized against the priciest price.
+const comparing = computed(function () {
+  const c = stats.value && stats.value.comparing
+  if (!c || !c.example) {
     return null
   }
-  const stores = product.stores
-  const cheapest = stores[0]
-  const priciest = stores[stores.length - 1]
-  const saving = priciest.price - cheapest.price
+  const labels = ['Cheapest', 'Median', 'Priciest']
+  const high = c.example.stores[c.example.stores.length - 1].price
+  const low = c.example.stores[0].price
   return {
-    name: itemName(product.name),
-    stores: stores,
-    cheapest: cheapest,
-    priciest: priciest,
-    saving: saving,
-    // Up to four bars: the three cheapest stores and the priciest, so the last bar matches "You save".
-    overpay: (stores.length > 4 ? stores.slice(0, 3).concat([priciest]) : stores).map(function (item) {
-      return {
-        store: item.store,
-        extra: item.price - cheapest.price,
-        width: saving ? ((item.price - cheapest.price) / saving) * 100 : 0
-      }
+    // The saving on this item: its priciest store minus its cheapest.
+    gap: high - low,
+    name: itemName(c.example.name),
+    rows: c.example.stores.map(function (st, i) {
+      return { label: labels[i], store: st.store, price: st.price, width: (st.price / high) * 100 }
     })
   }
 })
 
-// "YYYY-MM-DD" in Singapore time, like the server's price days.
-function sgDay(time) {
-  return new Date(time + 8 * 3600000).toISOString().slice(0, 10)
-}
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-function dayName(day) {
-  if (day === sgDay(Date.now())) {
-    return 'Today'
-  }
-  return Number(day.slice(8, 10)) + ' ' + MONTHS[Number(day.slice(5, 7)) - 1]
-}
-
-// Price tracking: the lowest price on each tracked day, once there are at least two days.
-// Until then the graph shows today's price at every store, cheapest to priciest.
-const tracking = computed(function () {
-  const history = (stats.value && stats.value.product && stats.value.product.history) || []
-  if (history.length < 2) {
-    return null
-  }
-  const first = history[0]
-  const last = history[history.length - 1]
-  return {
-    history: history,
-    today: last.price,
-    change: last.price - first.price,
-    since: dayName(first.day)
-  }
+const nextSale = computed(function () {
+  return stats.value && stats.value.nextSale
 })
 
-// Graph series: either the tracked days or today's stores. Both are a list of
-// { label, price }, so one line chart draws either.
-const series = computed(function () {
-  if (tracking.value) {
-    return tracking.value.history.map(function (d) { return { label: dayName(d.day), price: d.price } })
+// "In 12 days. Shopee and Lazada usually join. Not urgent? It may be worth waiting."
+const saleText = computed(function () {
+  const sale = nextSale.value
+  if (!sale) {
+    return ''
   }
-  if (heroProduct.value) {
-    return heroProduct.value.stores.map(function (item) { return { label: item.store, price: item.price } })
-  }
-  return []
+  const when = sale.daysAway === 0 ? 'Today.' : sale.daysAway === 1 ? 'Tomorrow.' : 'In ' + sale.daysAway + ' days.'
+  const who = sale.stores.length ? ' ' + sale.stores.join(' and ') + ' usually join.' : ''
+  return when + who + ' Not urgent? It may be worth waiting.'
 })
 
-// Price graph (SVG units).
-const chart = { width: 320, height: 150, top: 16, right: 12, bottom: 24, left: 12 }
+const drops = computed(function () {
+  return (stats.value && stats.value.drops) || []
+})
 
-const graph = computed(function () {
-  const rows = series.value
-  if (rows.length < 2) {
-    return null
-  }
-  const prices = rows.map(function (row) { return row.price })
-  const low = Math.min.apply(null, prices)
-  const high = Math.max.apply(null, prices)
-  const average = prices.reduce(function (sum, n) { return sum + n }, 0) / prices.length
-  const pad = (high - low) * 0.1 || high * 0.05 || 1
-  const yMin = low - pad
-  const yMax = high + pad
-  const plot = chart.height - chart.top - chart.bottom
-  const points = prices.map(function (price, i) {
-    return {
-      x: chart.left + (i * (chart.width - chart.left - chart.right)) / (prices.length - 1),
-      y: chart.top + ((yMax - price) * plot) / (yMax - yMin)
-    }
+// Shown in the third card while there are no believable price drops.
+const mostSaved = computed(function () {
+  return ((stats.value && stats.value.mostSaved) || []).map(function (m) {
+    return { name: itemName(m.name), count: m.count }
   })
-  const line = points.map(function (pt, i) {
-    return (i === 0 ? 'M' : 'L') + pt.x.toFixed(1) + ' ' + pt.y.toFixed(1)
-  }).join(' ')
-  const lastPoint = points[points.length - 1]
-  const lowIndex = prices.indexOf(low)
-  const name = heroProduct.value.name
-  return {
-    points: points,
-    line: line,
-    area: line + ' L' + lastPoint.x.toFixed(1) + ' ' + (chart.height - chart.bottom) +
-      ' L' + points[0].x.toFixed(1) + ' ' + (chart.height - chart.bottom) + ' Z',
-    average: average,
-    averageY: chart.top + ((yMax - average) * plot) / (yMax - yMin),
-    lowPoint: points[lowIndex],
-    firstLabel: tracking.value ? rows[0].label : 'Cheapest store',
-    lastLabel: tracking.value ? rows[rows.length - 1].label : 'Priciest',
-    summary: tracking.value
-      ? 'Lowest price of ' + name + ' each day from ' + rows[0].label + ' to ' + rows[rows.length - 1].label +
-        ', from ' + money(prices[0]) + ' to ' + money(prices[prices.length - 1]) + '. Lowest ' + money(low) + '.'
-      : 'Price of ' + name + ' at ' + prices.length + ' stores today, from ' + money(low) + ' to ' + money(high) + '.'
-  }
-})
-
-const hoverIndex = ref(null)
-const chartBox = ref(null)
-
-function onChartPointer(event) {
-  const count = series.value.length
-  const box = chartBox.value.getBoundingClientRect()
-  const svgX = ((event.clientX - box.left) / box.width) * chart.width
-  const step = (chart.width - chart.left - chart.right) / (count - 1)
-  const index = Math.round((svgX - chart.left) / step)
-  hoverIndex.value = Math.min(Math.max(index, 0), count - 1)
-}
-
-function clearChartPointer() {
-  hoverIndex.value = null
-}
-
-const tooltip = computed(function () {
-  if (hoverIndex.value === null || !graph.value) {
-    return null
-  }
-  const pt = graph.value.points[hoverIndex.value]
-  const row = series.value[hoverIndex.value]
-  return { left: (pt.x / chart.width) * 100 + '%', x: pt.x, y: pt.y, label: row.label, price: money(row.price) }
 })
 
 // Cards fly out to the right as the hero scrolls away.
@@ -300,74 +208,49 @@ onBeforeUnmount(function () {
           <FdSearchBar />
         </div>
 
-        <div v-if="heroProduct && graph" class="fd-cluster">
-          <article class="fd-card fd-card--history">
-            <header class="fd-card-head">
-              <p class="fd-card-label">{{ heroProduct.name }}</p>
-              <template v-if="tracking">
-                <p class="fd-card-value">{{ money(tracking.today) }} <span class="fd-card-note">today</span></p>
-                <p class="fd-card-meta">
-                  <template v-if="tracking.change < 0">Down {{ money(-tracking.change) }} since {{ tracking.since }}</template>
-                  <template v-else-if="tracking.change > 0">Up {{ money(tracking.change) }} since {{ tracking.since }}</template>
-                  <template v-else>No change since {{ tracking.since }}</template>
-                  · lowest price each day
-                </p>
-              </template>
-              <template v-else>
-                <p class="fd-card-value">{{ money(heroProduct.cheapest.price) }} <span class="fd-card-note">cheapest today</span></p>
-                <p class="fd-card-meta">Price tracking just started: the daily line appears once there are 2 days. For now, {{ heroProduct.stores.length }} stores today.</p>
-              </template>
-            </header>
-            <div
-              ref="chartBox"
-              class="fd-chart"
-              @pointermove="onChartPointer"
-              @pointerdown="onChartPointer"
-              @pointerleave="clearChartPointer"
-            >
-              <svg :viewBox="'0 0 ' + chart.width + ' ' + chart.height" role="img" :aria-label="graph.summary">
-                <path class="fd-chart-area" :d="graph.area" />
-                <line class="fd-chart-average" :x1="chart.left" :x2="chart.width - chart.right" :y1="graph.averageY" :y2="graph.averageY" />
-                <path class="fd-chart-line" :d="graph.line" />
-                <circle class="fd-chart-low" :cx="graph.lowPoint.x" :cy="graph.lowPoint.y" r="5" />
-                <g v-if="tooltip">
-                  <line class="fd-chart-cross" :x1="tooltip.x" :x2="tooltip.x" :y1="chart.top" :y2="chart.height - chart.bottom" />
-                  <circle class="fd-chart-hover" :cx="tooltip.x" :cy="tooltip.y" r="5" />
-                </g>
-                <text class="fd-chart-value" :x="graph.points[0].x" :y="graph.points[0].y - 10">{{ money(series[0].price) }}</text>
-                <text class="fd-chart-value" :x="graph.points[graph.points.length - 1].x" :y="graph.points[graph.points.length - 1].y - 10" text-anchor="end">{{ money(series[series.length - 1].price) }}</text>
-                <text class="fd-chart-axis" :x="chart.left" :y="chart.height - 6">{{ graph.firstLabel }}</text>
-                <text class="fd-chart-axis" :x="chart.width - chart.right" :y="chart.height - 6" text-anchor="end">{{ graph.lastLabel }}</text>
-              </svg>
-              <div v-if="tooltip" class="fd-tooltip" :style="{ left: tooltip.left }" aria-hidden="true">
-                <span>{{ tooltip.label }}</span>
-                <strong>{{ tooltip.price }}</strong>
-              </div>
-            </div>
-            <p class="fd-chart-key">
-              <span class="fd-key fd-key--low"></span>{{ tracking ? 'Lowest' : 'Cheapest' }}
-              <span class="fd-key fd-key--avg"></span>Average
-            </p>
-          </article>
-
-          <article class="fd-card fd-card--saving">
-            <p class="fd-card-label">You save</p>
-            <p class="fd-stat">{{ money(heroProduct.saving) }}</p>
-            <p class="fd-card-meta">Buy at <strong class="fd-save-store">{{ heroProduct.cheapest.store }}</strong> instead of the priciest store.</p>
-          </article>
-
-          <article class="fd-card fd-card--stores">
-            <p class="fd-card-label">Extra you'd pay vs cheapest</p>
+        <div v-if="comparing || nextSale" class="fd-cluster">
+          <article v-if="comparing" class="fd-card fd-card--history">
+            <p class="fd-card-label">Comparing pays</p>
+            <p class="fd-example-name">{{ comparing.name }}</p>
+            <p class="fd-stat">Save {{ money(comparing.gap) }}</p>
+            <p class="fd-card-meta">by buying it at the cheapest store instead of the priciest.</p>
             <ul class="fd-bars">
-              <li v-for="row in heroProduct.overpay" :key="row.store" class="fd-bar-row">
-                <span class="fd-bar-store">{{ row.store }}</span>
-                <span v-if="row.extra" class="fd-bar-value">+{{ money(row.extra) }}</span>
-                <span v-else class="fd-bar-cheapest">Cheapest</span>
+              <li v-for="row in comparing.rows" :key="row.label" class="fd-bar-row">
+                <span class="fd-bar-store">{{ row.label }}: {{ row.store }}</span>
+                <span class="fd-bar-value">{{ money(row.price) }}</span>
                 <span class="fd-bar-track">
-                  <span v-if="row.extra" class="fd-bar" :style="{ width: row.width + '%' }"></span>
+                  <span class="fd-bar" :style="{ width: row.width + '%' }"></span>
                 </span>
               </li>
             </ul>
+          </article>
+
+          <article v-if="nextSale" class="fd-card fd-card--stores">
+            <p class="fd-card-label">Next big sale</p>
+            <p class="fd-stat">{{ nextSale.id }}</p>
+            <p class="fd-card-meta">{{ saleText }}</p>
+          </article>
+
+          <!-- Real price drops when there are some; until then, the most-saved products. -->
+          <article v-if="drops.length" class="fd-card fd-card--saving">
+            <p class="fd-card-label">Price drops right now</p>
+            <ul class="fd-drops">
+              <li v-for="row in drops" :key="row.name" class="fd-drop-row">
+                <span class="fd-bar-store">{{ itemName(row.name) }}</span>
+                <span class="fd-drop-percent">-{{ row.percent }}%</span>
+              </li>
+            </ul>
+            <p class="fd-card-meta">Lower than when shoppers saved them.</p>
+          </article>
+          <article v-else-if="mostSaved.length" class="fd-card fd-card--saving">
+            <p class="fd-card-label">Most saved</p>
+            <ul class="fd-drops">
+              <li v-for="row in mostSaved" :key="row.name" class="fd-drop-row">
+                <span class="fd-bar-store">{{ row.name }}</span>
+                <span class="fd-drop-percent">{{ row.count }} {{ row.count === 1 ? 'person' : 'people' }}</span>
+              </li>
+            </ul>
+            <p class="fd-card-meta">On shoppers' wishlists right now.</p>
           </article>
         </div>
       </div>
@@ -927,122 +810,6 @@ onBeforeUnmount(function () {
   font-size: var(--fd-small);
 }
 
-/* Price graph */
-
-.fd-chart {
-  position: relative;
-  margin-top: 0.75rem;
-  touch-action: pan-y;
-  cursor: crosshair;
-}
-
-.fd-chart svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  overflow: visible;
-}
-
-.fd-chart-area {
-  fill: var(--fd-vanilla-soft);
-}
-
-.fd-chart-line {
-  fill: none;
-  stroke: var(--fd-blue);
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.fd-chart-average {
-  stroke: var(--fd-text-muted);
-  stroke-width: 1;
-  stroke-dasharray: 4 4;
-  opacity: 0.6;
-}
-
-.fd-chart-low,
-.fd-chart-hover {
-  stroke: var(--fd-paper);
-  stroke-width: 2;
-}
-
-/* The lowest point: vanilla with a blue ring, so it stands out on the blue line. */
-.fd-chart-low {
-  fill: var(--fd-vanilla);
-  stroke: var(--fd-blue);
-}
-
-.fd-chart-hover {
-  fill: var(--fd-blue);
-}
-
-.fd-chart-cross {
-  stroke: var(--fd-text-muted);
-  stroke-width: 1;
-  opacity: 0.5;
-}
-
-.fd-chart-axis {
-  fill: var(--fd-text-muted);
-  font-family: var(--fd-font-body);
-  font-size: var(--fd-small);
-}
-
-/* The first and last price, written on the line so the graph reads without hovering. */
-.fd-chart-value {
-  fill: var(--fd-blue);
-  font-family: var(--fd-font-body);
-  font-size: var(--fd-small);
-  font-weight: 700;
-}
-
-.fd-tooltip {
-  position: absolute;
-  top: -0.5rem;
-  transform: translate(-50%, -100%);
-  display: grid;
-  padding: 0.375rem 0.625rem;
-  border-radius: 0.5rem;
-  background: var(--fd-blue-dark);
-  color: var(--fd-beige);
-  font-size: var(--fd-small);
-  line-height: 1.3;
-  text-align: center;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.fd-chart-key {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  margin: 0.5rem 0 0;
-  color: var(--fd-text-muted);
-  font-size: var(--fd-small);
-}
-
-.fd-key {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.fd-key--low {
-  border: 2px solid var(--fd-blue);
-  background: var(--fd-vanilla);
-}
-
-.fd-key--avg {
-  width: 16px;
-  height: 0;
-  margin-left: 0.75rem;
-  border-top: 2px dashed var(--fd-text-muted);
-  border-radius: 0;
-}
-
 /* Saving stat */
 
 .fd-stat {
@@ -1052,10 +819,6 @@ onBeforeUnmount(function () {
   /* Anton level 2: page title size. */
   font-size: var(--fd-page-title);
   line-height: 1;
-}
-
-.fd-save-store {
-  color: var(--fd-blue);
 }
 
 /* Overpay bars: store name and amount on one line, a full-width bar under them. */
@@ -1087,12 +850,33 @@ onBeforeUnmount(function () {
   font-weight: 700;
 }
 
-.fd-bar-cheapest {
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-  background: var(--fd-vanilla);
-  color: var(--fd-ink);
+/* The product name above "Save S$...", like the label of the other cards. */
+.fd-example-name {
+  margin: 0.25rem 0 0;
+  color: var(--fd-text);
   font-size: var(--fd-small);
+  font-weight: 700;
+}
+
+/* Price drops: a name and its drop on each line. */
+.fd-drops {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0.75rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fd-drop-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: var(--fd-small);
+}
+
+.fd-drop-percent {
+  flex-shrink: 0;
+  color: var(--fd-blue);
   font-weight: 700;
 }
 
