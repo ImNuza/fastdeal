@@ -152,7 +152,7 @@ async function onResetSubmit() {
   <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
       <h1 class="fd-page-title">Log in</h1>
-      <p class="fd-page-subtitle">Log in to save products to your wishlist, get alerts when prices drop, and see what your friends are eyeing!</p>
+      <p class="fd-page-subtitle">Log in to see your wishlist, your price alerts, and your friends.</p>
 
       <div class="card p-4">
         <p v-if="errorText" class="alert alert-danger mb-3">{{ errorText }}</p>

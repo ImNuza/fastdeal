@@ -16,7 +16,7 @@ function nameOf(row) {
 
 <template>
   <h1 class="fd-page-title">Trending</h1>
-  <p class="fd-page-subtitle">Anonymised searches on FastDeal this week. A row opens the same compare table.</p>
+  <p class="fd-page-subtitle">What people are searching for on FastDeal this week. Tap a row to compare prices.</p>
   <p v-if="error" class="alert alert-danger">{{ error }}</p>
   <p v-else-if="!week.length" class="alert alert-secondary">Nothing has been searched yet this week.</p>
   <div v-else class="table-responsive">

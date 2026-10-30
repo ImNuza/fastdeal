@@ -14,9 +14,9 @@ import Friendship from './models/friendship-model.js'
 import { toPairKey } from './models/pair-key.js'
 import { search,identifyImage } from './models/shoppingapimodel.js'
 import SearchLog from './models/search-log-model.js'
-import SearchCache from './models/search-cache-model.js'
 import PriceDay from './models/price-day-model.js'
-import { storePrices, sgDay } from './services/priceHistory.js'
+import { sgDay } from './services/priceHistory.js'
+import { SALE_EVENTS, STORE_SALES } from './data/sale-calendar.js'
 import { toProductKey } from './models/product-key.js'
 import { error } from 'console'
 import Notification from './models/notification-model.js'
@@ -465,62 +465,112 @@ async function topSince(since) {
   ])
 }
 
-// Home hero stats, all from live data: what real people searched this week (seeded
-// searchLogs rows, sessionId "seed-...", are left out) joined with the store prices the
-// shopping API returned for those searches (searchCache).
-// product: the top trending product with its price at each store, for the hero graph,
-//          "You save", and "Extra you'd pay", plus its tracked price history: the lowest
-//          price on each of the last 14 days (priceDays, written by every fresh search).
-// Prices only count between half and double the median (storePrices), so accessories in
-// the results do not skew them.
+// Home hero stats for shoppers, straight from our own data, so they are always there. Seed data
+// stays in the database but is left out: seed accounts are the demo account and seed-friend-1
+// to 3, and seed prices have no source.
+//   drops:     the biggest real price drops on wishlists right now (latest checked price below
+//              the saved price), one per product, as a percentage. Only 3% to 50%: a bigger
+//              "drop" almost always means the check found a different, cheaper listing, and
+//              under 3% is noise, so neither is shown to shoppers.
+//   comparing: this week's biggest saving: the product and day with at least 3 real store prices
+//              and the biggest cheapest-to-priciest gap, as its cheapest, median, and priciest store
+//   nextSale:  the next big double-day sale from data/sale-calendar.js, and the stores that join it
+//   mostSaved: the 3 products on the most real users' wishlists, shown when there are no drops
+const SEED_UIDS = [process.env.DEMO_FIREBASE_UID, process.env.DEMO_USER_FIREBASE_UID,
+  'seed-friend-1', 'seed-friend-2', 'seed-friend-3'].filter(Boolean)
+
+// The next big sale on or after today (Singapore day), with whole days to go.
+function nextBigSale() {
+  const today = sgDay(Date.now())
+  const year = Number(today.slice(0, 4))
+  const upcoming = []
+  for (const event of SALE_EVENTS) {
+    if (!event.big) continue
+    for (const y of [year, year + 1]) {
+      const day = y + '-' + String(event.month).padStart(2, '0') + '-' + String(event.day).padStart(2, '0')
+      if (day >= today) upcoming.push({ event: event, day: day })
+    }
+  }
+  upcoming.sort(function (a, b) { return a.day < b.day ? -1 : 1 })
+  const next = upcoming[0]
+  return {
+    name: next.event.name,
+    id: next.event.id,
+    day: next.day,
+    daysAway: Math.round((Date.parse(next.day) - Date.parse(today)) / (24 * 3600000)),
+    stores: STORE_SALES.filter(function (s) { return s.events.includes(next.event.id) }).map(function (s) { return s.label })
+  }
+}
+
 app.get('/api/home-stats', async (req, res) => {
   try {
-    const weekAgo = new Date(Date.now() - 7 * 24 * 3600000)
-    const trending = await SearchLog.aggregate([
-      { $match: { searchedAt: { $gte: weekAgo }, sessionId: { $not: /^seed-/ } } },
-      { $group: { _id: '$productKey', name: { $first: '$productName' }, count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 30 }
-    ])
-    const caches = await SearchCache.find({
-      queryKey: { $in: trending.map(function (t) { return t._id }) },
-      expiresAt: { $gt: new Date() }
-    }).lean()
-    const cacheByKey = {}
-    for (const c of caches) cacheByKey[c.queryKey] = c
+    // Biggest drops: one row per product (by the search it was saved from), its biggest drop.
+    const cheaper = await WishlistItem.find({
+      firebaseUid: { $nin: SEED_UIDS },
+      latestPrice: { $gt: 0 },
+      $expr: { $lt: ['$latestPrice', '$savedPrice'] }
+    }).select('q productName savedPrice latestPrice latestStore').lean()
+    const best = {}
+    for (const item of cheaper) {
+      const name = String(item.q || item.productName).replace(/"/g, '').trim()
+      const key = name.toLowerCase()
+      const percent = Math.round(((item.savedPrice - item.latestPrice) / item.savedPrice) * 100)
+      if (percent < 3 || percent > 50) continue
+      if (!best[key] || percent > best[key].percent) {
+        best[key] = { name: name, percent: percent, saved: item.savedPrice, now: item.latestPrice, store: item.latestStore }
+      }
+    }
+    const drops = Object.values(best).sort(function (a, b) { return b.percent - a.percent }).slice(0, 4)
 
-    // The first trending product with prices from at least two stores.
-    const products = []
-    for (const t of trending) {
-      const cache = cacheByKey[t._id]
-      if (!cache) continue
-      const stores = storePrices(cache.listings || [])
-      if (stores.length < 2) continue
-      products.push({ key: t._id, name: cache.searchTerm || t.name || t._id, stores: stores, fetchedAt: cache.fetchedAt })
-      break
+    // Comparing pays: per product and day, cheapest vs priciest store, real prices only.
+    const since = sgDay(Date.now() - 6 * 24 * 3600000)
+    const spreads = await PriceDay.aggregate([
+      { $match: { day: { $gte: since }, source: { $in: ['search', 'product'] } } },
+      { $sort: { price: 1 } },
+      { $group: {
+          _id: { k: '$productKey', d: '$day' },
+          low: { $first: '$price' }, lowStore: { $first: '$store' },
+          high: { $last: '$price' }, highStore: { $last: '$store' },
+          stores: { $sum: 1 }
+      } },
+      { $match: { stores: { $gte: 2 } } }
+    ])
+    // The example for the big card: this week's biggest saving. Of every product and day with
+    // at least 3 real store prices, the one with the biggest gap between its cheapest and priciest
+    // store; a bigger gap found later in the week takes its place. Shown as three of that day's
+    // stores: the cheapest, the median (the one in the middle), and the priciest.
+    const biggest = spreads
+      .filter(function (sp) { return sp.stores >= 3 })
+      .sort(function (a, b) { return (b.high - b.low) - (a.high - a.low) })[0]
+    let example = null
+    if (biggest) {
+      const rows = await PriceDay.find({ productKey: biggest._id.k, day: biggest._id.d, source: { $in: ['search', 'product'] } })
+        .sort({ price: 1 }).select('store price').lean()
+      const pick = [rows[0], rows[Math.floor(rows.length / 2)], rows[rows.length - 1]]
+      // A search typed with quotes is saved with them; show the name without.
+      example = { name: biggest._id.k.replace(/"/g, '').trim(), stores: pick.map(function (r) { return { store: r.store, price: r.price } }) }
     }
 
-    const top = products[0] || null
-    if (!top) return res.json({ product: null })
+    const comparing = example ? { example: example } : null
 
-    const since = sgDay(Date.now() - 13 * 24 * 3600000)
-    const history = await PriceDay.aggregate([
-      // Real prices only: seeded rows have no source and are left out.
-      { $match: { productKey: top.key, day: { $gte: since }, source: { $in: ['search', 'product'] } } },
-      { $group: { _id: '$day', price: { $min: '$price' } } },
-      { $sort: { _id: 1 } }
+    // The fallback for the third card when there are no believable drops: the products on the
+    // most real users' wishlists, grouped by the search they were saved from.
+    const mostSaved = await WishlistItem.aggregate([
+      { $match: { firebaseUid: { $nin: SEED_UIDS } } },
+      { $group: {
+          _id: { $toLower: { $trim: { input: { $ifNull: ['$q', '$productName'] }, chars: ' "' } } },
+          people: { $addToSet: '$firebaseUid' }
+      } },
+      { $project: { count: { $size: '$people' } } },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: 3 }
     ])
-    // The current store prices count as a point too, on the day they were fetched.
-    const points = {}
-    for (const d of history) points[d._id] = d.price
-    const fetchedDay = sgDay(new Date(top.fetchedAt).getTime())
-    points[fetchedDay] = Math.min(points[fetchedDay] || Infinity, top.stores[0].price)
+
     res.json({
-      product: {
-        name: top.name,
-        stores: top.stores,
-        history: Object.keys(points).sort().map(function (day) { return { day: day, price: points[day] } })
-      }
+      drops: drops,
+      comparing: comparing,
+      nextSale: nextBigSale(),
+      mostSaved: mostSaved.map(function (m) { return { name: m._id, count: m.count } })
     })
   } catch (error) {
     res.status(500).json({ error: 'Failed to load home stats' })
@@ -663,9 +713,42 @@ app.post('/api/notifications/sleep-ended', requireUser, async (req, res) => {
   }
 })
 
+// Add a sale-soon alert when the next big sale is this close and the user has a wishlist.
+const SALE_SOON_DAYS = 14
+
+// One alert per user per sale: productKey is "sale:<id>:<day>", for example "sale:11.11:2026-11-11".
+async function addSaleSoonNotification(firebaseUid) {
+  const sale = nextBigSale()
+  if (sale.daysAway > SALE_SOON_DAYS) return
+
+  const items = await WishlistItem.find({ firebaseUid }).sort({ savedAt: -1 }).select('productName').lean()
+  if (!items.length) return
+
+  const others = items.length - 1
+  const saved = items[0].productName + (others ? ' and ' + others + ' more' : '')
+  const when = sale.daysAway === 0 ? 'today' : sale.daysAway === 1 ? 'tomorrow' : 'in ' + sale.daysAway + ' days'
+  await Notification.updateOne(
+    { firebaseUid, type: 'sale-soon', productKey: 'sale:' + sale.id + ':' + sale.day },
+    {
+      $setOnInsert: {
+        title: sale.name + ' is ' + when,
+        body: saved + (others ? ' are' : ' is') + ' on your wishlist.' +
+          (sale.stores.length ? ' ' + sale.stores.join(' and ') + ' usually join this sale.' : ''),
+        link: '/wishlist'
+      }
+    },
+    { upsert: true }
+  )
+}
+
 //retrieve notifications
 app.get('/api/notifications', requireUser, async (req, res) => {
   try {
+    try {
+      await addSaleSoonNotification(req.uid)
+    } catch (saleErr) {
+      console.error('[Sale soon] notification failed:', saleErr)
+    }
     const rows = await Notification.find({ firebaseUid: req.uid }).sort({ createdAt: -1 })
     res.json(rows)
   } catch (err) {
@@ -832,6 +915,7 @@ app.post('/api/wishlist', requireUser, async (req, res) => {
       if (store && existing.savedStore !== store) {
         existing.savedStore = store
         existing.savedPrice = price
+        existing.dropNotifiedPrice = null
       }
       existing.productId = existing.productId || text(req.body.productId) || null
       existing.q = existing.q || text(req.body.q) || null
@@ -883,6 +967,7 @@ app.patch('/api/wishlist/:productKey', requireUser, async (req, res) => {
       if (row.targetPrice !== newTarget) {
         set.targetPrice = newTarget
         set.targetEmailFor = null
+        set.targetNotifiedFor = null
         set.lastCheckedAt = null
       }
     }
@@ -957,22 +1042,113 @@ async function requireAdmin(req, res, next) {
   next()
 }
 
-// Stat cards: total users, total wishlist items, active this week, top 5 products
+// Admin dashboard for the last 7 or 30 days (?days=7|30), each number next to the same
+// number for the period before it. Seed accounts are left out, like the Home stats.
+//   kpis:     sign-ups, active shoppers (saved something), searches, items saved,
+//             save rate (saves per search), price-drop alerts, target prices hit,
+//             and money shoppers could save right now (wishlist items cheaper than saved)
+//   daily:    searches, saves, and alerts per Singapore day, for the two charts
+//   products: the 5 products on the most wishlists, with how many set a target and the best price now
 app.get('/api/admin/stats', requireUser, requireAdmin, async (req, res) => {
   try {
-    const [totalUsers, totalWishlistItems, topProducts] = await Promise.all([
-      User.countDocuments(),
-      WishlistItem.countDocuments(),
-      WishlistItem.aggregate([
-        { $group: { _id: '$productName', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 5 },
-        { $project: { _id: 0, name: '$_id', count: 1 } }
-      ])
+    const days = Number(req.query.days) === 30 ? 30 : 7
+    const DAY = 24 * 3600000
+    const now = Date.now()
+    const from = new Date(now - days * DAY)
+    const prevFrom = new Date(now - 2 * days * DAY)
+    const real = { firebaseUid: { $nin: SEED_UIDS } }
+    const alertTypes = ['price-drop', 'target-hit']
+
+    // One number for this period and the one before
+    async function both(count) {
+      const [current, previous] = await Promise.all([count(from, new Date(now)), count(prevFrom, from)])
+      return { current, previous }
+    }
+
+    const [signups, active, searches, saves, drops, targets] = await Promise.all([
+      both(function (a, b) { return User.countDocuments({ ...real, createdAt: { $gte: a, $lt: b } }) }),
+      both(async function (a, b) {
+        return (await WishlistItem.distinct('firebaseUid', { ...real, savedAt: { $gte: a, $lt: b } })).length
+      }),
+      both(function (a, b) { return SearchLog.countDocuments({ searchedAt: { $gte: a, $lt: b } }) }),
+      both(function (a, b) { return WishlistItem.countDocuments({ ...real, savedAt: { $gte: a, $lt: b } }) }),
+      both(function (a, b) { return Notification.countDocuments({ ...real, type: 'price-drop', createdAt: { $gte: a, $lt: b } }) }),
+      both(function (a, b) { return Notification.countDocuments({ ...real, type: 'target-hit', createdAt: { $gte: a, $lt: b } }) })
     ])
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    const activeUids = await WishlistItem.distinct('firebaseUid', { savedAt: { $gte: weekAgo } })
-    res.json({ totalUsers, totalWishlistItems, activeThisWeek: activeUids.length, topProducts })
+
+    function rate(s, q) { return q ? Math.round((s / q) * 1000) / 10 : 0 }
+    const saveRate = { current: rate(saves.current, searches.current), previous: rate(saves.previous, searches.previous) }
+
+    // Money shoppers could save now: same 3% to 50% rule as the Home price drops
+    const cheaper = await WishlistItem.find({
+      ...real,
+      latestPrice: { $gt: 0 },
+      $expr: { $lt: ['$latestPrice', '$savedPrice'] }
+    }).select('savedPrice latestPrice').lean()
+    let savings = 0
+    let savingsItems = 0
+    for (const item of cheaper) {
+      const percent = ((item.savedPrice - item.latestPrice) / item.savedPrice) * 100
+      if (percent < 3 || percent > 50) continue
+      savings += item.savedPrice - item.latestPrice
+      savingsItems++
+    }
+
+    // Per Singapore day, oldest first, with empty days filled in
+    function byDay(field) {
+      return [{ $group: { _id: { $dateToString: { format: '%Y-%m-%d', timezone: '+08:00', date: field } }, n: { $sum: 1 } } }]
+    }
+    const [searchDays, saveDays, alertDays] = await Promise.all([
+      SearchLog.aggregate([{ $match: { searchedAt: { $gte: from } } }, ...byDay('$searchedAt')]),
+      WishlistItem.aggregate([{ $match: { ...real, savedAt: { $gte: from } } }, ...byDay('$savedAt')]),
+      Notification.aggregate([{ $match: { ...real, type: { $in: alertTypes }, createdAt: { $gte: from } } }, ...byDay('$createdAt')])
+    ])
+    function toMap(rows) {
+      const map = {}
+      rows.forEach(function (r) { map[r._id] = r.n })
+      return map
+    }
+    const s = toMap(searchDays)
+    const v = toMap(saveDays)
+    const a = toMap(alertDays)
+    const daily = []
+    for (let i = days - 1; i >= 0; i--) {
+      const day = sgDay(now - i * DAY)
+      daily.push({ day, searches: s[day] || 0, saves: v[day] || 0, alerts: a[day] || 0 })
+    }
+
+    const products = await WishlistItem.aggregate([
+      { $match: real },
+      { $group: {
+          _id: '$productKey',
+          name: { $first: '$productName' },
+          image: { $first: '$image' },
+          savers: { $sum: 1 },
+          targets: { $sum: { $cond: [{ $gt: ['$targetPrice', null] }, 1, 0] } },
+          avgSaved: { $avg: '$savedPrice' },
+          bestNow: { $min: '$latestPrice' }
+      } },
+      { $sort: { savers: -1 } },
+      { $limit: 5 }
+    ])
+
+    res.json({
+      days,
+      kpis: { signups, active, searches, saves, saveRate, drops, targets },
+      savings: { total: Math.round(savings * 100) / 100, items: savingsItems },
+      daily,
+      products: products.map(function (p) {
+        return {
+          key: p._id,
+          name: p.name,
+          image: p.image,
+          savers: p.savers,
+          targets: p.targets,
+          avgSaved: Math.round(p.avgSaved * 100) / 100,
+          bestNow: p.bestNow
+        }
+      })
+    })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -987,7 +1163,8 @@ app.get('/api/admin/users', requireUser, requireAdmin, async (req, res) => {
     ])
     const countMap = {}
     wishlistCounts.forEach(function (w) { countMap[w._id] = w.count })
-    res.json(users.map(function (u) { return { ...u, wishlistCount: countMap[u.firebaseUid] || 0 } }))
+    // Older accounts were made before roles existed and have no role saved; they are users.
+    res.json(users.map(function (u) { return { ...u, role: u.role || 'user', wishlistCount: countMap[u.firebaseUid] || 0 } }))
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

@@ -388,7 +388,7 @@ function initials(f) {
   <div v-if="user" class="friends-page">
 
     <h1 class="fd-page-title">Friend List</h1>
-    <p class="fd-page-subtitle">Shop with friends. Add them by username, then buy together to split the shipping.</p>
+    <p class="fd-page-subtitle">Add friends by their username. If you both want the same thing, buy it together and split the shipping.</p>
 
     <div class="friend-tabs" role="tablist" aria-label="Friends">
       <button
@@ -405,8 +405,8 @@ function initials(f) {
         @click="openTab(tab.id)"
         @keydown="onTabKey($event, i)"
       >
-        {{ tab.label }}
-        <span v-if="tab.id === 'requests' && requests.length" class="request-badge">{{ requests.length }}</span>
+        <span class="friend-tab-label">{{ tab.label }}</span>
+        <span v-if="tab.id === 'requests' && requests.length" class="fd-count request-badge">{{ requests.length }}</span>
       </button>
     </div>
 
@@ -473,7 +473,6 @@ function initials(f) {
           <section v-else-if="activeTab === 'add'" id="fd-tabpanel-add" role="tabpanel" aria-labelledby="fd-tab-add">
             <!-- Before anything is typed: the requests you sent that are still waiting. -->
             <template v-if="!searchQuery.trim()">
-              <h2 class="friend-group-title">Pending</h2>
               <div v-if="sent.length" class="friend-rows">
                 <div v-for="req in sent" :key="req.pairKey" class="friend-card">
                   <div class="friend-avatar">{{ initials(req) }}</div>
@@ -482,6 +481,7 @@ function initials(f) {
                     <div class="friend-email">has not answered yet</div>
                   </div>
                   <div class="friend-actions">
+                    <span class="badge-pending">Pending</span>
                     <button
                       class="btn btn-outline-dark btn-sm"
                       type="button"
@@ -504,7 +504,16 @@ function initials(f) {
                 </div>
                 <div class="search-action">
                   <span v-if="r.friendshipStatus === 'accepted'" class="badge-friends">Friends</span>
-                  <span v-else-if="r.friendshipStatus === 'pending' && r.iRequested" class="badge-pending">Pending</span>
+                  <div v-else-if="r.friendshipStatus === 'pending' && r.iRequested" class="friend-actions">
+                    <span class="badge-pending">Pending</span>
+                    <button
+                      class="btn btn-outline-dark btn-sm"
+                      type="button"
+                      :disabled="actionLoading[r.pairKey]"
+                      :aria-label="'Cancel the request to ' + r.username"
+                      @click="onCancel(r)"
+                    >Cancel</button>
+                  </div>
                   <div v-else-if="r.friendshipStatus === 'pending' && !r.iRequested" class="friend-actions">
                     <button class="btn btn-dark btn-sm" type="button" :disabled="actionLoading[r.pairKey]" @click="onAccept(r)">Accept</button>
                     <button class="btn btn-outline-dark btn-sm" type="button" :disabled="actionLoading[r.pairKey]" :aria-label="'Decline ' + r.username" @click="onDecline(r)">Decline</button>
@@ -684,12 +693,18 @@ function initials(f) {
   color: var(--fd-text);
 }
 
-.friend-tab.is-active::after {
+/* The blue line sits under the label only, so it stops before the Requests count. */
+.friend-tab-label {
+  position: relative;
+  display: inline-block;
+}
+
+.friend-tab.is-active .friend-tab-label::after {
   content: '';
   position: absolute;
-  bottom: 0.625rem;
-  left: 1.75rem;
-  right: 1.75rem;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
   height: 3px;
   border-radius: 999px;
   background: var(--fd-blue);
@@ -722,9 +737,9 @@ function initials(f) {
   border-top-left-radius: 0;
 }
 
-/* The count bubble on Requests. */
+/* The count bubble on Requests: the shared .fd-count from app.css, a little after the label. */
 .friend-tab .request-badge {
-  margin-left: 0.5rem;
+  margin-left: 0.4rem;
 }
 
 /* Phones: the three tabs share the width evenly with tighter padding, so they always fit. */
@@ -735,10 +750,6 @@ function initials(f) {
     padding: 0 0.5rem;
   }
 
-  .friend-tab.is-active::after {
-    left: 0.5rem;
-    right: 0.5rem;
-  }
 
   .friend-tabpanel {
     padding: 1rem;
@@ -993,31 +1004,20 @@ function initials(f) {
   color: var(--fd-ink);
 }
 
+/* The same size as the small Cancel button beside it. */
 .badge-pending {
-  font-size: var(--fd-small);
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--fd-control-sm);
+  padding: 0.25rem 0.875rem;
+  font-size: var(--fd-button-sm);
   font-weight: 700;
-  padding: 0.2rem 0.6rem;
   border-radius: 999px;
   background: var(--fd-vanilla-soft);
   color: var(--fd-text-muted);
   border: var(--fd-border) solid var(--friends-line);
 }
 
-/* Requests */
-.request-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.5rem;
-  height: 1.5rem;
-  padding: 0 0.25rem;
-  border-radius: 50%;
-  background: var(--fd-blue);
-  color: var(--fd-beige);
-  font-size: var(--fd-small);
-  font-weight: 700;
-  margin-left: 0.4rem;
-  vertical-align: middle;
-}
+
 
 </style>

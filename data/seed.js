@@ -62,16 +62,6 @@ function sgDay(time) {
   return new Date(time + 8 * HOUR).toISOString().slice(0, 10)
 }
 
-// Whole days from now until the next 11 Nov in Singapore.
-function daysTo1111(now) {
-  const today = sgDay(now)
-  let year = Number(today.slice(0, 4))
-  if (today > year + '-11-11') {
-    year = year + 1
-  }
-  return Math.round((Date.parse(year + '-11-11') - Date.parse(today)) / DAY)
-}
-
 async function seed() {
   const uid = process.env.DEMO_FIREBASE_UID
   if (!uid) {
@@ -251,57 +241,6 @@ async function seed() {
       }
     ])
 
-    // Notifications for the demo user, newest first on the page
-    await Notification.insertMany([
-      {
-        firebaseUid: uid,
-        type: 'target-hit',
-        title: 'Target reached: Sony WH-1000XM5',
-        body: 'Now $429 at Shopee. Your target was $430.',
-        link: '/wishlist',
-        productKey: sony,
-        emailedAt: new Date(now - 2 * HOUR),
-        createdAt: new Date(now - 2 * HOUR)
-      },
-      {
-        firebaseUid: uid,
-        type: 'sleep-ended',
-        title: 'Sleep on it is over: Nintendo Switch OLED',
-        body: 'Was $425, now $419. priya_k also has it on their wishlist.',
-        link: '/sleep',
-        productKey: switchOled,
-        createdAt: new Date(now - 2 * HOUR)
-      },
-      {
-        firebaseUid: uid,
-        type: 'price-drop',
-        title: 'Price drop: Kindle Paperwhite',
-        body: 'Now $189 at Amazon.sg, down from $219.',
-        link: '/wishlist',
-        productKey: kindle,
-        readAt: new Date(now - 1 * HOUR),
-        createdAt: new Date(now - 3 * HOUR)
-      },
-      {
-        firebaseUid: uid,
-        type: 'friend-request',
-        title: 'marcus.lim sent you a friend request',
-        link: '/friends',
-        fromUid: 'seed-friend-3',
-        createdAt: new Date(now - 5 * HOUR)
-      },
-      {
-        firebaseUid: uid,
-        type: 'sale-soon',
-        title: '11.11 is in ' + daysTo1111(now) + ' days',
-        body: 'Sony WH-1000XM5 is on your wishlist. Big sales often start on 11 Nov.',
-        link: '/wishlist',
-        productKey: sony,
-        readAt: new Date(now - 20 * HOUR),
-        createdAt: new Date(now - 26 * HOUR)
-      }
-    ])
-
     // Anonymous search logs for Trending and "searched together"
     const logs = []
     for (let s = 0; s < sessions.length; s++) {
@@ -321,7 +260,7 @@ async function seed() {
 
     console.log(
       'Seeded ' + priceDays.length + ' priceDays, ' + (1 + friends.length) + ' users, 3 friendships, ' +
-        '5 wishlistItems, 2 sleepHolds, 5 notifications, ' + logs.length + ' searchLogs'
+        '5 wishlistItems, 2 sleepHolds, ' + logs.length + ' searchLogs'
     )
   } catch (error) {
     console.error('Seed failed:', error.message)

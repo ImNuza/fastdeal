@@ -1,6 +1,7 @@
 
 import WishlistItem from '../models/wishlist-item-model.js'
 import User from '../models/user-model.js'
+import Notification from '../models/notification-model.js'
 import { search } from '../models/shoppingapimodel.js'
 import { sendPriceAlertEmail } from './emailServices.js'
 
@@ -43,6 +44,54 @@ function comparable(productName, listing) {
     requestedWords.length > 0 &&
     requestedWords.every(word => listingWords.includes(word))
   )
+}
+
+function sgd(n) {
+  return 'S$' + Number(n).toFixed(2)
+}
+
+// One target-hit alert per target, and one price-drop alert per new lowest price
+// below the saved price. Each claim is atomic, so two checks at once add one alert.
+async function addPriceNotification(item, currentPrice, target, listing) {
+  const store = listing.store || 'a store'
+
+  if (currentPrice <= target) {
+    const claim = await WishlistItem.updateOne(
+      { _id: item._id, targetPrice: target, targetNotifiedFor: { $ne: target } },
+      { $set: { targetNotifiedFor: target } }
+    )
+    if (!claim.modifiedCount) return
+
+    await Notification.create({
+      firebaseUid: item.firebaseUid,
+      type: 'target-hit',
+      title: 'Target reached: ' + item.productName,
+      body: 'Now ' + sgd(currentPrice) + ' at ' + store + '. Your target was ' + sgd(target) + '.',
+      link: '/wishlist',
+      productKey: item.productKey
+    })
+    return
+  }
+
+  if (currentPrice >= item.savedPrice) return
+
+  const claim = await WishlistItem.updateOne(
+    {
+      _id: item._id,
+      $or: [{ dropNotifiedPrice: null }, { dropNotifiedPrice: { $gt: currentPrice } }]
+    },
+    { $set: { dropNotifiedPrice: currentPrice } }
+  )
+  if (!claim.modifiedCount) return
+
+  await Notification.create({
+    firebaseUid: item.firebaseUid,
+    type: 'price-drop',
+    title: 'Price drop: ' + item.productName,
+    body: 'Now ' + sgd(currentPrice) + ' at ' + store + ', down from ' + sgd(item.savedPrice) + '.',
+    link: '/wishlist',
+    productKey: item.productKey
+  })
 }
 
 // Limit repeated server-side price searches to once per 30 minutes.
@@ -180,7 +229,15 @@ export async function checkTargetPrice(uid, productKey) {
     }
   }
 
-  // 5. Stop if the current price is still above the target.
+  // 5. Add a target-hit or price-drop alert to the Notifications page.
+  // A failure here must not stop the email.
+  try {
+    await addPriceNotification(claimed, currentPrice, target, listing)
+  } catch (error) {
+    console.error('[Price notification] Could not create:', error)
+  }
+
+  // Stop if the current price is still above the target.
   if (currentPrice > target) {
     return {
       checked: true,

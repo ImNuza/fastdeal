@@ -97,6 +97,18 @@ const wishlistItemSchema = new mongoose.Schema(
       default: null
     },
 
+    // Target threshold that already has a target-hit notification.
+    targetNotifiedFor: {
+      type: Number,
+      default: null
+    },
+
+    // Lowest price that already has a price-drop notification. A new one needs a lower price.
+    dropNotifiedPrice: {
+      type: Number,
+      default: null
+    },
+
     // Sleep on it. sleepUntil null = not on hold. The price when the hold started
     // and whether the user has seen the verdict after it ended.
     sleepUntil: {
