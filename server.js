@@ -1048,7 +1048,8 @@ async function requireAdmin(req, res, next) {
 //             save rate (saves per search), price-drop alerts, target prices hit,
 //             and money shoppers could save right now (wishlist items cheaper than saved)
 //   daily:    searches, saves, and alerts per Singapore day, for the two charts
-//   products: the 5 products on the most wishlists, with how many set a target and the best price now
+//   products: the 5 products saved by the most shoppers in this period, with how many set a target
+//             and the best price now
 app.get('/api/admin/stats', requireUser, requireAdmin, async (req, res) => {
   try {
     const days = Number(req.query.days) === 30 ? 30 : 7
@@ -1118,7 +1119,7 @@ app.get('/api/admin/stats', requireUser, requireAdmin, async (req, res) => {
     }
 
     const products = await WishlistItem.aggregate([
-      { $match: real },
+      { $match: { ...real, savedAt: { $gte: from } } },
       { $group: {
           _id: '$productKey',
           name: { $first: '$productName' },

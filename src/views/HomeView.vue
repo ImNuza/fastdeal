@@ -236,7 +236,12 @@ onBeforeUnmount(function () {
             <p class="fd-card-label">Price drops right now</p>
             <ul class="fd-drops">
               <li v-for="row in drops" :key="row.name" class="fd-drop-row">
-                <span class="fd-bar-store">{{ itemName(row.name) }}</span>
+                <span class="fd-drop-item">
+                  <span class="fd-drop-name">{{ itemName(row.name) }}</span>
+                  <span v-if="row.saved && row.now" class="fd-drop-prices">
+                    <s>{{ money(row.saved) }}</s> {{ money(row.now) }}
+                  </span>
+                </span>
                 <span class="fd-drop-percent">-{{ row.percent }}%</span>
               </li>
             </ul>
@@ -246,8 +251,10 @@ onBeforeUnmount(function () {
             <p class="fd-card-label">Most saved</p>
             <ul class="fd-drops">
               <li v-for="row in mostSaved" :key="row.name" class="fd-drop-row">
-                <span class="fd-bar-store">{{ row.name }}</span>
-                <span class="fd-drop-percent">{{ row.count }} {{ row.count === 1 ? 'person' : 'people' }}</span>
+                <span class="fd-drop-item">
+                  <span class="fd-drop-name">{{ row.name }}</span>
+                </span>
+                <span class="fd-drop-percent">{{ row.count }}<small>{{ row.count === 1 ? 'person' : 'people' }}</small></span>
               </li>
             </ul>
             <p class="fd-card-meta">On shoppers' wishlists right now.</p>
@@ -858,26 +865,59 @@ onBeforeUnmount(function () {
   font-weight: 700;
 }
 
-/* Price drops: a name and its drop on each line. */
+/* Price drops: the product and its prices on the left, the drop big on the right in Anton,
+   like the "Save S$..." stat on the card beside it. */
 .fd-drops {
   display: grid;
-  gap: 0.375rem;
-  margin: 0.75rem 0;
+  margin: 0.5rem 0 0.75rem;
   padding: 0;
   list-style: none;
 }
 
 .fd-drop-row {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.fd-drop-row + .fd-drop-row {
+  border-top: 1px solid var(--fd-vanilla-line);
+}
+
+.fd-drop-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fd-drop-name {
+  color: var(--fd-text);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.fd-drop-prices {
+  color: var(--fd-text-muted);
   font-size: var(--fd-small);
 }
 
 .fd-drop-percent {
+  display: flex;
   flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
   color: var(--fd-blue);
-  font-weight: 700;
+  font-family: var(--fd-font-display);
+  font-size: var(--fd-section-title);
+  line-height: 1.1;
+}
+
+.fd-drop-percent small {
+  color: var(--fd-text-muted);
+  font-family: var(--fd-font-body);
+  font-size: var(--fd-small);
 }
 
 .fd-bar-track {

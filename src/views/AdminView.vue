@@ -176,9 +176,17 @@ function linePoints(field) {
 
 const products = computed(function () { return stats.value ? stats.value.products : [] })
 
-function dropPercent(p) {
-  if (!p.bestNow || p.bestNow >= p.avgSaved) return 0
-  return Math.round(((p.avgSaved - p.bestNow) / p.avgSaved) * 100)
+// Podium order left to right is 2, 1, 3, like a real podium
+const podium = computed(function () {
+  const order = [2, 1, 3]
+  return products.value.slice(0, 3).map(function (p, i) {
+    return { p, rank: i + 1, order: order.indexOf(i + 1) }
+  })
+})
+
+// The price comparison for a product, like a search for it
+function compareLink(p) {
+  return { path: '/compare', query: { q: p.name } }
 }
 
 // Sort like the Wishlist's Sort by. Names sort by username, or email when there is none.
@@ -364,11 +372,12 @@ async function confirmRoleChange() {
 
 <template>
   <div>
+    <h1 class="fd-page-title">Admin Dashboard</h1>
+    <p class="fd-page-subtitle">How shoppers are using FastDeal, and the deals it finds for them.</p>
+
+    <!-- Shopper Insights: the leaderboard, stat cards, and charts, with the date range beside its title -->
     <div class="fd-admin-header">
-      <div>
-        <h1 class="fd-page-title">Admin Dashboard</h1>
-        <p class="fd-page-subtitle mb-0">How shoppers are using FastDeal, and the deals it finds for them.</p>
-      </div>
+      <h2 class="fd-section-title mb-0">Shopper Insights</h2>
       <div class="fd-range" role="group" aria-label="Date range">
         <button v-for="n in [7, 30]" :key="n" type="button" class="fd-range-btn" :class="{ 'is-active': days === n }"
           :aria-pressed="days === n" @click="setRange(n)">Last {{ n }} days</button>
@@ -379,6 +388,48 @@ async function confirmRoleChange() {
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
 
     <template v-if="stats">
+      <!-- Leaderboard first, in one card: the top 3 on a blue podium (2, 1, 3), 4 and 5 beside it.
+           Each one opens its price comparison. -->
+      <div class="card fd-board mb-3" :class="{ 'has-side': products.length > 3 }">
+        <div class="fd-board-main">
+          <p class="fd-board-title">Most saved products</p>
+          <p v-if="!products.length" class="fd-board-empty">No products saved in this period.</p>
+          <ol class="fd-stage list-unstyled" aria-label="Top 3 most saved products">
+            <li v-for="slot in podium" :key="slot.p.key" class="fd-stage-slot" :class="'is-' + slot.rank"
+              :style="{ order: slot.order }">
+              <router-link class="fd-stage-link" :to="compareLink(slot.p)">
+                <span class="fd-stage-image">
+                  <img v-if="slot.p.image" :src="slot.p.image" alt="" />
+                </span>
+                <span class="fd-stage-name">{{ slot.p.name }}</span>
+                <span class="fd-stage-pill">{{ slot.p.savers }} saved</span>
+                <span class="fd-stage-block">
+                  <span class="visually-hidden">Rank</span>{{ slot.rank }}
+                </span>
+              </router-link>
+            </li>
+          </ol>
+        </div>
+
+        <div v-if="products.length > 3" class="fd-board-side">
+          <p class="fd-board-title fd-board-side-title">Also often saved</p>
+          <ol class="fd-board-list list-unstyled" aria-label="Also often saved">
+            <li v-for="(p, i) in products.slice(3)" :key="p.key">
+              <router-link class="fd-board-row" :to="compareLink(p)">
+                <span class="fd-board-rank">{{ String(i + 4).padStart(2, '0') }}</span>
+                <span class="fd-board-image">
+                  <img v-if="p.image" :src="p.image" alt="" />
+                </span>
+                <span class="fd-board-info">
+                  <span class="fd-board-name">{{ p.name }}</span>
+                  <span class="small text-secondary">{{ p.savers }} saved</span>
+                </span>
+              </router-link>
+            </li>
+          </ol>
+        </div>
+      </div>
+
       <!-- KPI cards -->
       <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3" v-for="k in kpis" :key="k.label">
@@ -490,55 +541,6 @@ async function confirmRoleChange() {
         </div>
       </div>
 
-      <!-- Products: the all-time leaderboard -->
-      <h2 class="fd-section-title">Most Saved Products</h2>
-      <p class="fd-page-subtitle">What shoppers want most, and whether FastDeal found it cheaper.</p>
-
-      <!-- Leaderboard: the top 3 as big cards, then 4 and 5 as rows -->
-      <div class="card fd-board mb-5">
-        <p class="small text-secondary mb-3">All time</p>
-        <p v-if="!products.length" class="small text-secondary mb-0">No saved products yet.</p>
-        <template v-else>
-          <div class="row g-3">
-            <div class="col-12 col-md-4" v-for="(p, i) in products.slice(0, 3)" :key="p.key">
-              <div class="fd-podium" :class="'is-' + (i + 1)">
-                <span class="fd-medal">#{{ i + 1 }}</span>
-                <span class="fd-podium-image">
-                  <img v-if="p.image" :src="p.image" alt="" />
-                </span>
-                <p class="fd-rank-name fd-podium-name mb-0">{{ p.name }}</p>
-                <p class="fd-podium-count mb-0">{{ p.savers }}</p>
-                <p class="small text-secondary mb-2">{{ p.savers === 1 ? 'shopper saved it' : 'shoppers saved it' }}</p>
-                <p class="small mb-0">
-                  <template v-if="p.bestNow">
-                    <strong>{{ sgd(p.bestNow) }}</strong> now
-                    <span v-if="dropPercent(p)" class="fd-delta is-up ms-1">−{{ dropPercent(p) }}%</span>
-                  </template>
-                  <span v-else class="text-secondary">Not checked yet</span>
-                </p>
-                <p class="small text-secondary mb-0">{{ p.targets }} set a target price</p>
-              </div>
-            </div>
-          </div>
-
-          <ol v-if="products.length > 3" class="list-unstyled mb-0 mt-3" aria-label="Also often saved">
-            <li v-for="(p, i) in products.slice(3)" :key="p.key" class="fd-rank-row">
-              <span class="fd-rank">{{ i + 4 }}</span>
-              <span class="fd-product-image">
-                <img v-if="p.image" :src="p.image" alt="" />
-              </span>
-              <div class="fd-rank-info">
-                <p class="fd-rank-name mb-0">{{ p.name }}</p>
-                <p class="small text-secondary mb-0">
-                  <template v-if="p.bestNow">{{ sgd(p.bestNow) }} now</template>
-                  <template v-else>Not checked yet</template>
-                </p>
-              </div>
-              <span class="fd-big-count">{{ p.savers }}<small>saved</small></span>
-            </li>
-          </ol>
-        </template>
-      </div>
     </template>
 
     <!-- Manage users: folder tabs and cards, like the Friends page. Its own box, so the total
@@ -660,10 +662,10 @@ async function confirmRoleChange() {
 .fd-admin-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin: 2rem 0 1rem;
 }
 
 .fd-range {
@@ -923,28 +925,243 @@ async function confirmRoleChange() {
   color: var(--fd-blue);
   font-weight: 700;
 }
-
+/* The count at the end of a row: the number in bold blue, its unit small beside it */
 /* ===================================
-   MOST SAVED PRODUCTS
+   LEADERBOARD
 =================================== */
 
-.fd-rank-row {
+.fd-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  padding: 0;
+  border-color: var(--fd-blue);
+  background: var(--fd-blue);
+}
+
+/* With 4 and 5: podium three quarters, list one quarter */
+@media (min-width: 992px) {
+  .fd-board.has-side {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  }
+}
+
+/* The podium half is blue; the blocks stand on its bottom edge */
+.fd-board-main {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  background: var(--fd-blue);
+}
+
+.fd-board-title {
+  margin: 0;
+  padding: 1rem 1.25rem 0;
+  color: var(--fd-beige);
+  font-size: var(--fd-small);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fd-board-empty {
+  margin: 0;
+  padding: 1rem 1.25rem 1.25rem;
+  color: var(--fd-beige);
+}
+
+.fd-stage {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   gap: 0.75rem;
-  padding: 0.5rem 0;
+  margin: auto 0 0;
+  padding: 0.5rem 1.25rem 0;
 }
 
-.fd-rank-row + .fd-rank-row {
-  border-top: 1px solid var(--fd-vanilla-line);
-}
-
-.fd-rank-info {
+.fd-stage-slot {
   flex: 1;
+  max-width: 13rem;
   min-width: 0;
 }
 
-.fd-rank-name {
+.fd-stage-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--fd-beige);
+  text-align: center;
+  text-decoration: none;
+}
+
+.fd-stage-image {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  overflow: hidden;
+  border: 3px solid var(--fd-beige);
+  border-radius: 50%;
+  background: var(--fd-white);
+  transition: transform 0.15s ease;
+}
+
+.fd-stage-slot.is-1 .fd-stage-image {
+  width: 4.25rem;
+  height: 4.25rem;
+  border-color: var(--fd-vanilla);
+}
+
+.fd-stage-image img {
+  width: 100%;
+  height: 100%;
+  padding: 0.3rem;
+  object-fit: contain;
+}
+
+/* One line, so the podium stays thin */
+.fd-stage-name {
+  max-width: 100%;
+  margin-top: 0.375rem;
+  overflow: hidden;
+  font-size: var(--fd-small);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fd-stage-pill {
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.0625rem 0.5rem;
+  border-radius: 999px;
+  background: var(--fd-vanilla);
+  color: var(--fd-ink);
+  font-size: var(--fd-small);
+  font-weight: 700;
+}
+
+/* The podium blocks: 1 tallest, then 2, then 3, with the rank in Anton */
+.fd-stage-block {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  padding-top: 0.5rem;
+  border-radius: 0.75rem 0.75rem 0 0;
+  background: rgb(244 237 227 / 18%);
+  color: var(--fd-beige);
+  font-family: var(--fd-font-display);
+  font-size: var(--fd-section-title);
+  line-height: 1;
+  transition: background-color 0.15s ease;
+}
+
+.fd-stage-slot.is-1 .fd-stage-block {
+  height: 5.5rem;
+  background: rgb(244 237 227 / 28%);
+}
+
+.fd-stage-slot.is-2 .fd-stage-block {
+  height: 4rem;
+}
+
+.fd-stage-slot.is-3 .fd-stage-block {
+  height: 3rem;
+}
+
+/* Hover: the photo lifts and the block brightens */
+.fd-stage-link:hover .fd-stage-image,
+.fd-stage-link:focus-visible .fd-stage-image {
+  transform: translateY(-4px);
+}
+
+.fd-stage-link:hover .fd-stage-block,
+.fd-stage-link:focus-visible .fd-stage-block {
+  background: rgb(244 237 227 / 38%);
+}
+
+.fd-stage-link:focus-visible {
+  outline: 3px solid var(--fd-vanilla);
+  outline-offset: 2px;
+}
+
+/* 4 and 5 beside the podium: paper cards floating on the blue */
+.fd-board-side {
+  display: flex;
+  flex-direction: column;
+  padding: 0 1.25rem 1.25rem;
+}
+
+.fd-board-side-title {
+  padding: 1rem 0 0.75rem;
+}
+
+.fd-board-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.fd-board-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--fd-radius);
+  background: var(--fd-paper);
+  box-shadow: 0 0.5rem 1.25rem rgb(0 0 0 / 18%);
+  color: var(--fd-text);
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fd-board-row:hover,
+.fd-board-row:focus-visible {
+  box-shadow: 0 0.75rem 1.5rem rgb(0 0 0 / 24%);
+  transform: translateY(-3px);
+}
+
+.fd-board-row:focus-visible {
+  outline: 3px solid var(--fd-vanilla);
+  outline-offset: 2px;
+}
+
+.fd-board-rank {
+  flex-shrink: 0;
+  width: 1.75rem;
+  color: var(--fd-text-muted);
+  font-weight: 700;
+}
+
+.fd-board-image {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  overflow: hidden;
+  border: 1px solid var(--fd-vanilla-line);
+  border-radius: 50%;
+  background: var(--fd-white);
+}
+
+.fd-board-image img {
+  width: 100%;
+  height: 100%;
+  padding: 0.25rem;
+  object-fit: contain;
+}
+
+.fd-board-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fd-board-name {
   overflow: hidden;
   color: var(--fd-blue);
   font-weight: 700;
@@ -952,120 +1169,36 @@ async function confirmRoleChange() {
   white-space: nowrap;
 }
 
-/* The count at the end of a row: the number in bold blue, its unit small beside it */
-.fd-big-count {
-  display: flex;
-  flex-shrink: 0;
-  align-items: baseline;
-  gap: 0.25rem;
-  color: var(--fd-blue);
-  font-weight: 700;
-  white-space: nowrap;
+@media (prefers-reduced-motion: reduce) {
+  .fd-stage-image,
+  .fd-stage-block,
+  .fd-board-row {
+    transition: none;
+  }
+
+  .fd-stage-link:hover .fd-stage-image,
+  .fd-stage-link:focus-visible .fd-stage-image,
+  .fd-board-row:hover,
+  .fd-board-row:focus-visible {
+    transform: none;
+  }
 }
 
-.fd-big-count small {
-  color: var(--fd-text-muted);
-  font-weight: 400;
-}
+@media (max-width: 576px) {
+  .fd-stage {
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem 0;
+  }
 
-/* ===================================
-   LEADERBOARD
-=================================== */
+  .fd-stage-image {
+    width: 3rem;
+    height: 3rem;
+  }
 
-.fd-board {
-  padding: 1.25rem;
-}
-
-.fd-podium {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-  padding: 1.25rem 1rem;
-  border: var(--fd-border) solid var(--fd-vanilla-line);
-  border-radius: var(--fd-radius);
-  background: var(--fd-paper);
-  text-align: center;
-}
-
-/* Number 1 stands out with a vanilla card */
-.fd-podium.is-1 {
-  border-color: var(--fd-vanilla-line);
-  background: var(--fd-vanilla-soft);
-}
-
-.fd-medal {
-  position: absolute;
-  top: 0.75rem;
-  left: 0.75rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.25rem;
-  height: 2.25rem;
-  padding: 0 0.5rem;
-  border-radius: 999px;
-  background: var(--fd-blue);
-  color: var(--fd-beige);
-  font-size: var(--fd-small);
-  font-weight: 700;
-}
-
-.fd-podium-image {
-  display: grid;
-  place-items: center;
-  width: 6rem;
-  height: 6rem;
-  margin-bottom: 0.75rem;
-  overflow: hidden;
-  border-radius: 0.75rem;
-  background: var(--fd-white);
-}
-
-.fd-podium-image img {
-  width: 100%;
-  height: 100%;
-  padding: 0.5rem;
-  object-fit: contain;
-}
-
-.fd-podium-name {
-  max-width: 100%;
-}
-
-.fd-podium-count {
-  margin-top: 0.5rem;
-  color: var(--fd-blue);
-  font-family: var(--fd-font-display);
-  font-size: var(--fd-page-title);
-  line-height: 1;
-}
-
-.fd-rank {
-  width: 1.5rem;
-  flex-shrink: 0;
-  color: var(--fd-blue);
-  font-weight: 700;
-  text-align: center;
-}
-
-.fd-product-image {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  overflow: hidden;
-  border-radius: 0.75rem;
-  background: var(--fd-white);
-}
-
-.fd-product-image img {
-  width: 100%;
-  height: 100%;
-  padding: 0.25rem;
-  object-fit: contain;
+  .fd-stage-slot.is-1 .fd-stage-image {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
 }
 
 /* ===================================
