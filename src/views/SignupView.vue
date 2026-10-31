@@ -4,7 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { signInWithGoogle, signUpWithEmail } from '../services/auth.js'
 import { createOrGetUser } from '../services/userApi.js'
 import { useAuthStore } from '../store/auth.js'
-const { startSignup, endSignup, applyDbUser } = useAuthStore()
+const auth = useAuthStore()
+const { startSignup, endSignup, applyDbUser } = auth
 
 const route = useRoute()
 const router = useRouter()
@@ -24,7 +25,7 @@ if (route.query.error === 'not-registered') {
   errorText.value = "You don't have an account yet. Sign up below!"
 }
 
-// After Google auth: if this is a new user (no username in DB yet), send them to /set-username.
+// After Google auth: a new user (no profile yet) is sent to /set-username, where the profile is created.
 // Returning Google users land on the next page as normal.
 async function onGoogleSignUp() {
   errorText.value = ''
@@ -32,11 +33,22 @@ async function onGoogleSignUp() {
   startSignup() // tell watchAuthState to skip the DB check — we handle it below
   try {
     const fbUser = await signInWithGoogle()
-    const dbUser = await createOrGetUser()
-    applyDbUser(dbUser, fbUser) // populate user.value immediately
-    if (!dbUser.username) {
+    auth.firebaseUser = fbUser
+    // No username is sent, so the server only returns a profile that already exists (404 = new user).
+    let dbUser = null
+    try {
+      dbUser = await createOrGetUser()
+    } catch (err) {
+      if (err.response?.status !== 404) throw err
+    }
+    if (!dbUser) {
+      // New Google user: no profile is created until they choose a username.
+      router.push('/set-username')
+    } else if (!dbUser.username) {
+      applyDbUser(dbUser, fbUser)
       router.push('/set-username')
     } else {
+      applyDbUser(dbUser, fbUser) // populate user.value immediately
       const next = route.query.next
       router.push(typeof next === 'string' && next.startsWith('/') ? next : '/wishlist')
     }

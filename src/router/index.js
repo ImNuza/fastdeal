@@ -29,7 +29,7 @@ const router = createRouter({
     { path: '/account', component: AccountView, meta: { requiresAuth: true } },
     { path: '/login', component: LoginView },
     { path: '/signup', component: SignupView },
-    { path: '/set-username', component: SetUsernameView, meta: { requiresAuth: true } },
+    { path: '/set-username', component: SetUsernameView, meta: { requiresFirebase: true } },
     { path: '/wishlist', component: WishlistView, meta: { requiresAuth: true } },
     { path: '/admin', component: AdminView, meta: { requiresAuth: true, requiresRole: 'admin' } },
     { path: '/error/:code', component: ErrorView },
@@ -52,6 +52,16 @@ router.beforeEach(async (to) => {
         if (ready) { stop(); resolve() }
       })
     })
+  }
+
+  // An old profile with no username must pick one before using the app.
+  if (auth.user && !auth.user.username && to.path !== '/set-username') {
+    return { path: '/set-username' }
+  }
+
+  // Sign-up step: signed in with Firebase, but the profile is only created once a username is chosen.
+  if (to.meta.requiresFirebase && !auth.firebaseUser) {
+    return { path: '/login', query: { next: to.fullPath } }
   }
 
   if (to.meta.requiresAuth && !auth.user) {

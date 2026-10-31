@@ -4,7 +4,10 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth.js'
 import { storeToRefs } from 'pinia'
 const { firebaseUser, user } = storeToRefs(useAuthStore())
-import { updateUser } from '../services/userApi.js'
+import { createOrGetUser, updateUser } from '../services/userApi.js'
+import { signOutUser } from '../services/auth.js'
+
+const auth = useAuthStore()
 
 const router = useRouter()
 
@@ -38,12 +41,25 @@ async function onSubmit() {
   }
   loading.value = true
   try {
-    const patch = { username: u }
-    if (tg) patch.telegramUsername = tg
-    const dbUser = await updateUser(patch)
     if (user.value) {
+      // An older profile that has no username yet: fill it in.
+      const patch = { username: u }
+      if (tg) patch.telegramUsername = tg
+      const dbUser = await updateUser(patch)
       user.value.username = dbUser.username
       user.value.telegramUsername = dbUser.telegramUsername || null
+    } else {
+      // New user: the profile is created here, with the username, and not before.
+      const dbUser = await createOrGetUser(u)
+      if (tg) {
+        try { 
+          await updateUser({ telegramUsername: tg }) 
+        } catch (error) {
+          console.error(error)
+        }
+        dbUser.telegramUsername = tg
+      }
+      auth.applyDbUser(dbUser, firebaseUser.value)
     }
     router.push('/wishlist')
   } catch (err) {
@@ -57,6 +73,12 @@ async function onSubmit() {
   } finally {
     loading.value = false
   }
+}
+
+// Wrong Google account? Sign out so no profile is kept for it.
+async function onUseDifferentAccount() {
+  await signOutUser()
+  router.push('/signup')
 }
 </script>
 
@@ -97,6 +119,9 @@ async function onSubmit() {
 
           <button class="btn btn-dark fd-btn-lg w-100" type="submit" :disabled="loading">
             {{ loading ? 'Saving…' : 'Set username' }}
+          </button>
+          <button class="btn btn-link w-100 mt-2" type="button" :disabled="loading" @click="onUseDifferentAccount">
+            Use a different account
           </button>
         </form>
       </div>

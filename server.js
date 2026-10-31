@@ -155,6 +155,17 @@ app.post('/api/users', requireUser, async (req, res) => {
     setOnInsert.username = username
   }
   try {
+    // No username sent: only return a profile that already exists. A new profile is never
+    // created without a username, so leaving the sign-up page cannot leave a "(no username)" row.
+    if (!username) {
+      const found = await User.findOneAndUpdate(
+        { firebaseUid: req.uid },
+        { $set: { email: req.email } },
+        { new: true }
+      )
+      if (!found) return res.status(404).json({ error: 'Choose a username first.' })
+      return res.json(found)
+    }
     const user = await User.findOneAndUpdate(
       { firebaseUid: req.uid },
       { $set: { email: req.email }, $setOnInsert: setOnInsert },
