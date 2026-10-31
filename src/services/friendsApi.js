@@ -3,20 +3,21 @@ import axios from 'axios'
 // The server reads who I am from the login token (see http.js), so no uid is sent.
 
 // Returns all my accepted friends, with their username and email.
-export async function getFriends() {
-  const { data } = await axios.get('/api/friends')
+// config is passed to axios, e.g. { quiet: true } for a background refresh (see http.js).
+export async function getFriends(config) {
+  const { data } = await axios.get('/api/friends', config)
   return data
 }
 
 // Returns incoming pending friend requests (other users who sent a request TO me).
-export async function getIncomingRequests() {
-  const { data } = await axios.get('/api/friends/requests')
+export async function getIncomingRequests(config) {
+  const { data } = await axios.get('/api/friends/requests', config)
   return data
 }
 
 // Returns requests I sent that are still pending (people I asked who have not answered yet).
-export async function getSentRequests() {
-  const { data } = await axios.get('/api/friends/sent')
+export async function getSentRequests(config) {
+  const { data } = await axios.get('/api/friends/sent', config)
   return data
 }
 

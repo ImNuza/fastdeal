@@ -7,7 +7,9 @@ export async function fetchProduct(productId, q) {
     return {}
   })
   if (!res.ok) {
-    throw new Error(data.error || 'Could not load this product.')
+    const error = new Error(data.error || 'Could not load this product.')
+    error.status = res.status
+    throw error
   }
   return data
 }

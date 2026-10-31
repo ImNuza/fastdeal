@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { fetchProduct, fetchSearchedWith } from '../services/productApi.js'
+import { useErrorStore } from './error.js'
 
 export const useProductStore = defineStore('product', () => {
   // state
@@ -39,7 +40,15 @@ export const useProductStore = defineStore('product', () => {
     try {
       product.value = await fetchProduct(productId, q)
     } catch (error) {
-      errorText.value = error.message
+      // fetch() skips the axios error check in http.js, so a missing product or a down server
+      // shows the error page here. No status means the request never reached the server.
+      if (error.status === 404) {
+        useErrorStore().showError(404, 'This product could not be found. It may have been removed.')
+      } else if (!error.status || error.status >= 500) {
+        useErrorStore().showError(navigator.onLine ? error.status || 503 : 'offline')
+      } else {
+        errorText.value = error.message
+      }
     } finally {
       loading.value = false
     }

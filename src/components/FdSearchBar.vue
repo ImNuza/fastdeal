@@ -88,7 +88,7 @@ const showSuggestions = computed(function () {
 // so they follow them across devices. A guest gets a 401, so they get this browser's list instead.
 async function loadRecentSearches() {
   try {
-    const res = await axios.get('/api/me/recent-searches')
+    const res = await axios.get('/api/me/recent-searches', { quiet: true })
     const names = (res.data.recentSearches || []).map(function (item) { return item.query })
     recentSearches.value = names.filter(Boolean).slice(0, 5)
   } catch (error) {

@@ -9,8 +9,17 @@ import FdLogo from './components/FdLogo.vue'
 import FdIcon from './components/FdIcon.vue'
 import FdFooter from './components/FdFooter.vue'
 import FdSearchBar from './components/FdSearchBar.vue'
+import FdError from './components/FdError.vue'
+import { useErrorStore } from './store/error.js'
+import { errorInfo } from './services/errors.js'
 
 const { user, firebaseUser } = storeToRefs(useAuthStore())
+
+// A page whose data failed to load shows the error page in its place (see services/http.js).
+// Going to another page clears it.
+const errorStore = useErrorStore()
+const { error: pageError } = storeToRefs(errorStore)
+const pageErrorInfo = computed(() => pageError.value && errorInfo(pageError.value.code))
 
 // Creating the wishlist store here keeps its sleep-ended timer running on every page.
 useWishlistStore()
@@ -23,6 +32,8 @@ const ENTRY_CHOICE_KEY = 'fastdeal-entry-choice'
 
 const route = useRoute()
 const router = useRouter()
+
+watch(() => route.fullPath, () => errorStore.clearError())
 
 // A guest who taps a locked icon lands on /login?next=..., so the tapped icon stays yellow, not Log in.
 const GATED_PAGES = ['/wishlist', '/friends', '/notifications']
@@ -113,7 +124,7 @@ async function refreshUnread() {
     return
   }
   try {
-    const res = await axios.get('/api/notifications')
+    const res = await axios.get('/api/notifications', { quiet: true })
     unreadCount.value = res.data.filter(n => !n.read).length
   } catch (err) {
     console.log(err)
@@ -214,7 +225,14 @@ watch([() => route.path, user], maybeShowEntryDialog)
     </div>
   </nav>
   <main class="fd-main" :class="{ 'container fd-page': !route.meta.fullBleed }">
-    <router-view :key="$route.fullPath" />
+    <FdError
+      v-if="pageError"
+      :code="pageErrorInfo.label"
+      :title="pageErrorInfo.title"
+      :message="pageError.message || pageErrorInfo.message"
+      :retry="!!pageErrorInfo.retry"
+    />
+    <router-view v-else :key="$route.fullPath" />
   </main>
   <FdFooter />
   <div v-if="showEntryDialog" class="fd-entry-backdrop">

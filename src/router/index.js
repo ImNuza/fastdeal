@@ -13,6 +13,7 @@ import AccountView from '../views/AccountView.vue'
 import SetUsernameView from '../views/SetUsernameView.vue'
 import ProductView from '../views/ProductView.vue'
 import AdminView from '../views/AdminView.vue'
+import ErrorView from '../views/ErrorView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -30,7 +31,10 @@ const router = createRouter({
     { path: '/signup', component: SignupView },
     { path: '/set-username', component: SetUsernameView, meta: { requiresAuth: true } },
     { path: '/wishlist', component: WishlistView, meta: { requiresAuth: true } },
-    { path: '/admin', component: AdminView, meta: { requiresAuth: true, requiresRole: 'admin' } }
+    { path: '/admin', component: AdminView, meta: { requiresAuth: true, requiresRole: 'admin' } },
+    { path: '/error/:code', component: ErrorView },
+    // Any URL that matches nothing above shows the 404 page. Keep this last.
+    { path: '/:pathMatch(.*)*', component: ErrorView }
   ],
   // A new page opens at the top. Back and forward return to where you were.
   scrollBehavior(to, from, savedPosition) {
@@ -55,8 +59,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresRole === 'admin' && !auth.isAdmin) {
-    alert('Access denied. Admins only.')
-    return false
+    return { path: '/error/403', query: { message: 'This page is for admins only.' }, replace: true }
   }
 })
 
