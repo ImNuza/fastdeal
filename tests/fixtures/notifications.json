@@ -1,0 +1,44 @@
+[
+  {
+    "_id": "000000000000000000000001",
+    "firebaseUid": "e2e-demo",
+    "type": "price-drop",
+    "title": "Price drop: Sony WH-1000XM5",
+    "body": "Sony WH-1000XM5 dropped 12% to S$349 at Lazada.",
+    "link": "/wishlist",
+    "productKey": "sony wh-1000xm5",
+    "fromUid": null,
+    "readAt": null,
+    "emailedAt": null,
+    "createdAt": "2026-10-30T08:00:00.000Z",
+    "read": false
+  },
+  {
+    "_id": "000000000000000000000002",
+    "firebaseUid": "e2e-demo",
+    "type": "sale-soon",
+    "title": "11.11 sale starts soon",
+    "body": "Your saved Kindle Paperwhite is on your wishlist. Shopee and Lazada usually join this sale.",
+    "link": "/wishlist",
+    "productKey": null,
+    "fromUid": null,
+    "readAt": null,
+    "emailedAt": null,
+    "createdAt": "2026-10-29T08:00:00.000Z",
+    "read": false
+  },
+  {
+    "_id": "000000000000000000000003",
+    "firebaseUid": "e2e-demo",
+    "type": "friend-request",
+    "title": "New friend request",
+    "body": "marcus.lim sent you a friend request.",
+    "link": "/friends?tab=requests",
+    "productKey": null,
+    "fromUid": "seed-friend-3",
+    "readAt": null,
+    "emailedAt": null,
+    "createdAt": "2026-10-28T08:00:00.000Z",
+    "read": false
+  }
+]
