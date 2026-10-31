@@ -429,14 +429,19 @@ tr.cheapest td {
   cursor: pointer;
 }
 
-/* A friend's username in the Buy Together pop-ups: bold DM Sans capitals, like a table header */
-.fd-friend-name {
-  color: var(--fd-blue);
-  font-family: var(--fd-font-body);
-  font-size: var(--fd-table-header);
+/* Wider pop-up with a list: Plan a budget and Buy Together. Scrolls inside when tall. */
+.fd-dialog-wide {
+  width: min(100%, 38rem);
+  max-height: calc(100svh - 2rem);
+  overflow-y: auto;
+}
+
+/* Bold heading above a tick list, like "Items to include" */
+.fd-list-heading {
+  margin-bottom: 0.25rem;
+  color: var(--fd-text);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-align: start;
 }
 
 /* Pending pill: a friend request or Buy Together invite with no answer yet */
