@@ -319,7 +319,10 @@ async function openGroupInvite(n) {
     const res = await axios.get('/api/users/profile/' + n.fromUid)
     inviterProfile.value = res.data
   } catch (err) {
-    inviterError.value = err.response?.data?.error || 'Could not load their profile.'
+    // 403: the server only shows a friend's profile, and this friendship has ended.
+    inviterError.value = err.response?.status === 403
+      ? 'You are no longer friends with ' + inviterName(n) + ', so this invite expired.'
+      : err.response?.data?.error || 'Could not load their profile.'
   } finally {
     inviterLoading.value = false
   }

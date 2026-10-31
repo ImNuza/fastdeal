@@ -422,6 +422,8 @@ app.put('/api/friends/:pairKey/accept', requireUser, async (req, res) => {
 })
 
 // Decline or cancel/remove a friendship (delete the row)
+// Buy Together invites between the two users go too, in both directions: an invite needs the
+// friendship, so without it the invite would only show "Not friends".
 app.delete('/api/friends/:pairKey', requireUser, async (req, res) => {
   const myUid = req.uid
   try {
@@ -430,6 +432,13 @@ app.delete('/api/friends/:pairKey', requireUser, async (req, res) => {
       $or: [{ requesterUid: myUid }, { addresseeUid: myUid }]
     })
     if (!f) return res.status(404).json({ error: 'Friendship not found' })
+    await Notification.deleteMany({
+      type: 'group-invite',
+      $or: [
+        { firebaseUid: f.requesterUid, fromUid: f.addresseeUid },
+        { firebaseUid: f.addresseeUid, fromUid: f.requesterUid }
+      ]
+    })
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
