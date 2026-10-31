@@ -91,9 +91,13 @@ onMounted(async function () {
       </p>
       <p v-if="verdict.reason" class="mb-1">{{ verdict.reason }}</p>
       <p class="small text-secondary mb-0">
-        <template v-if="verdict.madeAt">Made {{ madeText(verdict.madeAt) }} by {{ verdict.source }}.</template>
+        <template v-if="verdict.source === 'rules'">The AI did not answer, so this is an estimate made
+          {{ madeText(verdict.madeAt) }} with fixed rules on the same inputs. The page asks the AI again in a few
+          minutes.</template>
+        <template v-else-if="verdict.madeAt">Made {{ madeText(verdict.madeAt) }} by {{ verdict.source }}.</template>
         <template v-else>The AI did not answer, so this is the standard message.</template>
-        The same verdict is kept for the rest of the day, unless the cheapest price changes.
+        <template v-if="verdict.source !== 'rules'">The same verdict is kept for the rest of the day, unless the
+          cheapest price changes.</template>
       </p>
     </section>
 

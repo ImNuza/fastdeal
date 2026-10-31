@@ -8,7 +8,8 @@ export default mergeConfig(
     test: {
       environment: 'node',
       include: ['**/__tests__/**/*.spec.js'],
-      exclude: [...configDefaults.exclude, 'tests/**'],
+      // .claude/ holds agent worktrees: full copies of the repo with their own tests.
+      exclude: [...configDefaults.exclude, 'tests/**', '.claude/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
     },
   }),

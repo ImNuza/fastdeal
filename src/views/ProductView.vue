@@ -147,7 +147,10 @@ const breadcrumbs = computed(function () {
         </p>
         <p v-if="worthItVerdict.reason" class="mb-1">{{ worthItVerdict.reason }}</p>
         <p v-if="worthItVerdict.summary" class="small text-secondary mb-1">Based on: {{ worthItVerdict.summary }}</p>
-        <p class="small text-secondary mb-2">AI guidance for {{ product.title }} at {{ sgd(cheapest.total) }}.
+        <p v-if="worthItVerdict.source === 'rules'" class="small text-secondary mb-1">
+          The AI did not answer, so this is an estimate from the same numbers with fixed rules. Reload later for
+          the AI verdict.</p>
+        <p class="small text-secondary mb-2">{{ worthItVerdict.source === 'rules' ? 'Guidance' : 'AI guidance' }} for {{ product.title }} at {{ sgd(cheapest.total) }}.
           Not financial advice.</p>
         <router-link v-if="worthItVerdict.inputs"
           class="btn btn-sm btn-outline-dark align-self-start"

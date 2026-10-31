@@ -169,6 +169,7 @@ The seed now uses real data only (`data/demo-products.json` and the team account
 | 23 | `product.spec.js` | none | "See what the AI read" opens `/product/:id/worth-it`: the inputs table, Sent and Not sent, and the prompt. |
 | 24 | `home.spec.js` | none | A trending product with no photo shows its initials. |
 | 25 | `notifications.spec.js` | `@admin` | A Buy together invite from someone who is no longer a friend says the invite expired, with no Telegram link (`/api/users/profile/*` mocked as 403). |
+| 26 | `product.spec.js` | none | When the AI did not answer, the verdict card says it is an estimate from fixed rules. |
 
 Unit: `services/__tests__/worthItInputs.spec.js` (9 tests: the inputs from live stores, the sale calendar,
 history only with 3 or more days, the summary, the prompt) and `services/__tests__/serpapiKeys.spec.js`
