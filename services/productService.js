@@ -57,6 +57,13 @@ async function fetchImmersive(token) {
   }
 }
 
+// Google gives some stores a redirect link with no domain ("/goto?url=..."). In the browser it would
+// open on FastDeal and show 404, so it gets Google's domain. Full links stay as they are.
+export function storeUrl(link) {
+  const text = String(link || '')
+  return text.startsWith('/') ? 'https://www.google.com' + text : text
+}
+
 // One SerpApi store row in the shape the product page uses.
 function toStore(row) {
   const price = Number(row.extracted_price) || 0
@@ -241,7 +248,8 @@ export async function getProduct(productId, q) {
   const now = Date.now()
   const stores = product.stores
     .map(function (store) {
-      return Object.assign({}, store, { deal: dealCheck(store, product.stores, typical, now) })
+      // storeUrl here also fixes rows saved in productCache before this change.
+      return Object.assign({}, store, { link: storeUrl(store.link), deal: dealCheck(store, product.stores, typical, now) })
     })
     .sort(function (a, b) {
       return a.total - b.total
