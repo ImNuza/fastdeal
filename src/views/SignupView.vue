@@ -109,14 +109,16 @@ async function onEmailSignUp() {
 
         <!-- Username + Email + Password -->
         <form @submit.prevent="onEmailSignUp">
+          <label class="form-label" for="username">Username</label>
           <input
             id="username"
             v-model="username"
             class="form-control login-input mb-3"
             type="text"
-            placeholder="Username (e.g. marvel.t)"
+            placeholder="e.g. marvel.t"
             autocomplete="username"
           />
+          <label class="form-label" for="email">Email</label>
           <input
             id="email"
             v-model="email"
@@ -125,14 +127,16 @@ async function onEmailSignUp() {
             placeholder="Email"
             autocomplete="email"
           />
+          <label class="form-label" for="password">Password</label>
           <input
             id="password"
             v-model="password"
             class="form-control login-input mb-3"
             type="password"
-            placeholder="Password (min 6 characters)"
+            placeholder="At least 6 characters"
             autocomplete="new-password"
           />
+          <label class="form-label" for="telegram">Telegram username <span class="text-secondary fw-normal">(optional)</span></label>
           <div class="input-group mb-1">
             <span class="input-group-text" style="border-radius: 999px 0 0 999px;">@</span>
             <input
@@ -140,7 +144,7 @@ async function onEmailSignUp() {
               v-model="telegram"
               class="form-control login-input-flat"
               type="text"
-              placeholder="Telegram username (optional)"
+              placeholder="your_handle"
               autocomplete="off"
             />
           </div>
@@ -175,7 +179,7 @@ async function onEmailSignUp() {
 
         <p class="fd-entry-signup">
           Already have an account?
-          <router-link :to="{ path: '/login', query: route.query }">Log in</router-link>
+          <router-link class="fd-text-link" :to="{ path: '/login', query: route.query }">Log in</router-link>
         </p>
       </div>
     </div>

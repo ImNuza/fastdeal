@@ -264,7 +264,7 @@ watch([() => route.path, user], maybeShowEntryDialog)
       </div>
       <p class="fd-entry-signup">
         New to FastDeal?
-        <a href="/signup" @click.prevent="openAccountPage('/signup')">Create an account</a>
+        <a class="fd-text-link" href="/signup" @click.prevent="openAccountPage('/signup')">Create an account</a>
       </p>
     </section>
   </div>

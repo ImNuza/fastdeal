@@ -159,6 +159,7 @@ async function onResetSubmit() {
 
         <!-- Username or Email + Password -->
         <form @submit.prevent="onSignIn">
+          <label class="form-label" for="login-input">Username or Email</label>
           <input
             id="login-input"
             v-model="loginInput"
@@ -167,6 +168,7 @@ async function onResetSubmit() {
             placeholder="Username or Email"
             autocomplete="username"
           />
+          <label class="form-label" for="password">Password</label>
           <input
             id="password"
             v-model="password"
@@ -209,7 +211,7 @@ async function onResetSubmit() {
 
         <p class="fd-entry-signup">
           New to FastDeal?
-          <router-link :to="{ path: '/signup', query: route.query }">Create an account</router-link>
+          <router-link class="fd-text-link" :to="{ path: '/signup', query: route.query }">Create an account</router-link>
         </p>
       </div>
     </div>
@@ -225,7 +227,7 @@ async function onResetSubmit() {
         <p v-if="resetError" class="alert alert-danger mb-3">{{ resetError }}</p>
         <p v-if="resetSuccess" class="alert alert-success mb-3">{{ resetSuccess }}</p>
 
-        <label class="visually-hidden" for="reset-email">Email</label>
+        <label class="form-label" for="reset-email">Email</label>
         <input
           id="reset-email"
           ref="resetInput"
@@ -258,12 +260,6 @@ async function onResetSubmit() {
 .forgot-link {
   color: var(--fd-blue);
   font-size: var(--fd-small);
-  text-decoration: none;
-  font-weight: 500;
   vertical-align: baseline;
-}
-
-.forgot-link:hover {
-  text-decoration: underline;
 }
 </style>

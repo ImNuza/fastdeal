@@ -33,7 +33,7 @@ function nameOf(row) {
           <td>{{ itemName(nameOf(row)) }}</td>
           <td>{{ row.count }}</td>
           <td>
-            <router-link :to="{ path: '/compare', query: { q: nameOf(row) } }">Compare</router-link>
+            <router-link class="fd-text-link" :to="{ path: '/compare', query: { q: nameOf(row) } }">Compare</router-link>
           </td>
         </tr>
       </tbody>
