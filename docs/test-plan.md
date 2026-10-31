@@ -154,6 +154,8 @@ Batch 3, now unblocked (Zoe's wishlist is merged): 5 E2E tests in `wishlist.spec
 
 Added 2026-10-31 after Zoe's PR #38 (error pages): `tests/errors.spec.js` (unknown URL shows "Page not found"; a 500 from `/api/trending` shows "Server error" with "Try again") and `src/services/__tests__/errors.spec.js` (4 unit tests for `errorInfo`). The admin access test now checks the `/error/403` page instead of an alert.
 
+Ronald's AI verdict landed on 31 Oct (`/api/worth-it`, Gemini). `tests/fixtures/worth-it.json` is the saved verdict. `product.spec.js` and `wishlist.spec.js` route `**/api/worth-it*` to it, and `product.spec.js` tests the Show/Hide verdict panel.
+
 Batch 4, after Ronald's AI verdict merges: Compare filters and sort, the cheapest badge, the verdict (with a saved Gemini response). About 3 tests. Then check `product.spec.js` and `target-price-alert.spec.js`.
 
 Rules for this batch:
