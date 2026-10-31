@@ -25,11 +25,13 @@ export async function fetchPriceHistory(key) {
   return res.json()
 }
 
-// AI "Worth It" verdict for one product at a given price. The backend always returns
-// a verdict object (graceful fallback on any error), so we just return the JSON.
-export async function fetchWorthIt(name, price) {
-  const url = '/api/worth-it?name=' + encodeURIComponent(name || '') +
-    '&price=' + encodeURIComponent(price != null ? price : '')
+// AI "Worth It" verdict for one product. The server reads the product's live stores, its tracked
+// price history and the next big sale. The answer also has inputs, summary and prompt: what the AI
+// read, for the "How this verdict was made" page. The backend always returns a verdict object
+// (graceful fallback on any error), so we just return the JSON.
+export async function fetchWorthIt(productId, q) {
+  const url = '/api/worth-it?productId=' + encodeURIComponent(productId || '') +
+    '&q=' + encodeURIComponent(q || '')
   const res = await fetch(url)
   return res.json().catch(function () {
     return {

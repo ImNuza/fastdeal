@@ -209,15 +209,41 @@ onMounted(async function () {
     <h1 class="fd-page-title">{{ result.name }}</h1>
     <p class="fd-page-subtitle">{{ result.listings.length }} listings. Cheapest now is {{ sgd(cheapest) }}.</p>
 
-    <div v-if="verdict" class="card verdict p-3 mb-3" :class="verdict.label === 'Worth It' ? 'worth' : verdict.label === 'Not Worth It' ? 'not' : 'maybe'">
-      <p class="mb-1"><strong>{{ verdict.label }}</strong> · {{ verdict.action }}</p>
-      <p class="mb-1">{{ verdict.why }}</p>
-      <p class="small text-secondary mb-0">14-day low {{ sgd(verdict.low) }}. 14-day average {{ sgd(verdict.avg) }}. Mean rating {{ verdict.rating.toFixed(1) }} from {{ verdict.reviewSum }} reviews.</p>
-    </div>
-
-    <p v-else class="alert alert-secondary small mb-3">
-      Price history is still being tracked for this product, so there is no verdict yet. It appears after a few days of searches.
-    </p>
+    <!-- Price history first: the bars, and the verdict once there are 3 or more days of prices.
+         Both come from FastDeal's own tracked prices (priceDays), not from SerpApi. -->
+    <section class="card p-3 mb-3" aria-labelledby="fd-history-title">
+      <h2 id="fd-history-title" class="fd-section-title">Price history</h2>
+      <template v-if="result.history.length > 1">
+        <div class="row g-3">
+          <div :class="verdict ? 'col-md-7' : 'col-12'">
+            <div class="history mb-2">
+              <span
+                v-for="row in result.history"
+                :key="row.day"
+                :style="{ height: Math.round((row.price / historyMax) * 84) + 'px' }"
+                :title="dayText(row.day) + ' ' + sgd(row.price)"
+              ></span>
+            </div>
+            <p class="small text-secondary mb-0">
+              One bar for each day with a tracked price, {{ dayText(result.history[0].day) }} to
+              {{ dayText(result.history[result.history.length - 1].day) }}. Taller bar means a higher price.
+              Low {{ sgd(historyLow) }}.
+            </p>
+          </div>
+          <div v-if="verdict" class="col-md-5">
+            <div class="verdict p-3 h-100" :class="verdict.label === 'Worth It' ? 'worth' : verdict.label === 'Not Worth It' ? 'not' : 'maybe'">
+              <p class="mb-1"><strong>{{ verdict.label }}</strong> · {{ verdict.action }}</p>
+              <p class="mb-1">{{ verdict.why }}</p>
+              <p class="small text-secondary mb-0">14-day low {{ sgd(verdict.low) }}. 14-day average {{ sgd(verdict.avg) }}. Mean rating {{ verdict.rating.toFixed(1) }} from {{ verdict.reviewSum }} reviews.</p>
+            </div>
+          </div>
+        </div>
+        <p v-if="!verdict" class="small text-secondary mt-2 mb-0">The verdict appears after 3 days of prices.</p>
+      </template>
+      <p v-else class="small text-secondary mb-0">
+        Price history is still being tracked for this product. The chart and the verdict appear after a few days of searches.
+      </p>
+    </section>
 
     <p v-if="note" class="small mb-3" role="status">{{ note }}</p>
 
@@ -318,21 +344,6 @@ onMounted(async function () {
         </article>
       </li>
     </ul>
-
-    <h2 class="fd-section-title">Price history</h2>
-    <template v-if="result.history.length > 1">
-      <p class="small text-secondary">Last 14 days of tracked prices. Taller bar means a higher price.</p>
-      <div class="history mb-2">
-        <span
-          v-for="row in result.history"
-          :key="row.day"
-          :style="{ height: Math.round((row.price / historyMax) * 84) + 'px' }"
-          :title="dayText(row.day) + ' ' + sgd(row.price)"
-        ></span>
-      </div>
-      <p class="small text-secondary">{{ dayText(result.history[0].day) }} to {{ dayText(result.history[result.history.length - 1].day) }}. Low {{ sgd(historyLow) }}.</p>
-    </template>
-    <p v-else class="small text-secondary">Not enough tracked prices yet. This fills in as people search for this product.</p>
 
     <section v-if="searchedWith.length" class="mb-4 mt-4">
       <h2 class="fd-section-title">Customers who viewed this also viewed:</h2>

@@ -5,6 +5,7 @@ import { sgd, storeLink } from '../services/format.js'
 import FdIcon from '../components/FdIcon.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
 import FdTelegramPrompt from '../components/FdTelegramPrompt.vue'
+import FdConfirmDialog from '../components/FdConfirmDialog.vue'
 import FdScrollArea from '../components/FdScrollArea.vue'
 import axios from 'axios'
 import { storeToRefs } from 'pinia'
@@ -43,6 +44,24 @@ function productLink(item) {
     return { path: '/product/' + item.productId, query: { q: item.q || item.name } }
   }
   return { path: '/compare', query: { q: item.name } }
+}
+
+// Remove pop-up for a saved product ({ kind: 'item', name }) or a saved budget ({ kind: 'budget', id, name }).
+const confirmRemove = ref(null)
+const confirmBusy = ref(false)
+
+async function onConfirmRemove() {
+  const target = confirmRemove.value
+  if (target.kind === 'item') {
+    removeSaved(target.name)
+    confirmRemove.value = null
+    return
+  }
+  confirmBusy.value = true
+  draftError.value = ''
+  await removeDraft(target.id)
+  confirmBusy.value = false
+  if (!draftError.value) confirmRemove.value = null
 }
 
 // Ticks every 30 seconds so the "left" countdown on held items stays current.
@@ -567,7 +586,7 @@ function onBuyTogether(item) {
                 </span>
               </button>
               <button class="btn btn-outline-danger btn-sm fd-icon-btn" type="button"
-                :aria-label="'Delete ' + d.name" title="Delete" @click="removeDraft(d._id)">
+                :aria-label="'Delete ' + d.name" title="Delete" @click="confirmRemove = { kind: 'budget', id: d._id, name: d.name }">
                 <FdIcon name="trash" />
               </button>
             </li>
@@ -627,6 +646,11 @@ function onBuyTogether(item) {
                 </span>
                 <span class="fd-section-subtitle mb-0">{{ item.name }}</span>
               </router-link>
+              <!-- After Sleep on it ends: the verdict link sits under the product name -->
+              <button v-if="hasFinishedSleep(item)" class="fd-verdict-link" type="button"
+                @click="openVerdict(item)">
+                View purchase verdict
+              </button>
             </div>
             <!-- On hold: the prices, target, and buttons give way to one countdown across those columns. -->
             <div v-if="asleep(item)" class="fd-wish-cell fd-wish-countdown" role="cell" aria-colspan="4">
@@ -698,7 +722,7 @@ function onBuyTogether(item) {
               <div class="fd-wish-cell fd-wish-action-cell" role="cell">
                 <div class="fd-wish-action-group">
 
-                  <!-- Moon and trash buttons -->
+                  <!-- Friends, moon and trash buttons -->
                   <div class="fd-wish-actions">
                     <div v-if="friendsFor(item.productKey).length" class="fd-friends-wrap">
                       <button class="btn btn-outline-dark btn-sm fd-icon-btn" type="button"
@@ -716,16 +740,11 @@ function onBuyTogether(item) {
                     </button>
 
                     <button class="btn btn-outline-danger btn-sm fd-icon-btn" type="button"
-                      :aria-label="'Remove ' + item.name" @click="removeSaved(item.name)">
+                      :aria-label="'Remove ' + item.name" @click="confirmRemove = { kind: 'item', name: item.name }">
                       <FdIcon name="trash" />
                     </button>
                   </div>
 
-                  <!-- Verdict link directly below the icons -->
-                  <button v-if="hasFinishedSleep(item)" class="fd-verdict-link" type="button"
-                    @click="openVerdict(item)">
-                    View purchase verdict
-                  </button>
 
                 </div>
               </div>
@@ -1042,6 +1061,24 @@ function onBuyTogether(item) {
       </form>
     </section>
   </div>
+
+  <FdConfirmDialog
+    v-if="confirmRemove"
+    :title="confirmRemove.kind === 'item' ? 'Remove from wishlist' : 'Delete budget'"
+    :confirm-label="confirmRemove.kind === 'item' ? 'Remove' : 'Delete'"
+    danger
+    :busy="confirmBusy"
+    :error="confirmRemove.kind === 'budget' ? draftError : ''"
+    @confirm="onConfirmRemove"
+    @cancel="confirmRemove = null"
+  >
+    <template v-if="confirmRemove.kind === 'item'">
+      Remove <strong>{{ confirmRemove.name }}</strong> from your wishlist? Its target price goes too.
+    </template>
+    <template v-else>
+      Delete the budget <strong>{{ confirmRemove.name }}</strong>? Your saved products stay on the wishlist.
+    </template>
+  </FdConfirmDialog>
 </template>
 
 
@@ -1336,7 +1373,8 @@ function onBuyTogether(item) {
 
 .fd-wish-head,
 .fd-wish-row {
-  --fd-wish-columns: minmax(0, 22rem) 9.5rem 9.5rem 12.5rem 5rem;
+  /* Last column fits three icon buttons (friends, moon, trash): 3 x 2.25rem + 2 x 0.5rem gaps */
+  --fd-wish-columns: minmax(0, 22rem) 9.5rem 9.5rem 12.5rem 7.75rem;
 }
 
 .fd-wish-head,
@@ -1563,7 +1601,7 @@ function onBuyTogether(item) {
   width: max-content;
 }
 
-/* Moon and trash buttons stay side by side */
+/* Friends, moon and trash buttons stay side by side */
 .fd-wish-actions {
   display: flex;
   align-items: center;
@@ -1571,17 +1609,21 @@ function onBuyTogether(item) {
   gap: 0.5rem;
 }
 
+/* "Sent!" hangs below the friends button, so the button stays in line with moon and trash */
 .fd-friends-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
+  position: relative;
 }
 
 .fd-sent {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 0.15rem;
+  transform: translateX(-50%);
   color: #187447;
   font-size: 0.75rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 /* Right-align the verdict text */

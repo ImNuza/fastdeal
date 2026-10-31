@@ -10,21 +10,45 @@ test.describe('Friends', () => {
   test('admin can search the friend list and see a message when nobody matches @admin', async ({ page }) => {
     await page.goto('/friends');
 
+    // npm run seed makes the team accounts friends of demo. zoedharm is one of them.
     const search = page.getByLabel('Search your friends');
-    await search.fill('alex.tan');
-    await expect(page.getByText('alex.tan', { exact: true })).toBeVisible();
+    await search.fill('zoedharm');
+    await expect(page.getByText('zoedharm', { exact: true })).toBeVisible();
 
     await search.fill('zzzznobody');
     await expect(page.getByText('No friends match')).toBeVisible();
   });
 
-  test('admin can see the friend request from marcus.lim @admin', async ({ page }) => {
+  test('admin can see the friend request from dewa @admin', async ({ page }) => {
+    // npm run seed adds a waiting request from the team account dewa.
     await page.goto('/friends');
     await page.getByRole('tab', { name: 'Requests' }).click();
 
-    await expect(page.getByText('marcus.lim', { exact: true })).toBeVisible();
+    await expect(page.getByText('dewa', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Accept' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Decline marcus.lim' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Decline dewa' })).toBeVisible();
+  });
+
+  test('admin sees a pop-up before a friend is removed, and Cancel keeps the friend @admin', async ({ page }) => {
+    await page.goto('/friends');
+    await page.getByLabel('Search your friends').fill('zoedharm');
+    await page.getByRole('button', { name: 'Remove zoedharm as a friend' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Remove friend' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('zoedharm', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Remove', exact: true })).toBeVisible();
+
+    // Cancel closes it and nothing changes. Esc closes it too.
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('zoedharm', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Remove zoedharm as a friend' }).click();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('zoedharm', { exact: true })).toBeVisible();
   });
 
   test('user can send a friend request that the other user then sees @user', async ({ page, browser }) => {

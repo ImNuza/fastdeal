@@ -24,18 +24,35 @@ test.describe('Product page', () => {
     await expect(page.getByRole('row', { name: new RegExp(cheapest.store) })).toBeVisible();
   });
 
-  test('user can open the AI Worth it verdict and read its advice', async ({ page }) => {
+  test('user sees the AI Worth it verdict without a click, with what it was based on', async ({ page }) => {
     await page.goto('/product/' + productIphone.productId + '?q=iphone%2016');
 
-    // The verdict is hidden until the user asks for it.
-    const toggle = page.getByRole('button', { name: /Show the .Worth it\?. verdict/ });
-    await expect(toggle).toBeVisible();
-    await expect(page.getByText(worthIt.headline)).toBeHidden();
-
-    await toggle.click();
     await expect(page.getByRole('heading', { name: 'Worth it?' })).toBeVisible();
     await expect(page.getByText(worthIt.headline)).toBeVisible();
     await expect(page.getByText(worthIt.reason)).toBeVisible();
-    await expect(page.getByRole('button', { name: /Hide the .Worth it\?. verdict/ })).toBeVisible();
+    await expect(page.getByText('Based on: ' + worthIt.summary)).toBeVisible();
+  });
+
+  test('user can open what the AI read: every input, its source and the prompt', async ({ page }) => {
+    await page.goto('/product/' + productIphone.productId + '?q=iphone%2016');
+    await page.getByRole('link', { name: 'See what the AI read' }).click();
+
+    await expect(page).toHaveURL(new RegExp('/product/' + productIphone.productId + '/worth-it'));
+    await expect(page.getByRole('heading', { level: 1, name: 'How the AI decided' })).toBeVisible();
+    await expect(page.getByText(worthIt.headline)).toBeVisible();
+
+    // One row per input, with Sent or Not sent.
+    const cheapestRow = page.getByRole('row', { name: /Cheapest total now/ });
+    await expect(cheapestRow).toContainText('S$806.00 at Swiftronics USA');
+    await expect(cheapestRow).toContainText('Sent');
+    await expect(page.getByRole('row', { name: /Price history/ })).toContainText('Not sent');
+    await expect(page.getByText('7 of 8 inputs were sent.', { exact: false })).toBeVisible();
+
+    // The exact prompt opens on click.
+    await page.getByText('Show the text sent to Gemini').click();
+    await expect(page.getByText('You are a shopping adviser for Singapore shoppers.', { exact: false })).toBeVisible();
+
+    await page.getByRole('link', { name: 'Back to the product' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: productIphone.title })).toBeVisible();
   });
 });

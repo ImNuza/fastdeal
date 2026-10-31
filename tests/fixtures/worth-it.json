@@ -1,6 +1,26 @@
 {
   "decision": "wait",
   "headline": "Wait for 11.11",
-  "reason": "The 11.11 sale is close and this phone usually drops in price during it.",
-  "source": "gemini"
+  "reason": "The cheapest S$806.00 is close to the typical price, and the 11.11 sale is 11 days away.",
+  "source": "gemini-3.1-flash-lite",
+  "madeAt": "2026-10-31T08:00:00.000Z",
+  "summary": "Cheapest S$806.00, typical S$829.00, 11.11 in 11 days.",
+  "price": 806,
+  "product": {
+    "productId": "3029695054782898920",
+    "q": "iphone 16",
+    "title": "Apple iPhone 16",
+    "image": ""
+  },
+  "inputs": [
+    { "key": "product", "label": "Product", "value": "Apple iPhone 16", "source": "Live store prices (SerpApi)", "sent": true },
+    { "key": "cheapest", "label": "Cheapest total now", "value": "S$806.00 at Swiftronics USA", "source": "Live store prices (SerpApi)", "sent": true },
+    { "key": "typical", "label": "Typical price", "value": "S$829.00, the middle total of 5 stores", "source": "Live store prices (SerpApi)", "sent": true },
+    { "key": "range", "label": "Price range", "value": "S$806.00 to S$999.00 across 5 stores", "source": "Live store prices (SerpApi)", "sent": true },
+    { "key": "sale-now", "label": "Stores showing a sale price", "value": "No store shows a \"was\" price", "source": "Live store prices (SerpApi)", "sent": true },
+    { "key": "rating", "label": "Rating", "value": "4.8 out of 5 from 15000 reviews", "source": "Live store prices (SerpApi)", "sent": true },
+    { "key": "next-sale", "label": "Next big sale", "value": "11.11 sale on 11 Nov, in 11 days", "source": "FastDeal sale calendar", "sent": true },
+    { "key": "history", "label": "Price history", "value": "No tracked days yet. It needs 3, so it was not sent", "source": "FastDeal price history", "sent": false }
+  ],
+  "prompt": "You are a shopping adviser for Singapore shoppers.\nFacts from FastDeal (prices in SGD, from stores that sell this product today):\n- Product: Apple iPhone 16\n- Cheapest total now: S$806.00 at Swiftronics USA\n\nDecide whether the shopper should BUY NOW at the cheapest total, or WAIT for the next big sale."
 }

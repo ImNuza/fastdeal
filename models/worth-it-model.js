@@ -1,7 +1,9 @@
 // Server-side (Node/Express) "Worth It" verdict model for FastDeal.
-// Flow: ProductView -> GET /api/worth-it?name=&price= -> worthIt(name, price) -> Gemini.
-// Given a product name and a price, ask Gemini whether to buy now or wait for a big
-// sale, and return a small verdict object the product page renders above the Deal check.
+// Flow: ProductView -> GET /api/worth-it?productId=&q= -> server.js loads the product (cached),
+// its tracked price history and the next big sale -> worthIt(product, history, sale) -> Gemini.
+// Gemini reads the rows from services/worthItInputs.js (live store prices, the sale calendar, and
+// price history when there is enough), and returns buy now or wait. The answer, the rows and the
+// exact prompt go back together, so the "How this verdict was made" page can show what the AI read.
 //
 // Conventions match models/shoppingapimodel.js:
 //   - GEMINI_API_KEY is read at module scope (server.js does `import 'dotenv/config'`
@@ -10,8 +12,13 @@
 //   - Any failure returns a graceful FALLBACK verdict; worthIt() never throws upward,
 //     so the product page always renders.
 //
-// Model: gemini-3.8-flash is the primary. On a 429 RESOURCE_EXHAUSTED (quota/rate limit)
-// it retries ONCE with gemini-3.6-flash. Any other error falls back to a neutral verdict.
+// Model: WORTH_IT_MODEL is the primary. On a 429 RESOURCE_EXHAUSTED (quota/rate limit)
+// it retries ONCE with WORTH_IT_FALLBACK_MODEL. Any other error falls back to a neutral verdict.
+// A good verdict is saved in worthItCache for the rest of the Singapore day.
+
+import WorthItCache from './worth-it-cache-model.js'
+import { verdictInputs, verdictPrompt } from '../services/worthItInputs.js'
+import { sgDay } from '../services/priceHistory.js'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
@@ -51,23 +58,6 @@ function parseGeminiJson(text) {
   }
 }
 
-// Build the exact prompt sent to Gemini.
-function buildPrompt(name, price) {
-  return (
-    `You are a shopping adviser for Singapore shoppers. ` +
-    `A shopper is looking at this product:\n` +
-    `Product: ${name}\n` +
-    `Current price: S$${price}\n\n` +
-    `Decide whether they should BUY NOW at this price, or WAIT for a big sale ` +
-    `(for example 11.11, Black Friday, 12.12, or a mid-year sale) where it is ` +
-    `likely to be cheaper. Consider how often this kind of product is discounted, ` +
-    `how close the next major sale is, and whether S$${price} is already a good price.\n\n` +
-    `Return JSON only, no prose, in exactly this shape:\n` +
-    `{"decision": "buy" | "wait", "headline": string (max 6 words), ` +
-    `"reason": string (one short sentence, max 25 words)}`
-  )
-}
-
 // Call one Gemini model once. Returns { ok, status, errorStatus, text }:
 //   ok=true with text on success; ok=false with status (HTTP) and errorStatus
 //   (the Google error .status string, e.g. "RESOURCE_EXHAUSTED") on failure.
@@ -77,7 +67,20 @@ async function callGemini(model, prompt) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
+        contents: [{ parts: [{ text: prompt }] }],
+        // Ask for JSON in a fixed shape, so fewer answers come back unusable.
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              decision: { type: 'STRING', enum: ['buy', 'wait'] },
+              headline: { type: 'STRING' },
+              reason: { type: 'STRING' }
+            },
+            required: ['decision', 'headline', 'reason']
+          }
+        }
       })
     })
 
@@ -118,36 +121,68 @@ function toVerdict(text, model) {
   return { decision, headline, reason, source: model }
 }
 
-// Public entry point. name: product title, price: current (cheapest) price shown.
-// Always resolves to a verdict object; never throws.
-export async function worthIt(name, price) {
-  const cleanName = String(name || '').trim()
-  const cleanPrice = Number(price)
-  if (!cleanName) return fallbackVerdict('No product name was given.')
-  if (!Number.isFinite(cleanPrice) || cleanPrice <= 0) {
-    return fallbackVerdict('No valid price was given.')
-  }
-  if (!GEMINI_API_KEY) return fallbackVerdict('AI verdict is not configured.')
+const DAY = 24 * 3600000
 
-  const prompt = buildPrompt(cleanName, cleanPrice.toFixed(2))
+// Public entry point. product: from getProduct. history: [{ day, price }] tracked by FastDeal.
+// sale: the next big sale ({ name, day, daysAway }) or null.
+// Always resolves to a verdict object with inputs, summary and prompt; never throws.
+export async function worthIt(product, history, sale) {
+  if (!product || !product.title) return fallbackVerdict('No product was given.')
+  const { rows, summary } = verdictInputs(product, history, sale)
+  const cheapest = (product.stores || []).filter(function (row) { return row.total > 0 })
+    .reduce(function (low, row) { return !low || row.total < low.total ? row : low }, null)
+  if (!cheapest) return fallbackVerdict('No store price was found for this product.')
+
+  const prompt = verdictPrompt(rows)
+  const extra = {
+    inputs: rows,
+    summary: summary,
+    prompt: prompt,
+    price: cheapest.total,
+    product: { productId: product.productId, q: product.q || '', title: product.title, image: product.image || '' }
+  }
+
+  const key = product.productId + '|' + cheapest.total.toFixed(2) + '|' + sgDay(Date.now())
+  try {
+    const saved = await WorthItCache.findOne({ key: key, expiresAt: { $gt: new Date() } }).lean()
+    if (saved) return Object.assign({}, saved.verdict, { cached: true })
+  } catch (error) {
+    console.error('[Worth it] cache read failed:', error.message)
+  }
+
+  if (!GEMINI_API_KEY) return Object.assign(fallbackVerdict('AI verdict is not configured.'), extra)
 
   // Primary model.
   let call = await callGemini(WORTH_IT_MODEL, prompt)
+  let model = WORTH_IT_MODEL
 
   // Backup ONLY on a 429 RESOURCE_EXHAUSTED (quota / rate limit).
   if (!call.ok && call.status === 429 && call.errorStatus === 'RESOURCE_EXHAUSTED') {
     call = await callGemini(WORTH_IT_FALLBACK_MODEL, prompt)
-    if (call.ok) {
-      const verdict = toVerdict(call.text, WORTH_IT_FALLBACK_MODEL)
-      if (verdict) return verdict
+    model = WORTH_IT_FALLBACK_MODEL
+    if (!call.ok) {
+      return Object.assign(fallbackVerdict('The AI verdict service is busy right now. Try again later.'), extra)
     }
-    return fallbackVerdict('The AI verdict service is busy right now. Try again later.')
   }
 
   if (!call.ok) {
-    return fallbackVerdict('We could not get an AI verdict right now. Use the deal check below.')
+    return Object.assign(fallbackVerdict('We could not get an AI verdict right now. Use the deal check below.'), extra)
   }
 
-  const verdict = toVerdict(call.text, WORTH_IT_MODEL)
-  return verdict || fallbackVerdict('The AI verdict was unclear. Use the deal check below.')
+  const answer = toVerdict(call.text, model)
+  if (!answer) {
+    return Object.assign(fallbackVerdict('The AI verdict was unclear. Use the deal check below.'), extra)
+  }
+
+  const verdict = Object.assign(answer, extra, { madeAt: new Date().toISOString() })
+  try {
+    await WorthItCache.updateOne(
+      { key: key },
+      { $set: { verdict: verdict, expiresAt: new Date(Date.now() + DAY) } },
+      { upsert: true }
+    )
+  } catch (error) {
+    console.error('[Worth it] cache write failed:', error.message)
+  }
+  return verdict
 }
