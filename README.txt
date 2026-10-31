@@ -27,8 +27,8 @@ Logged out:
 - Home (/): search a product by name, or press the camera icon to search with a photo (AI finds the
   product). Trending Today and Trending This Week show what people search.
 - Compare (/compare?q=...): every listing for the search, with filters (price, store, rating, free
-  shipping, on sale) and sort. The Price history card shows the prices FastDeal tracked.
-- Product page: every store for one product, with a Deal check per store, and the AI "Worth it?"
+  shipping, on sale) and sort.
+- Product page: every store for one product, cheapest total first, and the AI "Worth it?"
   verdict. "See what the AI read" opens a page with every input the AI used and the exact prompt.
   If both Gemini models are busy, the card shows an estimate from fixed rules and says so.
 - Trending (/trending): the most searched products.
@@ -116,12 +116,12 @@ Each AI verdict is kept for the rest of the day.
 Two kinds of tests. Neither one calls SerpApi or Gemini: the tests use saved responses from
 tests/fixtures/.
 
-Unit tests (Vitest), 106 tests in 11 files, in the __tests__ folders:
+Unit tests (Vitest), 84 tests in 11 files, in the __tests__ folders:
   npm run test:unit
-They test the pure logic: the Deal check rules, price history, the budget planner, the AI verdict
+They test the pure logic: the typical price, the store price rows, the budget planner, the AI verdict
 inputs, prompt and rule fallback, the SerpApi key fallback, keys, formats and search history.
 
-End-to-end tests (Playwright), 36 tests in 12 files, in tests/:
+End-to-end tests (Playwright), 34 tests in 11 files, in tests/:
 1. Once, install the browser:
      npx playwright install chromium
 2. Put E2E_DEMO_PASSWORD=demo1234 in .env.
@@ -137,7 +137,6 @@ End-to-end tests (Playwright), 36 tests in 12 files, in tests/:
 What the E2E tests cover:
 - smoke.spec.js: home page, search, login redirect, admin access and the 403 page
 - trending.spec.js, home.spec.js: Trending lists, links to Compare, photo fallback
-- compare.spec.js: the price history card, with and without history
 - product.spec.js: the product page, the AI verdict, and the "See what the AI read" page
 - wishlist.spec.js: save and remove, search, sort, tabs, Sleep on it, Plan a budget, Buy Together,
   the remove pop-up
@@ -156,7 +155,7 @@ demo.user@smu.edu.sg, and the rest run logged out.
 -----------------
 - server.js            Express server: every /api route, and it serves the built pages from dist/.
 - models/              MongoDB models (one file per collection) and the SerpApi + Gemini search.
-- services/            Server logic: product pages, Deal check, price history, AI verdict inputs,
+- services/            Server logic: product pages, typical price, store price rows, AI verdict inputs,
                        email, SerpApi keys.
 - src/                 Vue 3 app: views/ (pages), components/, store/ (Pinia), services/, router/.
 - data/                seed.js, demo-products.json (real products team members saved) and the

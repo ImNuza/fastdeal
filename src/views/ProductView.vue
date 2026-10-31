@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import DealCheck from '../components/DealCheck.vue'
 import FdBreadcrumbs from '../components/FdBreadcrumbs.vue'
 import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
 import SaveSleepButtons from '../components/SaveSleepButtons.vue'
@@ -11,13 +10,13 @@ import { useProductStore } from '../store/product.js'
 import { itemName } from '../services/itemName.js'
 import { fetchWorthIt } from '../services/productApi.js'
 
-// One product: every store that sells it, cheapest total first, with the Deal check,
+// One product: every store that sells it, cheapest total first, the AI verdict,
 // what buyers say and the product details.
 // URL: /product/:productId?q=<the search it came from>
 const route = useRoute()
 
-// The product, its loading state and the cheapest/highest/ratings maths live in the product store.
-const { product, loading, errorText, searchedWith, cheapest, highest } = storeToRefs(useProductStore())
+// The product, its loading state and the cheapest/ratings maths live in the product store.
+const { product, loading, errorText, searchedWith, cheapest } = storeToRefs(useProductStore())
 const { percentOf, loadProduct } = useProductStore()
 
 // AI "Worth It" verdict (buy now or wait). View-local: it is about presentation here,
@@ -124,7 +123,7 @@ const breadcrumbs = computed(function () {
       :product="saveInfo" />
 
     <!-- AI "Worth It" verdict: buy now or wait for a big sale. Open on load, right under the price,
-         because it is the main answer on this page. Sits above the Deal check. -->
+         because it is the main answer on this page. Sits above the store table. -->
     <section v-if="cheapest && (worthItLoading || worthItVerdict)" id="fd-worth-it-panel"
       class="card p-3 mt-3 mb-4 fd-worth-it"
       :class="worthItVerdict ? 'border-' + (WORTH_IT_TONE[worthItVerdict.decision] || 'secondary') : ''"
@@ -159,18 +158,6 @@ const breadcrumbs = computed(function () {
       </template>
     </section>
 
-    <section v-if="cheapest" class="card p-3 mb-4">
-      <h2 class="fd-section-title mb-2">Deal check</h2>
-      <p v-if="product.typicalPrice" class="mb-2">
-        Typical price {{ sgd(product.typicalPrice) }} across {{ product.stores.length }} stores.
-        Cheapest {{ sgd(cheapest.total) }} at {{ cheapest.store }}<template v-if="highest">,
-        highest {{ sgd(highest.total) }} at {{ highest.store }}</template>.
-      </p>
-      <DealCheck :deal="cheapest.deal" />
-      <p class="small text-secondary mb-0 mt-1">We compare the stores that sell this product today.
-        Totals include shipping when the store shows it.</p>
-    </section>
-
     <h2 class="fd-section-title">All stores</h2>
     <div class="table-responsive mb-4">
       <table class="table align-middle">
@@ -180,7 +167,6 @@ const breadcrumbs = computed(function () {
             <th scope="col">Price</th>
             <th scope="col">Shipping</th>
             <th scope="col">Total</th>
-            <th scope="col">Deal check</th>
             <th scope="col"><span class="visually-hidden">Link</span></th>
           </tr>
         </thead>
@@ -203,9 +189,6 @@ const breadcrumbs = computed(function () {
             </td>
             <td>{{ row.shipping || 'Not shown' }}</td>
             <td>{{ sgd(row.total) }}</td>
-            <td>
-              <DealCheck :deal="row.deal" />
-            </td>
             <td>
               <a v-if="row.link" class="btn btn-sm btn-outline-dark" :href="row.link" target="_blank" rel="noopener">
                 Go to store</a>

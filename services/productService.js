@@ -1,4 +1,4 @@
-// Product page data: every store for one product, buyer reviews and the Deal check.
+// Product page data: every store for one product, buyer reviews and the typical price.
 // Flow: ProductView -> GET /api/product/:productId?q= -> getProduct(productId, q)
 //   1. productCache has it and the prices are under 24 hours old: use it, no SerpApi credit.
 //   2. productCache has it but the prices are older: refresh with the saved token (1 credit).
@@ -10,7 +10,7 @@ import ProductCache from '../models/product-cache-model.js'
 import SearchCache from '../models/search-cache-model.js'
 import { toProductKey } from '../models/product-key.js'
 import { search } from '../models/shoppingapimodel.js'
-import { dealCheck, typicalPrice } from './dealCheck.js'
+import { typicalPrice } from './typicalPrice.js'
 import { recordPrices } from './priceHistory.js'
 
 const HOUR = 3600000
@@ -227,6 +227,7 @@ async function loadFromSerpApi(productId, productKey, q, cached) {
   await ProductCache.findOneAndUpdate({ productId: productId }, row, { upsert: true })
 
   // priceDays under this product's own title, not the search words. Only for new prices.
+  // The Home "Comparing pays" card reads these rows. They are not shown as price history.
   if (live) {
     await recordPrices(toProductKey(row.title), stores.map(function (store) {
       return Object.assign({ productId: productId }, store)
@@ -245,11 +246,10 @@ export async function getProduct(productId, q) {
   }
 
   const typical = typicalPrice(product.stores)
-  const now = Date.now()
   const stores = product.stores
     .map(function (store) {
       // storeUrl here also fixes rows saved in productCache before this change.
-      return Object.assign({}, store, { link: storeUrl(store.link), deal: dealCheck(store, product.stores, typical, now) })
+      return Object.assign({}, store, { link: storeUrl(store.link) })
     })
     .sort(function (a, b) {
       return a.total - b.total

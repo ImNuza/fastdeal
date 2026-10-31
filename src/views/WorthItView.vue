@@ -27,7 +27,7 @@ const TONE = {
 const NOT_READ = [
   'Review text. It reads the star rating and the number of reviews only.',
   'Prices from other countries, or stores that are not in the store list.',
-  'Past prices from before FastDeal started tracking this product.',
+  'Past prices. SerpApi does not give price history, so the AI sees today\'s prices only.',
   'Your budget, your wishlist or anything about you.'
 ]
 

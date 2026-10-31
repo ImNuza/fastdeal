@@ -3,10 +3,7 @@ import { ref, computed } from 'vue'
 import axios from 'axios'
 import { itemName } from '../services/itemName.js'
 import { sessionId } from '../services/searchSession.js'
-import { fetchPriceHistory, fetchSearchedWith } from '../services/productApi.js'
-
-// A verdict needs a few days of real price history to mean anything.
-const MIN_HISTORY_DAYS = 3
+import { fetchSearchedWith } from '../services/productApi.js'
 
 export const useCompareStore = defineStore('compare', () => {
   // state
@@ -74,8 +71,7 @@ export const useCompareStore = defineStore('compare', () => {
     }
   }
 
-  // Everything on the page is real: live listings, the tracked price history and what other
-  // shoppers searched with this product. A failed search shows the error state, never fake data.
+  // Everything on the page is real: live listings and what other shoppers searched with this product. A failed search shows the error state, never fake data.
   async function loadResult(q) {
     result.value = null
     failed.value = false
@@ -87,9 +83,8 @@ export const useCompareStore = defineStore('compare', () => {
       loading.value = false
       return
     }
-    const history = await orEmpty(fetchPriceHistory(live.productKey))
     const related = await orEmpty(fetchSearchedWith(live.productKey))
-    result.value = { name: live.name, listings: live.listings, history: history, related: related.slice(0, 8) }
+    result.value = { name: live.name, listings: live.listings, related: related.slice(0, 8) }
     loading.value = false
   }
 
@@ -107,66 +102,5 @@ export const useCompareStore = defineStore('compare', () => {
     return result.value.listings.reduce(function (low, row) { return row.price < low ? row.price : low }, Infinity)
   })
 
-  function verdictFor(data) {
-    let cheapestNow = data.listings[0].price
-    let ratingSum = 0
-    let reviewSum = 0
-    for (let i = 0; i < data.listings.length; i++) {
-      const row = data.listings[i]
-      if (row.price < cheapestNow) {
-        cheapestNow = row.price
-      }
-      ratingSum += row.rating
-      reviewSum += row.reviews
-    }
-    let low = data.history[0]
-    let sum = 0
-    for (let d = 0; d < data.history.length; d++) {
-      sum += data.history[d]
-      if (data.history[d] < low) {
-        low = data.history[d]
-      }
-    }
-    const avg = sum / data.history.length
-    const rating = ratingSum / data.listings.length
-    let label = 'Maybe'
-    let action = 'Wait'
-    let why = 'The price is above the recent average. A lower price showed up in the last 14 days.'
-    if (cheapestNow <= low * 1.03 && rating >= 4.3) {
-      label = 'Worth It'
-      action = 'Buy now'
-      why = 'The cheapest price is at the low end of the last 14 days, and seller ratings are high.'
-    } else if (cheapestNow > avg * 1.08 || rating < 3.9) {
-      label = 'Not Worth It'
-      action = 'Wait'
-      why = 'The cheapest price is above the recent average, or the ratings are weak.'
-    } else if (cheapestNow <= avg) {
-      label = 'Maybe'
-      action = 'Buy now'
-      why = 'The price is near the recent average. Ratings are acceptable, but this is not the low.'
-    }
-    return {
-      label: label,
-      action: action,
-      why: why,
-      cheapest: cheapestNow,
-      low: low,
-      avg: avg,
-      rating: rating,
-      reviewSum: reviewSum
-    }
-  }
-
-  // null until enough real price history has been tracked for this product.
-  const verdict = computed(function () {
-    if (!result.value || !result.value.listings.length || result.value.history.length < MIN_HISTORY_DAYS) {
-      return null
-    }
-    return verdictFor({
-      listings: result.value.listings,
-      history: result.value.history.map(function (row) { return row.price })
-    })
-  })
-
-  return { result, loading, failed, verdict, cheapest, loadResult, showFailed }
+  return { result, loading, failed, cheapest, loadResult, showFailed }
 })

@@ -15,11 +15,6 @@ export const useProductStore = defineStore('product', () => {
     return product.value && product.value.stores.length ? product.value.stores[0] : null
   })
 
-  const highest = computed(function () {
-    const stores = product.value ? product.value.stores : []
-    return stores.length > 1 ? stores[stores.length - 1] : null
-  })
-
   const ratingTotal = computed(function () {
     return (product.value ? product.value.ratings : []).reduce(function (sum, row) {
       return sum + row.amount
@@ -57,5 +52,5 @@ export const useProductStore = defineStore('product', () => {
     }
   }
 
-  return { product, loading, errorText, searchedWith, cheapest, highest, ratingTotal, percentOf, loadProduct }
+  return { product, loading, errorText, searchedWith, cheapest, ratingTotal, percentOf, loadProduct }
 })
