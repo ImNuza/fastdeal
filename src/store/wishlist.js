@@ -5,6 +5,7 @@ import { toProductKey } from '../../models/product-key.js'
 import { user, firebaseUser, findSaved } from './auth.js'
 import { fetchCheapestLiveListing } from '../services/livePriceService.js'
 import { planBudget } from '../services/budgetPlanner.js'
+import { createBudget, updateBudget, deleteBudget } from '../services/userApi.js'
 
 export const useWishlistStore = defineStore('wishlist', () => {
   // ---------------------------------------------------------------
@@ -537,7 +538,23 @@ export const useWishlistStore = defineStore('wishlist', () => {
     budgetError.value = ''
   }
 
+  // On a reopened draft the saved combination is the only one on screen, so the first tap works
+  // the plan out at today's prices and moves on to the one after it. If prices are not in yet,
+  // the saved one stays with the error under it.
   function nextOption() {
+    if (plan.value.saved) {
+      const saved = plan.value
+      const key = pickKey(saved.options[0].items)
+      findPlan()
+      if (!plan.value) {
+        plan.value = saved
+        return
+      }
+      if (!plan.value.options.length) return
+      const index = plan.value.options.findIndex(function (opt) { return pickKey(opt.items) === key })
+      planIndex.value = (index + 1) % plan.value.options.length
+      return
+    }
     planIndex.value = (planIndex.value + 1) % plan.value.options.length
   }
 
@@ -577,6 +594,136 @@ export const useWishlistStore = defineStore('wishlist', () => {
       return !option.value.items.some(function (item) { return item.name === name })
     })
   })
+
+  // Budget drafts: named plans saved on the account, newest first. editingId is the draft open in
+  // the planner: null for a new budget not saved yet. Opening a draft keeps only items still on
+  // the wishlist and not on hold.
+  const drafts = computed(function () { return user.value?.budgetDrafts || [] })
+  const editing = ref(false)
+  const editingId = ref(null)
+  const draftName = ref('')
+  const draftSaving = ref(false)
+  const draftError = ref('')
+
+  const editingDraft = computed(function () {
+    return drafts.value.find(function (d) { return d._id === editingId.value }) || null
+  })
+
+  function startDraft(draft) {
+    editing.value = true
+    editingId.value = draft ? draft._id : null
+    draftName.value = draft ? draft.name : ''
+    budget.value = draft && draft.amount !== null && draft.amount !== undefined ? String(draft.amount) : ''
+    included.value = draft
+      ? (draft.items || []).filter(function (name) {
+          return plannable.value.some(function (item) { return item.name === name })
+        })
+      : []
+    draftError.value = ''
+    clearPlan()
+    if (draft && draft.pick && draft.pick.length) showSavedPick(draft)
+  }
+
+  // Reopening a draft shows the combination as it was saved, with the prices and stores it had
+  // then, without working it out again. Find best combination works it out at today's prices.
+  function showSavedPick(draft) {
+    const items = draft.pick.filter(function (item) { return item && typeof item.name === 'string' })
+    if (!items.length) return
+    const spent = items.reduce(function (sum, item) { return sum + item.price }, 0)
+    plan.value = {
+      saved: true,
+      mustFits: true,
+      mustTotal: spent,
+      options: [{ items: items, total: spent, left: (draft.amount || 0) - spent }]
+    }
+    planIndex.value = 0
+  }
+
+  // The combination on screen, saved with the draft
+  const pickItems = computed(function () {
+    return option.value
+      ? option.value.items.map(function (item) {
+          return { name: item.name, price: item.price, store: item.store, rank: item.rank }
+        })
+      : []
+  })
+
+  function pickKey(list) {
+    return (list || []).map(function (item) { return item.name }).sort().join('|')
+  }
+
+  function closeDraft() {
+    editing.value = false
+    editingId.value = null
+    draftError.value = ''
+    clearPlan()
+  }
+
+  // True when what is on screen differs from the saved draft (always true for a new one),
+  // including trying another combination
+  const draftChanged = computed(function () {
+    const d = editingDraft.value
+    if (!d) return true
+    const amount = budget.value === '' ? null : Number(budget.value)
+    return draftName.value.trim() !== d.name || amount !== d.amount ||
+      included.value.join('|') !== (d.items || []).join('|') ||
+      (plan.value !== null && pickKey(pickItems.value) !== pickKey(d.pick))
+  })
+
+  async function saveDraft() {
+    if (!draftName.value.trim()) {
+      draftError.value = 'Give the budget a name.'
+      return
+    }
+    draftSaving.value = true
+    draftError.value = ''
+    const body = {
+      name: draftName.value.trim(),
+      amount: budget.value === '' ? null : Number(budget.value),
+      items: included.value,
+      pick: pickItems.value
+    }
+    try {
+      const data = editingId.value ? await updateBudget(editingId.value, body) : await createBudget(body)
+      if (user.value) user.value.budgetDrafts = data.drafts
+      editingId.value = data.id
+    } catch (err) {
+      draftError.value = err.response?.data?.error || 'Could not save the budget. Try again.'
+    } finally {
+      draftSaving.value = false
+    }
+  }
+
+  // Once a budget is saved, every combination it shows after that (Find best combination or Try
+  // another combination) is saved to it straight away, so the draft always holds the last one seen.
+  // A change made while a save is running is saved right after it.
+  let saveAgain = false
+
+  async function autoSaveDraft() {
+    if (draftSaving.value) {
+      saveAgain = true
+      return
+    }
+    await saveDraft()
+    if (saveAgain) {
+      saveAgain = false
+      if (editingId.value && plan.value && !plan.value.saved && draftChanged.value) await autoSaveDraft()
+    }
+  }
+
+  watch(option, function () {
+    if (editingId.value && plan.value && !plan.value.saved && draftChanged.value) autoSaveDraft()
+  })
+
+  async function removeDraft(id) {
+    try {
+      const data = await deleteBudget(id)
+      if (user.value) user.value.budgetDrafts = data.drafts
+      if (editingId.value === id) closeDraft()
+    } catch (err) {
+      draftError.value = err.response?.data?.error || 'Could not delete the budget. Try again.'
+    }
+  }
 
   // The cheapest ticked item, for the "Nothing fits" message.
   function cheapestPlannable() {
@@ -619,9 +766,8 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
   function openBuyTogether(item) {
     buyItem.value = item
-    selected.value = friendsFor(item.productKey)
-      .filter(function (f) { return !f.invited })
-      .map(function (f) { return f.firebaseUid })
+    // Nobody ticked to start, so inviting one friend now and others later is the normal path
+    selected.value = []
     inviteSent.value = false
     error.value = ''
   }
@@ -640,6 +786,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
         productKey: buyItem.value.productKey
       })
       inviteSent.value = true
+      selected.value = []
       await fetchFriendOverlap()
     } catch (err) {
       error.value = err.response?.data?.error || 'Could not send invites. Try again.'
@@ -657,6 +804,8 @@ export const useWishlistStore = defineStore('wishlist', () => {
     openVerdict, closeVerdict,
     budget, included, plan, planIndex, budgetError, plannable, heldCount, clearPlan, findPlan,
     nextOption, option, rankOf, setRank, pickedItems, missedItems, cheapestPlannable,
+    drafts, editing, editingId, editingDraft, draftName, draftSaving, draftError, draftChanged,
+    startDraft, closeDraft, saveDraft, removeDraft,
     friendOverlap, buyItem, selected, inviting, inviteSent, error,
     fetchFriendOverlap, friendsFor, allInvited, openBuyTogether, closeBuyTogether, sendInvites
   }

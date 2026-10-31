@@ -212,6 +212,80 @@ app.put('/api/users/me', requireUser, async (req, res) => {
   }
 })
 
+// --- Budget drafts (Plan a budget on the Wishlist page) ---
+// A draft is a name, a budget of S$0 or more (or none), and up to 100 item names in priority order.
+// Up to 20 drafts per user, newest first. Each route returns the user's full list.
+const MAX_DRAFTS = 20
+
+function readDraft(body) {
+  const name = text(body.name).slice(0, 60)
+  if (!name) return { error: 'Give the budget a name' }
+  const amount = body.amount === null || body.amount === '' || body.amount === undefined ? null : Number(body.amount)
+  if (amount !== null && (!Number.isFinite(amount) || amount < 0)) return { error: 'Budget must be S$0 or more' }
+  const items = Array.isArray(body.items) ? body.items.map(text).filter(Boolean).slice(0, 100) : []
+  // The combination on screen when saved, with its prices: only items that are also in items
+  const pick = Array.isArray(body.pick)
+    ? body.pick
+      .map(p => ({ name: text(p?.name), price: Number(p?.price), store: text(p?.store), rank: Number(p?.rank) || 0 }))
+      .filter(p => items.includes(p.name) && Number.isFinite(p.price) && p.price >= 0)
+    : []
+  return { draft: { name, amount, items, pick, savedAt: new Date() } }
+}
+
+app.post('/api/users/me/budgets', requireUser, async (req, res) => {
+  try {
+    const { draft, error } = readDraft(req.body || {})
+    if (error) return res.status(400).json({ error })
+    const user = await User.findOneAndUpdate(
+      { firebaseUid: req.uid },
+      { $push: { budgetDrafts: { $each: [draft], $position: 0, $slice: MAX_DRAFTS } } },
+      { new: true }
+    ).select('budgetDrafts')
+    if (!user) return res.status(404).json({ error: 'User not found' })
+    res.status(201).json({ drafts: user.budgetDrafts, id: user.budgetDrafts[0]._id })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.put('/api/users/me/budgets/:id', requireUser, async (req, res) => {
+  try {
+    const { draft, error } = readDraft(req.body || {})
+    if (error) return res.status(400).json({ error })
+    const user = await User.findOneAndUpdate(
+      { firebaseUid: req.uid, 'budgetDrafts._id': req.params.id },
+      { $set: {
+          'budgetDrafts.$.name': draft.name,
+          'budgetDrafts.$.amount': draft.amount,
+          'budgetDrafts.$.items': draft.items,
+          'budgetDrafts.$.pick': draft.pick,
+          'budgetDrafts.$.savedAt': draft.savedAt
+      } },
+      { new: true }
+    ).select('budgetDrafts')
+    if (!user) return res.status(404).json({ error: 'Budget not found' })
+    res.json({ drafts: user.budgetDrafts, id: req.params.id })
+  } catch (err) {
+    if (err.name === 'CastError') return res.status(404).json({ error: 'Budget not found' })
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.delete('/api/users/me/budgets/:id', requireUser, async (req, res) => {
+  try {
+    const user = await User.findOneAndUpdate(
+      { firebaseUid: req.uid },
+      { $pull: { budgetDrafts: { _id: req.params.id } } },
+      { new: true }
+    ).select('budgetDrafts')
+    if (!user) return res.status(404).json({ error: 'User not found' })
+    res.json({ drafts: user.budgetDrafts })
+  } catch (err) {
+    if (err.name === 'CastError') return res.status(404).json({ error: 'Budget not found' })
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // --- Friendship routes ---
 // Every route acts as the logged-in user (req.uid).
 

@@ -285,6 +285,9 @@ onMounted(async function () {
             <span v-if="row.price === lowInView" class="badge text-bg-success fd-listing-badge">
               Cheapest
             </span>
+            <span v-if="savedFrom(rowName(row), row.productId) === row.store" class="badge text-bg-dark fd-listing-saved">
+              Saved
+            </span>
           </div>
 
           <div class="fd-listing-body">
@@ -433,6 +436,13 @@ onMounted(async function () {
   position: absolute;
   top: 0.5rem;
   left: 0.5rem;
+}
+
+/* Top right, so it never covers the Cheapest badge */
+.fd-listing-saved {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
 }
 
 .fd-listing-body {

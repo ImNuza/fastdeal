@@ -183,6 +183,11 @@ small {
   min-height: 44px;
 }
 
+/* Unread count on the bell. In the phone menu it sits after the label. */
+.fd-nav-badge {
+  font-family: var(--fd-font-body);
+}
+
 @media (min-width: 992px) {
   .fd-nav .fd-icon-link {
     justify-content: center;
@@ -201,6 +206,14 @@ small {
   /* On desktop the icon stands alone; its label appears as a tooltip on hover or keyboard focus. */
   .fd-nav .fd-icon-link {
     position: relative;
+  }
+
+  /* Up and to the right of the bell, so two digits never cover it */
+  .fd-nav-badge {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    margin-left: 0.25rem;
   }
 
   .fd-icon-label {
@@ -298,7 +311,9 @@ tr.cheapest td {
   border-radius: 4px 4px 0 0;
 }
 
-.alert-secondary {
+/* Notes and success messages share the vanilla card look instead of Bootstrap's grey and mint */
+.alert-secondary,
+.alert-success {
   --bs-alert-bg: var(--fd-vanilla-soft);
   --bs-alert-color: var(--fd-text);
   --bs-alert-border-color: var(--fd-vanilla-line);
@@ -378,6 +393,64 @@ tr.cheapest td {
   letter-spacing: 0;
   line-height: 1;
   vertical-align: middle;
+}
+
+/* Tick list: a big checkbox, then a label that fills the row. Plan a budget and Buy Together. */
+.fd-check-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fd-check-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--fd-vanilla-line);
+}
+
+.fd-check-list .form-check-input {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0;
+}
+
+.fd-check-label {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  min-height: 3rem;
+  padding: 0.5rem 0;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* A friend's username in the Buy Together pop-ups: bold DM Sans capitals, like a table header */
+.fd-friend-name {
+  color: var(--fd-blue);
+  font-family: var(--fd-font-body);
+  font-size: var(--fd-table-header);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Pending pill: a friend request or Buy Together invite with no answer yet */
+.badge-pending {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--fd-control-sm);
+  padding: 0.25rem 0.875rem;
+  font-size: var(--fd-button-sm);
+  font-weight: 700;
+  border-radius: 999px;
+  background: var(--fd-vanilla-soft);
+  color: var(--fd-text-muted);
+  border: var(--fd-border) solid var(--fd-vanilla-line);
 }
 
 /* Icon-only small button, such as Remove or Decline: a circle as tall as any btn-sm. Give it an aria-label. */
