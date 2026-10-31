@@ -22,6 +22,7 @@ npm run build
 npm run seed         # resets the demo account data
 npm run test:e2e     # Playwright; starts both servers itself
 npm run test:report
+npm run test:unit    # Vitest unit tests in __tests__ folders
 ```
 Run `npm run build` and `npm run test:e2e` before a change goes to `main`.
 
