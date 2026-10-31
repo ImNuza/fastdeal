@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import DealCheck from '../components/DealCheck.vue'
 import FdBreadcrumbs from '../components/FdBreadcrumbs.vue'
@@ -24,6 +24,9 @@ const { percentOf, loadProduct } = useProductStore()
 // and depends on the cheapest total once the product has loaded.
 const worthItVerdict = ref(null)
 const worthItLoading = ref(false)
+// Seconds elapsed while the verdict is loading, so the user sees it is still working.
+const worthItElapsed = ref(0)
+let worthItTimer = null
 // Hidden on load: the verdict only shows after the user presses "Show". The fetch
 // still runs on load (below), so revealing it is instant — we gate display, not loading.
 const showWorthIt = ref(false)
@@ -49,11 +52,26 @@ onMounted(async function () {
   // Only ask for a verdict once a product with a price is actually on the page.
   if (product.value && cheapest.value && cheapest.value.total > 0) {
     worthItLoading.value = true
+    // Tick the elapsed seconds every second while we wait on the AI.
+    worthItElapsed.value = 0
+    worthItTimer = setInterval(function () {
+      worthItElapsed.value += 1
+    }, 1000)
     try {
       worthItVerdict.value = await fetchWorthIt(product.value.title, cheapest.value.total)
     } finally {
       worthItLoading.value = false
+      clearInterval(worthItTimer)
+      worthItTimer = null
     }
+  }
+})
+
+// Stop the elapsed timer if the user leaves the page mid-load.
+onUnmounted(function () {
+  if (worthItTimer) {
+    clearInterval(worthItTimer)
+    worthItTimer = null
   }
 })
 
@@ -118,8 +136,11 @@ const breadcrumbs = computed(function () {
         :class="worthItVerdict ? 'border-' + (WORTH_IT_TONE[worthItVerdict.decision] || 'secondary') : ''">
         <h2 class="fd-section-title mb-2">Worth it?</h2>
 
-        <p v-if="worthItLoading" class="small text-secondary mb-0">
-          Asking our AI whether to buy now or wait…</p>
+        <p v-if="worthItLoading" class="small text-secondary mb-0 d-flex align-items-center gap-2">
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          <span>Asking our AI whether to buy now or wait…</span>
+          <span class="badge text-bg-secondary" aria-live="polite">{{ worthItElapsed }}s elapsed</span>
+        </p>
 
         <template v-else-if="worthItVerdict">
           <p class="mb-1">
