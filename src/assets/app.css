@@ -5,6 +5,9 @@
   --bs-body-bg: var(--fd-beige);
   --bs-link-color-rgb: 39, 80, 138;
   --bs-link-hover-color-rgb: 29, 63, 110;
+  /* Link-style buttons (.btn-link) read these instead of the -rgb pair above. */
+  --bs-link-color: var(--fd-blue);
+  --bs-link-hover-color: var(--fd-blue-dark);
   --bs-border-color: var(--fd-vanilla-line);
   --bs-border-width: var(--fd-border);
 }
@@ -19,6 +22,12 @@ body {
 
 a {
   text-underline-offset: 0.2em;
+}
+
+/* Underlined text links are bold everywhere. Cards and rows that are links are not. */
+.fd-text-link,
+.btn-link {
+  font-weight: 700;
 }
 
 /* Type scale */
@@ -522,6 +531,22 @@ tr.cheapest td {
   box-shadow: 0 0 0 0.25rem rgb(39 80 138 / 35%);
 }
 
+/* Bootstrap switches the focused background to the beige page colour; keep it paper. */
+.form-control:focus,
+.form-select:focus {
+  background-color: var(--fd-paper);
+}
+
+/* Chrome paints autofilled fields light blue and ignores background-color, so cover it with an inset shadow. */
+.form-control:-webkit-autofill {
+  -webkit-text-fill-color: var(--fd-text);
+  box-shadow: inset 0 0 0 100px var(--fd-paper);
+}
+
+.form-control:-webkit-autofill:focus {
+  box-shadow: inset 0 0 0 100px var(--fd-paper), 0 0 0 0.25rem rgb(39 80 138 / 35%);
+}
+
 .form-check-input {
   border: var(--fd-border) solid var(--fd-text-muted);
 }
@@ -574,10 +599,6 @@ tr.cheapest td {
   color: var(--fd-text-muted);
   font-size: var(--fd-small);
   text-align: center;
-}
-
-.fd-entry-signup a {
-  font-weight: 700;
 }
 
 /* cards */

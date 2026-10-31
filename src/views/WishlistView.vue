@@ -649,7 +649,7 @@ function onBuyTogether(item) {
               <div class="fd-wish-cell" role="cell">
                 <span class="fd-wish-label" aria-hidden="true">Saved price</span>
                 <strong>{{ sgd(item.savedPrice) }}</strong>
-                <a v-if="item.savedStore" class="d-block small" :href="storeLink(item.savedStore, item.name)"
+                <a v-if="item.savedStore" class="fd-text-link d-block small" :href="storeLink(item.savedStore, item.name)"
                   target="_blank" rel="noopener">{{ item.savedStore }}</a>
                 <span v-else class="d-block small text-secondary">Store not recorded</span>
               </div>
@@ -668,7 +668,7 @@ function onBuyTogether(item) {
                     −{{ savingPercent(item) }}%
                   </span>
 
-                  <a v-if="best(item).link" class="d-block small" :href="best(item).link" target="_blank"
+                  <a v-if="best(item).link" class="fd-text-link d-block small" :href="best(item).link" target="_blank"
                     rel="noopener noreferrer">
                     {{ best(item).store || 'View listing' }}
                   </a>
@@ -1772,13 +1772,7 @@ function onBuyTogether(item) {
 .fd-draft-link {
   color: var(--fd-blue);
   font-size: var(--fd-small);
-  font-weight: 500;
-  text-decoration: none;
   vertical-align: baseline;
-}
-
-.fd-draft-link:hover {
-  text-decoration: underline;
 }
 
 .fd-budget-input {
