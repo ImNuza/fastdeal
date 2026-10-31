@@ -288,38 +288,6 @@ tr.cheapest td {
   background: var(--fd-green-soft);
 }
 
-.verdict {
-  border: var(--fd-border) solid var(--fd-vanilla-line);
-  border-radius: var(--fd-radius);
-  background: var(--fd-paper);
-}
-
-.verdict.worth {
-  border-color: #2f6b47;
-}
-
-.verdict.maybe {
-  border-color: #a8741a;
-}
-
-.verdict.not {
-  border-color: #a3301f;
-}
-
-.history {
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  height: 84px;
-}
-
-.history span {
-  flex: 1;
-  background: var(--fd-blue);
-  min-height: 4px;
-  border-radius: 4px 4px 0 0;
-}
-
 /* Notes and success messages share the vanilla card look instead of Bootstrap's grey and mint */
 .alert-secondary,
 .alert-success {

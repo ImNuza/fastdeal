@@ -22,6 +22,8 @@ test.describe('Product page', () => {
     await expect(page.getByText('Cheapest total is S$' + cheapest.total.toFixed(2) + ' at ' + cheapest.store)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'All stores' })).toBeVisible();
     await expect(page.getByRole('row', { name: new RegExp(cheapest.store) })).toBeVisible();
+    // The team removed the Deal check, so the store table has no Deal check column.
+    await expect(page.getByRole('columnheader', { name: 'Deal check' })).toHaveCount(0);
   });
 
   test('user sees the AI Worth it verdict without a click, with what it was based on', async ({ page }) => {
@@ -45,8 +47,9 @@ test.describe('Product page', () => {
     const cheapestRow = page.getByRole('row', { name: /Cheapest total now/ });
     await expect(cheapestRow).toContainText('S$806.00 at Swiftronics USA');
     await expect(cheapestRow).toContainText('Sent');
-    await expect(page.getByRole('row', { name: /Price history/ })).toContainText('Not sent');
-    await expect(page.getByText('7 of 8 inputs were sent.', { exact: false })).toBeVisible();
+    // FastDeal has no price history, so the AI never reads one.
+    await expect(page.getByRole('row', { name: /Price history/ })).toHaveCount(0);
+    await expect(page.getByText('7 of 7 inputs were sent.', { exact: false })).toBeVisible();
 
     // The exact prompt opens on click.
     await page.getByText('Show the text sent to Gemini').click();

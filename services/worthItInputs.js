@@ -1,16 +1,12 @@
 // What the AI "Worth it?" verdict reads, as rows a person can check on the
 // "How this verdict was made" page (/product/:productId/worth-it).
 // Every row comes from data the product page already has, so a niche product nobody searched
-// before still gets a verdict built on real numbers. Price history is used only when FastDeal
-// has tracked 3 or more days of it.
+// before still gets a verdict built on real numbers. There is no price history: SerpApi does not
+// give one, and a product the shopper searches for the first time would have none.
 // Pure functions: no database and no network, so they are unit tested in services/__tests__.
 
 const LIVE = 'Live store prices (SerpApi)'
 const CALENDAR = 'FastDeal sale calendar'
-const HISTORY = 'FastDeal price history'
-
-// Same as the compare page verdict: fewer days than this says nothing about a trend.
-export const MIN_HISTORY_DAYS = 3
 
 function money(n) {
   return 'S$' + Number(n).toFixed(2)
@@ -23,11 +19,11 @@ function dayText(day) {
   return Number(parts[2]) + ' ' + months[Number(parts[1]) - 1]
 }
 
-// product: from getProduct (services/productService.js). history: [{ day, price }] for this product.
+// product: from getProduct (services/productService.js).
 // sale: the next big sale ({ name, day, daysAway }) or null.
 // Returns { rows, summary }. Each row is { key, label, value, source, sent }: sent is false when
 // the data is missing, and that row is left out of the prompt.
-export function verdictInputs(product, history, sale) {
+export function verdictInputs(product, sale) {
   const stores = (product.stores || []).filter(function (row) { return row.total > 0 })
   const rows = []
 
@@ -81,26 +77,6 @@ export function verdictInputs(product, history, sale) {
     ? { key: 'next-sale', label: 'Next big sale', source: CALENDAR, sent: true,
         value: sale.name + ' on ' + dayText(sale.day) + ', in ' + sale.daysAway + (sale.daysAway === 1 ? ' day' : ' days') }
     : { key: 'next-sale', label: 'Next big sale', source: CALENDAR, sent: false, value: 'No sale found' })
-
-  const days = (history || []).length
-  if (days >= MIN_HISTORY_DAYS) {
-    let low = history[0].price
-    let sum = 0
-    for (const row of history) {
-      if (row.price < low) low = row.price
-      sum += row.price
-    }
-    rows.push({
-      key: 'history', label: 'Price history', source: HISTORY, sent: true,
-      value: 'Low ' + money(low) + ', average ' + money(sum / days) + ' over ' + days + ' tracked days'
-    })
-  } else {
-    rows.push({
-      key: 'history', label: 'Price history', source: HISTORY, sent: false,
-      value: (days ? days + (days === 1 ? ' tracked day' : ' tracked days') : 'No tracked days yet') +
-        '. It needs ' + MIN_HISTORY_DAYS + ', so it was not sent'
-    })
-  }
 
   let summary = 'Cheapest ' + money(cheapest.total)
   if (typical) summary += ', typical ' + money(typical)

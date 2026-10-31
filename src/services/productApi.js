@@ -1,4 +1,4 @@
-// Loads one product with every store and the Deal check.
+// Loads one product with every store and the typical price.
 // q is the search the product came from. The server needs it after a reload.
 export async function fetchProduct(productId, q) {
   const url = '/api/product/' + encodeURIComponent(productId) + '?q=' + encodeURIComponent(q || '')
@@ -19,14 +19,8 @@ export async function fetchSearchedWith(q,sid) {
   const res = await fetch('/api/searched-with?key=' + encodeURIComponent(q || '') + '&sid=' + encodeURIComponent(sid || ''))
   return res.json()
 }
-// Lowest price on each of the last 14 days for a searched product: [{ day: 'YYYY-MM-DD', price }].
-export async function fetchPriceHistory(key) {
-  const res = await fetch('/api/price-history?key=' + encodeURIComponent(key || ''))
-  return res.json()
-}
-
-// AI "Worth It" verdict for one product. The server reads the product's live stores, its tracked
-// price history and the next big sale. The answer also has inputs, summary and prompt: what the AI
+// AI "Worth It" verdict for one product. The server reads the product's live stores and the
+// next big sale. The answer also has inputs, summary and prompt: what the AI
 // read, for the "How this verdict was made" page. The backend always returns a verdict object
 // (graceful fallback on any error), so we just return the JSON.
 // A Gemini verdict is kept in this browser tab, so going Back to the product, or opening
@@ -50,7 +44,7 @@ export async function fetchWorthIt(productId, q) {
   return {
     decision: 'unknown',
     headline: 'No verdict available',
-    reason: 'We could not get an AI verdict right now. Use the deal check below.',
+    reason: 'We could not get an AI verdict right now. Compare the store prices below.',
     source: 'fallback'
   }
 }

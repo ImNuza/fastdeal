@@ -1,6 +1,8 @@
 // Writes the priceDays collection: the lowest price of one product at one store
 // on one Singapore day. The product page writes it keyed by the product title; every fresh
-// search writes it keyed by the search (its productKey), which builds the Home price tracking.
+// search writes it keyed by the search (its productKey). Only the Home "Comparing pays" card
+// reads it: the cheapest, middle and priciest store for one product on one day this week.
+// FastDeal does not show price history: SerpApi does not give one.
 import PriceDay from '../models/price-day-model.js'
 
 const HOUR = 3600000

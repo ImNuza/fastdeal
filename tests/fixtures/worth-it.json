@@ -19,8 +19,7 @@
     { "key": "range", "label": "Price range", "value": "S$806.00 to S$999.00 across 5 stores", "source": "Live store prices (SerpApi)", "sent": true },
     { "key": "sale-now", "label": "Stores showing a sale price", "value": "No store shows a \"was\" price", "source": "Live store prices (SerpApi)", "sent": true },
     { "key": "rating", "label": "Rating", "value": "4.8 out of 5 from 15000 reviews", "source": "Live store prices (SerpApi)", "sent": true },
-    { "key": "next-sale", "label": "Next big sale", "value": "11.11 sale on 11 Nov, in 11 days", "source": "FastDeal sale calendar", "sent": true },
-    { "key": "history", "label": "Price history", "value": "No tracked days yet. It needs 3, so it was not sent", "source": "FastDeal price history", "sent": false }
+    { "key": "next-sale", "label": "Next big sale", "value": "11.11 sale on 11 Nov, in 11 days", "source": "FastDeal sale calendar", "sent": true }
   ],
   "prompt": "You are a shopping adviser for Singapore shoppers.\nFacts from FastDeal (prices in SGD, from stores that sell this product today):\n- Product: Apple iPhone 16\n- Cheapest total now: S$806.00 at Swiftronics USA\n\nDecide whether the shopper should BUY NOW at the cheapest total, or WAIT for the next big sale."
 }

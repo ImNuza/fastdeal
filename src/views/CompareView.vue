@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FdBreadcrumbs from '../components/FdBreadcrumbs.vue'
 import FdLoadingSpeed from '../components/FdLoadingSpeed.vue'
-import { dayText, sgd } from '../services/format.js'
+import { sgd } from '../services/format.js'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../store/auth.js'
 import { useWishlistStore } from '../store/wishlist.js'
@@ -18,9 +18,9 @@ const { user } = storeToRefs(useAuthStore())
 const { isSaved, savedFrom, saveProduct } = useWishlistStore()
 const router = useRouter()
 
-// The search results, price history, related products and verdict live in the compare store.
+// The search results and related products live in the compare store.
 const compareStore = useCompareStore()
-const { result, loading, failed, verdict, cheapest } = storeToRefs(compareStore)
+const { result, loading, failed, cheapest } = storeToRefs(compareStore)
 const { loadResult, showFailed } = compareStore
 
 const minPrice = ref(0)
@@ -122,26 +122,6 @@ const lowInView = computed(function () {
   return low
 })
 
-const historyMax = computed(function () {
-  if (!result.value) {
-    return 1
-  }
-  let high = 1
-  for (let i = 0; i < result.value.history.length; i++) {
-    if (result.value.history[i].price > high) {
-      high = result.value.history[i].price
-    }
-  }
-  return high
-})
-
-const historyLow = computed(function () {
-  if (!result.value || !result.value.history.length) {
-    return 0
-  }
-  return Math.min.apply(null, result.value.history.map(function (row) { return row.price }))
-})
-
 function loginNext() {
   router.push({ path: '/login', query: { next: route.fullPath } })
 }
@@ -208,42 +188,6 @@ onMounted(async function () {
     <p v-if="route.query.from === 'photo'" class="small text-secondary mb-1">Identified from your photo</p>
     <h1 class="fd-page-title">{{ result.name }}</h1>
     <p class="fd-page-subtitle">{{ result.listings.length }} listings. Cheapest now is {{ sgd(cheapest) }}.</p>
-
-    <!-- Price history first: the bars, and the verdict once there are 3 or more days of prices.
-         Both come from FastDeal's own tracked prices (priceDays), not from SerpApi. -->
-    <section class="card p-3 mb-3" aria-labelledby="fd-history-title">
-      <h2 id="fd-history-title" class="fd-section-title">Price history</h2>
-      <template v-if="result.history.length > 1">
-        <div class="row g-3">
-          <div :class="verdict ? 'col-md-7' : 'col-12'">
-            <div class="history mb-2">
-              <span
-                v-for="row in result.history"
-                :key="row.day"
-                :style="{ height: Math.round((row.price / historyMax) * 84) + 'px' }"
-                :title="dayText(row.day) + ' ' + sgd(row.price)"
-              ></span>
-            </div>
-            <p class="small text-secondary mb-0">
-              One bar for each day with a tracked price, {{ dayText(result.history[0].day) }} to
-              {{ dayText(result.history[result.history.length - 1].day) }}. Taller bar means a higher price.
-              Low {{ sgd(historyLow) }}.
-            </p>
-          </div>
-          <div v-if="verdict" class="col-md-5">
-            <div class="verdict p-3 h-100" :class="verdict.label === 'Worth It' ? 'worth' : verdict.label === 'Not Worth It' ? 'not' : 'maybe'">
-              <p class="mb-1"><strong>{{ verdict.label }}</strong> · {{ verdict.action }}</p>
-              <p class="mb-1">{{ verdict.why }}</p>
-              <p class="small text-secondary mb-0">14-day low {{ sgd(verdict.low) }}. 14-day average {{ sgd(verdict.avg) }}. Mean rating {{ verdict.rating.toFixed(1) }} from {{ verdict.reviewSum }} reviews.</p>
-            </div>
-          </div>
-        </div>
-        <p v-if="!verdict" class="small text-secondary mt-2 mb-0">The verdict appears after 3 days of prices.</p>
-      </template>
-      <p v-else class="small text-secondary mb-0">
-        Price history is still being tracked for this product. The chart and the verdict appear after a few days of searches.
-      </p>
-    </section>
 
     <p v-if="note" class="small mb-3" role="status">{{ note }}</p>
 

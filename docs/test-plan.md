@@ -163,8 +163,8 @@ The seed now uses real data only (`data/demo-products.json` and the team account
 |---|---|---|---|
 | 18 | `friends.spec.js` | `@admin` | "Remove zoedharm as a friend" opens the "Remove friend" pop-up. Cancel and Esc close it. The friend stays. |
 | 19 | `wishlist.spec.js` | `@admin` | "Remove <name>" opens the "Remove from wishlist" pop-up. Cancel keeps the product. |
-| 20 | `compare.spec.js` | none | No price history: one line, no chart (`/api/price-history` mocked). |
-| 21 | `compare.spec.js` | none | 3 days of history: the chart and the verdict sit above the filters. |
+| 20 | `compare.spec.js` | none | Removed 31 Oct (batch 6). No price history: one line, no chart (`/api/price-history` mocked). |
+| 21 | `compare.spec.js` | none | Removed 31 Oct (batch 6). 3 days of history: the chart and the verdict sit above the filters. |
 | 22 | `product.spec.js` | none | The AI "Worth it?" verdict shows without a click, with its "Based on" line. |
 | 23 | `product.spec.js` | none | "See what the AI read" opens `/product/:id/worth-it`: the inputs table, Sent and Not sent, and the prompt. |
 | 24 | `home.spec.js` | none | A trending product with no photo shows its initials. |
@@ -174,6 +174,14 @@ The seed now uses real data only (`data/demo-products.json` and the team account
 Unit: `services/__tests__/worthItInputs.spec.js` (9 tests: the inputs from live stores, the sale calendar,
 history only with 3 or more days, the summary, the prompt) and `services/__tests__/serpapiKeys.spec.js`
 (5 tests: the next key after "run out of searches", keys that are not set, other errors).
+
+Batch 6 (31 Oct evening meeting): the team removed price history and the Deal check. SerpApi gives no price
+history, and a product the prof searches for the first time would have none. `tests/compare.spec.js` (tests 20
+and 21) is deleted. Test 23 now checks that the AI page has no Price history row (7 of 7 inputs sent).
+Test 1 in `product.spec.js` also checks that the store table has no Deal check column.
+`services/__tests__/dealCheck.spec.js` became `typicalPrice.spec.js` (4 tests): the AI verdict still uses the
+typical price. The two price history tests in `worthItInputs.spec.js` became one test (no history row).
+Totals: 34 E2E tests in 11 files, 84 unit tests in 11 files.
 
 Batch 4, after Ronald's AI verdict merges: Compare filters and sort, the cheapest badge, the verdict (with a saved Gemini response). About 3 tests. Then check `product.spec.js` and `target-price-alert.spec.js`.
 
@@ -201,7 +209,7 @@ Rules:
 
 | # | File | Functions | About |
 |---|---|---|---|
-| U1 | `services/__tests__/dealCheck.spec.js` | `typicalPrice`, `priceLabel`, `wasPriceLabel`, `saleSoon`, `dealCheck` | 16 tests: the median, each price label band and its edges, "too few stores", a real versus inflated "was" price, a sale inside and outside the 45-day window. |
+| U1 | `services/__tests__/dealCheck.spec.js` (now `typicalPrice.spec.js`, 4 tests, batch 6) | `typicalPrice`, `priceLabel`, `wasPriceLabel`, `saleSoon`, `dealCheck` | 16 tests: the median, each price label band and its edges, "too few stores", a real versus inflated "was" price, a sale inside and outside the 45-day window. |
 | U2 | `services/__tests__/priceHistory.spec.js` | `sgDay`, `storePrices` | 7 tests: the Singapore day at the midnight edge, prices outside half to double the median dropped, the cheapest price per store. |
 | U3 | `models/__tests__/keys.spec.js` | `toProductKey`, `toPairKey` | 8 tests: case, spaces and trim, the same key for both uid orders. |
 | U4 | `src/services/__tests__/budgetPlanner.spec.js` | `planBudget` | 10 tests: the best mix fits the budget, a must have #1 beats #2 and #3 together, nothing fits, an empty list, the option limit, more than 16 items. |

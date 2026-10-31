@@ -543,7 +543,7 @@ app.post('/api/identify-image', upload.single('photo'), async (req, res) => {
   }
 })
 
-// One product with every store, its price history and the Deal check.
+// One product with every store and the typical price.
 // q is the search it came from, so the page still works after a reload.
 app.get('/api/product/:productId', async (req, res) => {
   try {
@@ -555,22 +555,21 @@ app.get('/api/product/:productId', async (req, res) => {
 })
 
 // AI "Worth It" verdict: buy now or wait for a big sale, for one product.
-// Reads the product from productCache (the product page just loaded it, so no SerpApi credit),
-// its tracked price history and the next big sale, then asks Gemini (models/worth-it-model.js).
+// Reads the product from productCache (the product page just loaded it, so no SerpApi credit)
+// and the next big sale, then asks Gemini (models/worth-it-model.js).
 // Public, like /api/product. Never fails the page: the model returns a graceful
 // fallback verdict on any error, so this route always responds 200 with a verdict.
 app.get('/api/worth-it', async (req, res) => {
   try {
     const product = await getProduct(text(req.query.productId), text(req.query.q))
-    const history = await trackedDays(toProductKey(product.title))
-    const verdict = await worthIt(product, history, nextBigSale())
+    const verdict = await worthIt(product, nextBigSale())
     res.json(verdict)
   } catch (error) {
     // Defensive: worthIt() is designed never to throw, but keep the page safe anyway.
     res.json({
       decision: 'unknown',
       headline: 'No verdict available',
-      reason: 'We could not get an AI verdict right now. Use the deal check below.',
+      reason: 'We could not get an AI verdict right now. Compare the store prices below.',
       source: 'fallback'
     })
   }
@@ -725,29 +724,6 @@ app.get('/api/trending' , async (req,res) =>{
     res.status(500).json({ error: 'Failed to load trending' })
   }
 
-})
-
-// The lowest real price on each of the last 14 days for one product key: [{ day, price }], oldest first.
-// Real prices only: seeded rows have no source and are left out.
-async function trackedDays(key) {
-  const since = sgDay(Date.now() - 13 * 24 * 3600000)
-  const days = await PriceDay.aggregate([
-    { $match: { productKey: key, day: { $gte: since }, source: { $in: ['search', 'product'] } } },
-    { $group: { _id: '$day', price: { $min: '$price' } } },
-    { $sort: { _id: 1 } }
-  ])
-  return days.map(function (d) { return { day: d._id, price: d.price } })
-}
-
-// Lowest price on each of the last 14 days for one searched product (priceDays, written by every fresh search).
-app.get('/api/price-history', async (req, res) => {
-  const key = toProductKey(text(req.query.key))
-  if (!key) return res.status(400).json({ error: 'key required' })
-  try {
-    res.json(await trackedDays(key))
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to load price history' })
-  }
 })
 
 //search with feature

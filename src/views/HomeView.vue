@@ -22,7 +22,7 @@ function initials(name) {
 // The values band under the hero: FastDeal's features in four groups. ai marks the AI-powered one.
 const values = [
   { icon: 'sparkles', title: 'Photo search', text: 'Snap it, AI finds it.', ai: true },
-  { icon: 'scale', title: 'Compare', text: 'Every store, 14-day history, deal check.' },
+  { icon: 'scale', title: 'Compare', text: 'Every store, cheapest first, AI verdict.' },
   { icon: 'wallet', title: 'Plan', text: 'Wishlist and budget planner.' },
   { icon: 'moon', title: 'Decide', text: 'Sleep on it, or buy with friends.' }
 ]
@@ -215,7 +215,7 @@ onBeforeUnmount(function () {
           <p class="fd-eyebrow">Shop smart, not hard.</p>
           <h1 class="fd-display"><span class="fd-highlight">Smarter</span> buys start here!</h1>
           <p class="fd-hero-text">
-            The same item can cost a lot more at one store than another. FastDeal lines up every price, shows how it moved over 14 days, and points you to the cheapest.
+            The same item can cost a lot more at one store than another. FastDeal lines up every price, asks our AI if now is a good time to buy, and points you to the cheapest.
           </p>
           <FdSearchBar />
         </div>

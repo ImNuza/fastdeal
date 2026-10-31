@@ -1,8 +1,8 @@
 // Server-side (Node/Express) "Worth It" verdict model for FastDeal.
-// Flow: ProductView -> GET /api/worth-it?productId=&q= -> server.js loads the product (cached),
-// its tracked price history and the next big sale -> worthIt(product, history, sale) -> Gemini.
-// Gemini reads the rows from services/worthItInputs.js (live store prices, the sale calendar, and
-// price history when there is enough), and returns buy now or wait. The answer, the rows and the
+// Flow: ProductView -> GET /api/worth-it?productId=&q= -> server.js loads the product (cached)
+// and the next big sale -> worthIt(product, sale) -> Gemini.
+// Gemini reads the rows from services/worthItInputs.js (live store prices and the sale calendar),
+// and returns buy now or wait. The answer, the rows and the
 // exact prompt go back together, so the "How this verdict was made" page can show what the AI read.
 //
 // Conventions match models/shoppingapimodel.js:
@@ -43,7 +43,7 @@ function fallbackVerdict(reason) {
   return {
     decision: 'unknown',
     headline: 'No verdict available',
-    reason: reason || 'We could not get an AI verdict right now. Use the deal check below.',
+    reason: reason || 'We could not get an AI verdict right now. Compare the store prices below.',
     source: 'fallback'
   }
 }
@@ -127,13 +127,16 @@ function toVerdict(text, model) {
 }
 
 const DAY = 24 * 3600000
+// Part of the cache key. Change it when the inputs change, so no saved verdict shows old inputs.
+// v2: price history removed (31 Oct).
+const INPUTS_VERSION = 'v2'
 
-// Public entry point. product: from getProduct. history: [{ day, price }] tracked by FastDeal.
+// Public entry point. product: from getProduct.
 // sale: the next big sale ({ name, day, daysAway }) or null.
 // Always resolves to a verdict object with inputs, summary and prompt; never throws.
-export async function worthIt(product, history, sale) {
+export async function worthIt(product, sale) {
   if (!product || !product.title) return fallbackVerdict('No product was given.')
-  const { rows, summary } = verdictInputs(product, history, sale)
+  const { rows, summary } = verdictInputs(product, sale)
   const cheapest = (product.stores || []).filter(function (row) { return row.total > 0 })
     .reduce(function (low, row) { return !low || row.total < low.total ? row : low }, null)
   if (!cheapest) return fallbackVerdict('No store price was found for this product.')
@@ -147,7 +150,7 @@ export async function worthIt(product, history, sale) {
     product: { productId: product.productId, q: product.q || '', title: product.title, image: product.image || '' }
   }
 
-  const key = product.productId + '|' + cheapest.total.toFixed(2) + '|' + sgDay(Date.now())
+  const key = INPUTS_VERSION + '|' + product.productId + '|' + cheapest.total.toFixed(2) + '|' + sgDay(Date.now())
   try {
     const saved = await WorthItCache.findOne({ key: key, expiresAt: { $gt: new Date() } }).lean()
     if (saved) return Object.assign({}, saved.verdict, { cached: true })
@@ -172,7 +175,7 @@ export async function worthIt(product, history, sale) {
     // Both models failed or gave nothing usable: answer with the rules, and keep it a short while.
     const rules = ruleVerdict(product, sale)
     if (!rules) {
-      return Object.assign(fallbackVerdict('We could not get an AI verdict right now. Use the deal check below.'), extra)
+      return Object.assign(fallbackVerdict('We could not get an AI verdict right now. Compare the store prices below.'), extra)
     }
     const estimate = Object.assign(rules, extra, { madeAt: new Date().toISOString() })
     await saveVerdict(key, estimate, RULES_MINUTES * 60000)
