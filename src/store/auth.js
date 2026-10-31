@@ -26,6 +26,7 @@ export function applyDbUser(dbUser, fbUser) {
     telegramUsername: dbUser.telegramUsername || '',
     role: dbUser.role || 'user',
     createdAt: dbUser.createdAt || null,
+    budgetDrafts: dbUser.budgetDrafts || [],
     wishlist: []
   }
   void loadWishlist(fbUser.email)

@@ -186,7 +186,7 @@ watch([() => route.path, user], maybeShowEntryDialog)
             <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/notifications') }" active-class="" exact-active-class="" to="/notifications">
               <FdIcon name="bell" />
               <span class="fd-icon-label">Notifications</span>
-              <span v-if="unreadCount" class="badge rounded-pill bg-danger" style="position: absolute; top: 0; right: 0; font-family: var(--fd-font-body);">{{ unreadCount }}</span>
+              <span v-if="unreadCount" class="badge rounded-pill bg-danger fd-nav-badge">{{ unreadCount }}</span>
             </router-link>
           </li>
           <li v-if="user?.role === 'admin'" class="nav-item">

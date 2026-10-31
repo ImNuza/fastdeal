@@ -1373,6 +1373,9 @@ async function confirmRoleChange() {
 .fd-user-body {
   display: flex;
   gap: 0.5rem;
+  /* A set height, like the Wishlist, Friends, and Notifications lists: it fits the
+     screen, but never shorter than 20rem or taller than 40rem. Short lists leave white space
+     under them; longer ones scroll inside. The page scrolls around the card. */
   height: clamp(20rem, calc(100svh - var(--fd-nav-height) - 16rem), 40rem);
 }
 

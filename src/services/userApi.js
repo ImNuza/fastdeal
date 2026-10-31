@@ -17,7 +17,7 @@ export async function getUser() {
   return data
 }
 
-// Patch my profile. Allowed fields: emailAlertsOn, username.
+// Patch my profile. Allowed fields: emailAlertsOn, username, telegramUsername.
 export async function updateUser(patch) {
   const { data } = await axios.put('/api/users/me', patch)
   return data
@@ -28,4 +28,20 @@ export async function updateUser(patch) {
 export async function loginEmail(username, password) {
   const { data } = await axios.post('/api/users/login-email', { username, password })
   return data.email
+}
+
+// Plan a budget drafts. Each call returns my full list of drafts, newest first.
+export async function createBudget(draft) {
+  const { data } = await axios.post('/api/users/me/budgets', draft)
+  return data
+}
+
+export async function updateBudget(id, draft) {
+  const { data } = await axios.put('/api/users/me/budgets/' + encodeURIComponent(id), draft)
+  return data
+}
+
+export async function deleteBudget(id) {
+  const { data } = await axios.delete('/api/users/me/budgets/' + encodeURIComponent(id))
+  return data
 }

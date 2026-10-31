@@ -244,6 +244,18 @@ async function markAllRead() {
   notifications.value.forEach(n => { n.read = true })
 }
 
+// The product title for a notification, from my own wishlist. Buy Together is only for products
+// both friends saved, so it is there; null if it was removed since.
+function productName(n) {
+  const item = (user.value.wishlist || []).find(w => w.productKey === n.productKey)
+  return item ? item.name : null
+}
+
+// The sender, from the invite title "zoedharm wants to buy together!"
+function inviterName(n) {
+  return n.title.split(' wants ')[0]
+}
+
 function isBuyTogether(n) { return n.type === 'group-order' }
 function isGroupInvite(n) { return n.type === 'group-invite' }
 
@@ -452,29 +464,34 @@ onMounted(load)
     <div v-if="buyItem" class="fd-entry-backdrop" @click.self="closeBuyTogether" @keydown.esc="closeBuyTogether">
       <section ref="buyDialog" class="fd-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-buy-title">
         <h2 id="fd-buy-title" class="fd-page-title">Buy together</h2>
-        <p class="fd-entry-description">Select the friends you want to invite. They'll get a notification and can reach out to you.</p>
+        <p v-if="productName(buyItem)" class="fd-entry-description">
+          {{ buyFriends.length === 1 ? 'Your friend wants' : 'Your friends want' }}
+          <strong>{{ productName(buyItem) }}</strong> too! Buy it together and share the shipping. We'll send them your
+          Telegram so you can sort it out.
+        </p>
+        <p v-else class="fd-entry-description">Buy it together and share the shipping. We'll send them your
+          Telegram so you can sort it out.</p>
 
         <FdLoadingDots v-if="buyLoading" size="inline" message="Finding your friends" />
         <p v-else-if="buyError" class="alert alert-danger" role="alert">{{ buyError }}</p>
         <p v-else-if="!buyFriends.length" class="text-secondary">None of your friends has this product saved right now.</p>
 
-        <ul v-else class="list-unstyled text-start mb-4">
-          <li v-for="f in buyFriends" :key="f.firebaseUid"
-            class="d-flex align-items-center gap-3 py-2 border-bottom">
+        <ul v-else class="fd-check-list text-start mb-4">
+          <li v-for="f in buyFriends" :key="f.firebaseUid">
             <input
               type="checkbox"
-              class="form-check-input mt-0 flex-shrink-0"
+              class="form-check-input"
               :id="'chk-' + f.firebaseUid"
               :checked="buySelected.has(f.firebaseUid)"
               @change="toggleSelect(f.firebaseUid)"
             />
-            <label :for="'chk-' + f.firebaseUid" class="mb-0 flex-grow-1" style="cursor: pointer;">
-              <span class="fw-bold" style="font-family: var(--fd-font-display); letter-spacing: 0.04em;">{{ f.username.toUpperCase() }}</span>
+            <label :for="'chk-' + f.firebaseUid" class="fd-check-label">
+              <span class="fd-friend-name">{{ f.username }}</span>
             </label>
           </li>
         </ul>
 
-        <div v-if="buyInviteSent" class="alert alert-success mb-3">Invites sent!</div>
+        <div v-if="buyInviteSent" class="alert alert-success mb-3" role="status">Sent! They'll Telegram you if keen.</div>
 
         <div class="fd-entry-actions">
           <button v-if="!buyInviteSent && buyFriends.length" class="btn btn-dark" type="button"
@@ -492,20 +509,23 @@ onMounted(load)
     <div v-if="inviteItem" class="fd-entry-backdrop" @click.self="closeGroupInvite" @keydown.esc="closeGroupInvite">
       <section ref="inviteDialog" class="fd-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-invite-title">
         <h2 id="fd-invite-title" class="fd-page-title">Buy together</h2>
-        <p class="fd-entry-description">{{ inviteItem.body }}</p>
+        <p v-if="productName(inviteItem)" class="fd-entry-description">
+          {{ inviterName(inviteItem) }} wants to buy <strong>{{ productName(inviteItem) }}</strong> with you and share
+          the shipping. Message them on Telegram to sort it out.
+        </p>
+        <p v-else class="fd-entry-description">{{ inviteItem.body }}</p>
 
         <FdLoadingDots v-if="inviterLoading" size="inline" message="Loading their profile" />
         <p v-else-if="inviterError" class="alert alert-danger" role="alert">{{ inviterError }}</p>
 
         <div v-else-if="inviterProfile" class="d-flex align-items-center justify-content-between gap-3 py-3 mb-4 border-bottom border-top">
-          <span class="fw-bold" style="font-family: var(--fd-font-display); letter-spacing: 0.04em; font-size: var(--fd-section-title);">
-            {{ inviterProfile.username.toUpperCase() }}
-          </span>
+          <span class="fd-friend-name">{{ inviterProfile.username }}</span>
           <a v-if="inviterProfile.telegramUsername"
             class="btn btn-dark"
             :href="'https://t.me/' + inviterProfile.telegramUsername"
+            :aria-label="'Message ' + inviterProfile.username + ' on Telegram'"
             target="_blank" rel="noopener">
-            Message @{{ inviterProfile.telegramUsername }}
+            Message
           </a>
           <span v-else class="small text-secondary">No Telegram set yet</span>
         </div>
@@ -520,14 +540,15 @@ onMounted(load)
 </template>
 
 <style scoped>
-/* The page fills the screen below the navbar, like the Friends page, so the card stretches
-   down and the bar sits at the bottom of the screen. */
+/* Every outline on the page is the vanilla line, like the Friends page. */
 .notif-page {
   --notif-line: var(--fd-vanilla-line);
   display: flex;
   flex-direction: column;
-  height: calc(100svh - var(--fd-nav-height) - 2.5rem);
-  min-height: 32rem;
+  /* At least the screen below the navbar: a short list fills the screen down to the total bar.
+     A longer list makes the card taller (up to the list's maximum) and the page scrolls, with
+     the sticky total bar cutting across the card until the end. */
+  min-height: calc(100svh - var(--fd-nav-height) - 2.5rem);
 }
 
 /* Folder tabs, the same look and spacing as the Friends page tabs. */
@@ -595,12 +616,12 @@ onMounted(load)
 
 .notif-tabpanel {
   position: relative;
+  /* Fills the screen down to the total bar: the search on top, the scrolling list under it */
   display: flex;
-  flex: 1;
+  flex: 1 0 auto;
   flex-direction: column;
-  min-height: 0;
-  margin-top: calc(var(--fd-border) * -1);
   margin-bottom: 1.5rem;
+  margin-top: calc(var(--fd-border) * -1);
   padding: 1.25rem;
   border: var(--fd-border) solid var(--notif-line);
   border-radius: var(--fd-radius);
@@ -689,9 +710,12 @@ onMounted(load)
 /* The scrolling list and its scrollbar side by side. */
 .notif-body {
   display: flex;
-  flex: 1;
   gap: 0.5rem;
+  /* Fills the rest of the card, and grows with a longer list up to the same maximum as before
+     (fits the screen, 20rem to 40rem); past that the list scrolls inside */
+  flex: 1 1 auto;
   min-height: 0;
+  max-height: clamp(20rem, calc(100svh - var(--fd-nav-height) - 16rem), 40rem);
 }
 
 .notif-scroll {
@@ -708,6 +732,11 @@ onMounted(load)
 .notif-scroll:focus-visible {
   outline: 3px solid var(--fd-blue);
   outline-offset: 3px;
+}
+
+/* Room after the last item, so at the end of the scroll its bottom edge shows above the line */
+.notif-scroll > div {
+  padding-bottom: 1.25rem;
 }
 
 .notif-rows {
@@ -883,6 +912,7 @@ onMounted(load)
   justify-content: flex-end;
   gap: 0.5rem 1rem;
   min-height: calc(var(--fd-control) + 1.5rem + var(--fd-border));
+  /* Pushed to the bottom of the screen under the card */
   margin-top: auto;
   padding: 0.75rem 0;
   border-top: var(--fd-border) solid var(--notif-line);

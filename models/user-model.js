@@ -44,6 +44,28 @@ const userSchema = new mongoose.Schema(
       default: 'user'
     },
 
+    // Plan a budget drafts on the Wishlist page, newest first: each has a name, the budget, and the
+    // ticked items in priority order (item names, 1 first), so plans are still there next time.
+    // pick is the combination on screen when it was saved, with the prices and stores it had then,
+    // shown again as it was on reopen.
+    budgetDrafts: [
+      {
+        name: { type: String, trim: true, maxlength: 60 },
+        amount: { type: Number, default: null },
+        items: { type: [String], default: [] },
+        pick: [
+          {
+            _id: false,
+            name: String,
+            price: Number,
+            store: String,
+            rank: Number
+          }
+        ],
+        savedAt: { type: Date, default: Date.now }
+      }
+    ],
+
     // The user's own last 10 searches, newest first. Keep it at 10 with $push, $position 0 and $slice 10.
     recentSearches: [
       {

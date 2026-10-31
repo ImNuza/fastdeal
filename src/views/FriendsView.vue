@@ -639,17 +639,15 @@ function initials(f) {
   color: var(--fd-blue);
 }
 
-/* The page fills the screen below the navbar (minus the standard top gap), so the tab card can
-   stretch down and the total bar always sits at the bottom of the screen, like the Wishlist's.
-   Every outline on the page is the vanilla line, like the rest of the app's components. */
+/* Every outline on the page is the vanilla line, like the rest of the app's components. */
 .friends-page {
   --friends-line: var(--fd-vanilla-line);
   display: flex;
   flex-direction: column;
-  /* Exactly the screen, so the card's contents scroll inside it and the page itself does not.
-     Very short windows keep enough room and let the page scroll instead. */
-  height: calc(100svh - var(--fd-nav-height) - 2.5rem);
-  min-height: 32rem;
+  /* At least the screen below the navbar: a short list fills the screen down to the total bar.
+     A longer list makes the card taller (up to the list's maximum) and the page scrolls, with
+     the sticky total bar cutting across the card until the end. */
+  min-height: calc(100svh - var(--fd-nav-height) - 2.5rem);
 }
 
 /* Folder tabs: Friends, Add Friend, Requests. No strip behind them: the others sit on the page,
@@ -723,11 +721,10 @@ function initials(f) {
   padding: 1.25rem;
   border: var(--fd-border) solid var(--friends-line);
   border-radius: var(--fd-radius);
-  /* Fills the screen down to the total bar: the search on top, the scrolling list under it. */
+  /* Fills the screen down to the total bar: the search on top, the scrolling list under it */
   display: flex;
-  flex: 1;
+  flex: 1 0 auto;
   flex-direction: column;
-  min-height: 0;
   margin-bottom: 1.5rem;
   background: var(--fd-paper);
 }
@@ -774,6 +771,11 @@ function initials(f) {
   outline-offset: 3px;
 }
 
+/* Room after the last item, so at the end of the scroll its bottom edge shows above the line */
+.friend-scroll > section {
+  padding-bottom: 1.25rem;
+}
+
 /* The search ends where the friend cards end, leaving the scrollbar's column (its width plus
    the gap) free on the right. */
 .friend-tabpanel > .friend-search {
@@ -804,9 +806,12 @@ function initials(f) {
    line, so the bar begins level with the first friend. */
 .friend-body {
   display: flex;
-  flex: 1;
   gap: 0.5rem;
+  /* Fills the rest of the card, and grows with a longer list up to the same maximum as before
+     (fits the screen, 20rem to 40rem); past that the list scrolls inside */
+  flex: 1 1 auto;
   min-height: 0;
+  max-height: clamp(20rem, calc(100svh - var(--fd-nav-height) - 16rem), 40rem);
 }
 
 /* Scrollbar: an arrow at each end and a beige track with a brand-blue handle to drag. */
@@ -894,7 +899,7 @@ function initials(f) {
   gap: 0.5rem 1rem;
   /* Same height as the Wishlist's bar, which holds a full-size button. */
   min-height: calc(var(--fd-control) + 1.5rem + var(--fd-border));
-  /* Pushed to the bottom of the screen when the list is short; sticks there when it is long. */
+  /* Pushed to the bottom of the screen under the card */
   margin-top: auto;
   padding: 0.75rem 0;
   border-top: var(--fd-border) solid var(--friends-line);
@@ -1005,19 +1010,6 @@ function initials(f) {
 }
 
 /* The same size as the small Cancel button beside it. */
-.badge-pending {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--fd-control-sm);
-  padding: 0.25rem 0.875rem;
-  font-size: var(--fd-button-sm);
-  font-weight: 700;
-  border-radius: 999px;
-  background: var(--fd-vanilla-soft);
-  color: var(--fd-text-muted);
-  border: var(--fd-border) solid var(--friends-line);
-}
-
 
 
 </style>
