@@ -13,6 +13,7 @@ import User from './models/user-model.js'
 import Friendship from './models/friendship-model.js'
 import { toPairKey } from './models/pair-key.js'
 import { search,identifyImage } from './models/shoppingapimodel.js'
+import { worthIt } from './models/worth-it-model.js'
 import SearchLog from './models/search-log-model.js'
 import PriceDay from './models/price-day-model.js'
 import { sgDay } from './services/priceHistory.js'
@@ -530,6 +531,24 @@ app.get('/api/product/:productId', async (req, res) => {
     res.json(product)
   } catch (error) {
     res.status(404).json({ error: String((error && error.message) || error) })
+  }
+})
+
+// AI "Worth It" verdict: buy now or wait for a big sale, for one product + price.
+// Public, like /api/product. Never fails the page: the model returns a graceful
+// fallback verdict on any error, so this route always responds 200 with a verdict.
+app.get('/api/worth-it', async (req, res) => {
+  try {
+    const verdict = await worthIt(req.query.name, req.query.price)
+    res.json(verdict)
+  } catch (error) {
+    // Defensive: worthIt() is designed never to throw, but keep the page safe anyway.
+    res.json({
+      decision: 'unknown',
+      headline: 'No verdict available',
+      reason: 'We could not get an AI verdict right now. Use the deal check below.',
+      source: 'fallback'
+    })
   }
 })
 

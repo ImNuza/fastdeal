@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import DealCheck from '../components/DealCheck.vue'
 import FdBreadcrumbs from '../components/FdBreadcrumbs.vue'
@@ -9,6 +9,7 @@ import { sgd } from '../services/format.js'
 import { storeToRefs } from 'pinia'
 import { useProductStore } from '../store/product.js'
 import { itemName } from '../services/itemName.js'
+import { fetchWorthIt } from '../services/productApi.js'
 
 // One product: every store that sells it, cheapest total first, with the Deal check,
 // what buyers say and the product details.
@@ -19,6 +20,24 @@ const route = useRoute()
 const { product, loading, errorText, searchedWith, cheapest, highest } = storeToRefs(useProductStore())
 const { percentOf, loadProduct } = useProductStore()
 
+// AI "Worth It" verdict (buy now or wait). View-local: it is about presentation here,
+// and depends on the cheapest total once the product has loaded.
+const worthItVerdict = ref(null)
+const worthItLoading = ref(false)
+// Seconds elapsed while the verdict is loading, so the user sees it is still working.
+const worthItElapsed = ref(0)
+let worthItTimer = null
+// Hidden on load: the verdict only shows after the user presses "Show". The fetch
+// still runs on load (below), so revealing it is instant — we gate display, not loading.
+const showWorthIt = ref(false)
+
+// Bootstrap badge/border tone for each decision.
+const WORTH_IT_TONE = {
+  buy: 'success',
+  wait: 'warning',
+  unknown: 'secondary'
+}
+
 
 // What the wishlist stores with this product, so it can open this page again.
 const saveInfo = computed(function () {
@@ -28,8 +47,32 @@ const saveInfo = computed(function () {
   return { productId: product.value.productId, q: product.value.q || route.query.q || '', image: product.value.image }
 })
 
-onMounted(function () {
-  loadProduct(route.params.productId, route.query.q)
+onMounted(async function () {
+  await loadProduct(route.params.productId, route.query.q)
+  // Only ask for a verdict once a product with a price is actually on the page.
+  if (product.value && cheapest.value && cheapest.value.total > 0) {
+    worthItLoading.value = true
+    // Tick the elapsed seconds every second while we wait on the AI.
+    worthItElapsed.value = 0
+    worthItTimer = setInterval(function () {
+      worthItElapsed.value += 1
+    }, 1000)
+    try {
+      worthItVerdict.value = await fetchWorthIt(product.value.title, cheapest.value.total)
+    } finally {
+      worthItLoading.value = false
+      clearInterval(worthItTimer)
+      worthItTimer = null
+    }
+  }
+})
+
+// Stop the elapsed timer if the user leaves the page mid-load.
+onUnmounted(function () {
+  if (worthItTimer) {
+    clearInterval(worthItTimer)
+    worthItTimer = null
+  }
 })
 
 // FastDeal / the search (back to its results) / the store the shopper clicked on Compare.
@@ -78,6 +121,38 @@ const breadcrumbs = computed(function () {
 
     <!-- Ronald: the AI "Buy now or wait?" verdict goes here. The API also returns
          typicalPrice, each store's deal check, ratings and userReviews for it. -->
+
+    <!-- AI "Worth It" verdict: buy now or wait for a big sale. Sits above the Deal check.
+         Hidden on load; the button below reveals it. The fetch already ran on load. -->
+    <div v-if="cheapest && (worthItLoading || worthItVerdict)" class="mb-4">
+      <button type="button" class="btn btn-outline-dark"
+        :aria-expanded="showWorthIt ? 'true' : 'false'" aria-controls="fd-worth-it-panel"
+        @click="showWorthIt = !showWorthIt">
+        {{ showWorthIt ? 'Hide the “Worth it?” verdict' : 'Show the “Worth it?” verdict' }}
+      </button>
+
+      <section v-show="showWorthIt" id="fd-worth-it-panel"
+        class="card p-3 mt-3 fd-worth-it"
+        :class="worthItVerdict ? 'border-' + (WORTH_IT_TONE[worthItVerdict.decision] || 'secondary') : ''">
+        <h2 class="fd-section-title mb-2">Worth it?</h2>
+
+        <p v-if="worthItLoading" class="small text-secondary mb-0 d-flex align-items-center gap-2">
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          <span>Asking our AI whether to buy now or wait…</span>
+          <span class="badge text-bg-secondary" aria-live="polite">{{ worthItElapsed }}s elapsed</span>
+        </p>
+
+        <template v-else-if="worthItVerdict">
+          <p class="mb-1">
+            <span class="badge" :class="'text-bg-' + (WORTH_IT_TONE[worthItVerdict.decision] || 'secondary')">
+              {{ worthItVerdict.headline }}</span>
+          </p>
+          <p v-if="worthItVerdict.reason" class="mb-0">{{ worthItVerdict.reason }}</p>
+          <p class="small text-secondary mb-0 mt-1">AI guidance for {{ product.title }} at {{ sgd(cheapest.total) }}.
+            Not financial advice.</p>
+        </template>
+      </section>
+    </div>
 
     <section v-if="cheapest" class="card p-3 mb-4">
       <h2 class="fd-section-title mb-2">Deal check</h2>

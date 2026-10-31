@@ -24,3 +24,19 @@ export async function fetchPriceHistory(key) {
   const res = await fetch('/api/price-history?key=' + encodeURIComponent(key || ''))
   return res.json()
 }
+
+// AI "Worth It" verdict for one product at a given price. The backend always returns
+// a verdict object (graceful fallback on any error), so we just return the JSON.
+export async function fetchWorthIt(name, price) {
+  const url = '/api/worth-it?name=' + encodeURIComponent(name || '') +
+    '&price=' + encodeURIComponent(price != null ? price : '')
+  const res = await fetch(url)
+  return res.json().catch(function () {
+    return {
+      decision: 'unknown',
+      headline: 'No verdict available',
+      reason: 'We could not get an AI verdict right now. Use the deal check below.',
+      source: 'fallback'
+    }
+  })
+}
