@@ -45,16 +45,12 @@ test.describe('Smoke tests', () => {
   });
 
   test('user who is not an admin cannot see the admin page @user', async ({ page }) => {
-    // demo.user@smu.edu.sg has the role "user". The router shows an alert and stays out of /admin.
-    let alertText = '';
-    page.on('dialog', async (dialog) => {
-      alertText = dialog.message();
-      await dialog.dismiss();
-    });
-
+    // demo.user@smu.edu.sg has the role "user". The router sends them to the 403 error page.
     await page.goto('/admin');
 
-    await expect.poll(() => alertText).toContain('Access denied');
+    await expect(page).toHaveURL(/\/error\/403/);
+    await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
+    await expect(page.getByText('This page is for admins only.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Admin Dashboard' })).toHaveCount(0);
   });
 });
