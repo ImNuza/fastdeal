@@ -22,6 +22,7 @@ const LIVE_PRICES = {
 };
 
 // A product name inside a RegExp, with its brackets and dots taken literally
+/** @param {string} text */
 function literal(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -29,10 +30,12 @@ function literal(text) {
 const PRODUCT_URL = '/product/' + productIphone.productId + '?q=iphone%2016';
 const NAME = productIphone.title;
 
+/** @param {import('@playwright/test').Response} response */
 const isWishlistList = (response) =>
   new URL(response.url()).pathname === '/api/wishlist' && response.request().method() === 'GET';
 
 // Open a page and wait until the login is restored and the saved products are loaded.
+/** @param {import('@playwright/test').Page} page @param {string} path */
 async function open(page, path) {
   const loaded = page.waitForResponse(isWishlistList);
   await page.goto(path);
@@ -40,6 +43,7 @@ async function open(page, path) {
 }
 
 // Take the iPhone off the wishlist of demo.user, also after an earlier failed run.
+/** @param {import('@playwright/test').Page} page */
 async function clearProduct(page) {
   const remove = page.getByRole('button', { name: 'Remove ' + NAME, exact: true });
   const empty = page.getByText('No saved products yet');
@@ -66,6 +70,7 @@ async function clearProduct(page) {
 }
 
 // Save the iPhone from its product page.
+/** @param {import('@playwright/test').Page} page */
 async function saveProduct(page) {
   await open(page, PRODUCT_URL);
   await expect(page.getByRole('heading', { level: 1, name: NAME })).toBeVisible();

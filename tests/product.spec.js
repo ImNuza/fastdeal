@@ -55,4 +55,19 @@ test.describe('Product page', () => {
     await page.getByRole('link', { name: 'Back to the product' }).click();
     await expect(page.getByRole('heading', { level: 1, name: productIphone.title })).toBeVisible();
   });
+
+  test('user sees a clear note when the AI did not answer and the verdict comes from fixed rules', async ({ page }) => {
+    const rules = {
+      ...worthIt,
+      decision: 'buy',
+      headline: 'Good price now',
+      reason: 'The cheapest total S$806.00 is 12% under the typical S$916.00 across 5 stores.',
+      source: 'rules'
+    };
+    await page.route('**/api/worth-it*', (route) => route.fulfill({ json: rules }));
+    await page.goto('/product/' + productIphone.productId + '?q=iphone%2016');
+
+    await expect(page.getByText(rules.reason)).toBeVisible();
+    await expect(page.getByText('The AI did not answer, so this is an estimate', { exact: false })).toBeVisible();
+  });
 });

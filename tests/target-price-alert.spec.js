@@ -4,6 +4,7 @@ import { test, expect } from '@playwright/test';
 
 // Open the wishlist and wait until the saved products and live prices are loaded. Typing before
 // that can be lost, because the list can load again and the input gets the saved value back.
+/** @param {import('@playwright/test').Page} page */
 async function openWishlist(page) {
   const loaded = page.waitForResponse((response) =>
     new URL(response.url()).pathname === '/api/wishlist' && response.request().method() === 'GET');

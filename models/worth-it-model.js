@@ -12,19 +12,24 @@
 //   - Any failure returns a graceful FALLBACK verdict; worthIt() never throws upward,
 //     so the product page always renders.
 //
-// Model: WORTH_IT_MODEL is the primary. On a 429 RESOURCE_EXHAUSTED (quota/rate limit)
-// it retries ONCE with WORTH_IT_FALLBACK_MODEL. Any other error falls back to a neutral verdict.
-// A good verdict is saved in worthItCache for the rest of the Singapore day.
+// Model: WORTH_IT_MODEL is the primary. When it is busy or down (429 quota, or a 5xx such as
+// 503 "high demand"), it retries ONCE with WORTH_IT_FALLBACK_MODEL. When both fail, the answer
+// comes from fixed rules on the same numbers (ruleVerdict), marked source 'rules'.
+// A Gemini verdict is saved in worthItCache for the rest of the Singapore day. A rules verdict is
+// saved for RULES_MINUTES only, so the page asks Gemini again soon, but not on every view.
 
 import WorthItCache from './worth-it-cache-model.js'
-import { verdictInputs, verdictPrompt } from '../services/worthItInputs.js'
+import { verdictInputs, verdictPrompt, ruleVerdict } from '../services/worthItInputs.js'
 import { sgDay } from '../services/priceHistory.js'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
-// Primary model, then the backup used only on a 429 RESOURCE_EXHAUSTED.
-const WORTH_IT_MODEL = 'gemini-3.1-flash-lite'
-const WORTH_IT_FALLBACK_MODEL = 'gemini-3.5-flash-lite'
+// Primary model, then the backup when the primary is busy or down.
+// 3.5-flash-lite answered in about 1s every time in a check on 31 Oct. 3.1 took up to 7s and was
+// sometimes overloaded (503), so it is the backup now.
+const WORTH_IT_MODEL = 'gemini-3.5-flash-lite'
+const WORTH_IT_FALLBACK_MODEL = 'gemini-3.1-flash-lite'
+const RULES_MINUTES = 10
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
@@ -150,39 +155,43 @@ export async function worthIt(product, history, sale) {
     console.error('[Worth it] cache read failed:', error.message)
   }
 
-  if (!GEMINI_API_KEY) return Object.assign(fallbackVerdict('AI verdict is not configured.'), extra)
+  if (!GEMINI_API_KEY) {
+    return Object.assign(ruleVerdict(product, sale) || fallbackVerdict('AI verdict is not configured.'), extra)
+  }
 
-  // Primary model.
+  // Primary model, then the backup once when the primary is busy (429) or down (5xx, or no answer).
   let call = await callGemini(WORTH_IT_MODEL, prompt)
   let model = WORTH_IT_MODEL
-
-  // Backup ONLY on a 429 RESOURCE_EXHAUSTED (quota / rate limit).
-  if (!call.ok && call.status === 429 && call.errorStatus === 'RESOURCE_EXHAUSTED') {
+  if (!call.ok && (call.status === 429 || call.status >= 500 || call.status === 0)) {
     call = await callGemini(WORTH_IT_FALLBACK_MODEL, prompt)
     model = WORTH_IT_FALLBACK_MODEL
-    if (!call.ok) {
-      return Object.assign(fallbackVerdict('The AI verdict service is busy right now. Try again later.'), extra)
-    }
   }
 
-  if (!call.ok) {
-    return Object.assign(fallbackVerdict('We could not get an AI verdict right now. Use the deal check below.'), extra)
-  }
-
-  const answer = toVerdict(call.text, model)
+  const answer = call.ok ? toVerdict(call.text, model) : null
   if (!answer) {
-    return Object.assign(fallbackVerdict('The AI verdict was unclear. Use the deal check below.'), extra)
+    // Both models failed or gave nothing usable: answer with the rules, and keep it a short while.
+    const rules = ruleVerdict(product, sale)
+    if (!rules) {
+      return Object.assign(fallbackVerdict('We could not get an AI verdict right now. Use the deal check below.'), extra)
+    }
+    const estimate = Object.assign(rules, extra, { madeAt: new Date().toISOString() })
+    await saveVerdict(key, estimate, RULES_MINUTES * 60000)
+    return estimate
   }
 
   const verdict = Object.assign(answer, extra, { madeAt: new Date().toISOString() })
+  await saveVerdict(key, verdict, DAY)
+  return verdict
+}
+
+async function saveVerdict(key, verdict, ms) {
   try {
     await WorthItCache.updateOne(
       { key: key },
-      { $set: { verdict: verdict, expiresAt: new Date(Date.now() + DAY) } },
+      { $set: { verdict: verdict, expiresAt: new Date(Date.now() + ms) } },
       { upsert: true }
     )
   } catch (error) {
     console.error('[Worth it] cache write failed:', error.message)
   }
-  return verdict
 }

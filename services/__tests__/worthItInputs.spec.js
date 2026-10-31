@@ -2,7 +2,7 @@
 // Used by vitest to test what the AI "Worth it?" verdict reads, in services/worthItInputs.js
 
 import { describe, it, expect } from 'vitest'
-import { verdictInputs, verdictPrompt } from '../worthItInputs.js'
+import { verdictInputs, verdictPrompt, ruleVerdict } from '../worthItInputs.js'
 
 // A store row as the product page has it
 function store(name, price, oldPrice) {
@@ -81,5 +81,34 @@ describe('TestSuite2: verdictPrompt', () => {
     const prompt = verdictPrompt(verdictInputs(PRODUCT, [], SALE).rows)
     expect(prompt).toContain('Do not invent past prices')
     expect(prompt).toContain('"decision": "buy" | "wait"')
+  })
+})
+
+describe('TestSuite3: ruleVerdict', () => {
+  it('Test1: says buy when the cheapest is 10% or more under the typical price', () => {
+    const verdict = ruleVerdict(PRODUCT, SALE)
+    expect(verdict.decision).toBe('buy')
+    expect(verdict.source).toBe('rules')
+    expect(verdict.reason).toBe('The cheapest total S$30.00 is 25% under the typical S$40.00 across 3 stores.')
+  })
+
+  it('Test2: says wait when the price is close to typical and a big sale is near', () => {
+    const product = { ...PRODUCT, stores: [store('Shopee', 38), store('Lazada', 40), store('Amazon.sg', 42)] }
+    const verdict = ruleVerdict(product, SALE)
+    expect(verdict.decision).toBe('wait')
+    expect(verdict.headline).toBe('Wait for 11.11')
+  })
+
+  it('Test3: says fair price when the price is close to typical and the sale is far away', () => {
+    const product = { ...PRODUCT, stores: [store('Shopee', 38), store('Lazada', 40), store('Amazon.sg', 42)] }
+    const verdict = ruleVerdict(product, { ...SALE, daysAway: 40 })
+    expect(verdict.decision).toBe('buy')
+    expect(verdict.headline).toBe('Fair price')
+  })
+
+  it('Test4: has no answer with no typical price and no sale soon', () => {
+    const product = { title: 'Rare thing', stores: [store('eBay', 99)] }
+    expect(ruleVerdict(product, { ...SALE, daysAway: 40 })).toBe(null)
+    expect(ruleVerdict(product, SALE).decision).toBe('wait')
   })
 })

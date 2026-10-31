@@ -128,3 +128,48 @@ export function verdictPrompt(rows) {
     '"reason": string (max 35 words, and name at least one number from the facts)}'
   )
 }
+
+// The answer when both Gemini models fail: fixed rules on the same live numbers, so the page never
+// shows an empty verdict. source 'rules' tells the page to say that the AI did not answer.
+// A price 10% or more under the typical price is a buy. Otherwise, a big sale within
+// SALE_SOON_DAYS days is worth the wait. With fewer than 3 stores there is no typical price.
+const SALE_SOON_DAYS = 14
+
+export function ruleVerdict(product, sale) {
+  const stores = (product.stores || []).filter(function (row) { return row.total > 0 })
+  if (!stores.length) return null
+  let cheapest = stores[0]
+  for (const row of stores) {
+    if (row.total < cheapest.total) cheapest = row
+  }
+  const typical = product.typicalPrice
+  const saleSoon = sale && sale.daysAway <= SALE_SOON_DAYS
+  const saleName = sale ? sale.name.replace(/ sale$/, '') : ''
+  const days = sale ? sale.daysAway + (sale.daysAway === 1 ? ' day' : ' days') : ''
+
+  if (typical && cheapest.total <= typical * 0.9) {
+    const below = Math.round((1 - cheapest.total / typical) * 100)
+    return {
+      decision: 'buy', headline: 'Good price now', source: 'rules',
+      reason: 'The cheapest total ' + money(cheapest.total) + ' is ' + below + '% under the typical ' +
+        money(typical) + ' across ' + stores.length + ' stores.'
+    }
+  }
+  if (saleSoon) {
+    return {
+      decision: 'wait', headline: 'Wait for ' + saleName, source: 'rules',
+      reason: (typical
+        ? 'The cheapest total ' + money(cheapest.total) + ' is close to the typical ' + money(typical) + '.'
+        : 'Only ' + stores.length + (stores.length === 1 ? ' store sells' : ' stores sell') + ' it, so there is no typical price.') +
+        ' The ' + saleName + ' sale is in ' + days + '.'
+    }
+  }
+  if (typical) {
+    return {
+      decision: 'buy', headline: 'Fair price', source: 'rules',
+      reason: 'The cheapest total ' + money(cheapest.total) + ' is close to the typical ' + money(typical) +
+        (sale ? ', and the next big sale is ' + days + ' away.' : '.')
+    }
+  }
+  return null
+}
