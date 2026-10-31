@@ -759,7 +759,7 @@ function onBuyTogether(item) {
   <!-- Plan a budget pop-up for one budget: its name, the budget, and the ranked items. Opened from
        the budget list in the Plan a budget tab. Uses the welcome prompt's dialog styles from app.css. -->
   <div v-if="editing" class="fd-entry-backdrop" @click.self="closeBudget" @keydown.esc="closeBudget">
-    <section class="fd-entry-dialog fd-budget-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-budget-title">
+    <section class="fd-entry-dialog fd-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="fd-budget-title">
       <h2 id="fd-budget-title" class="fd-page-title">{{ editingDraft ? editingDraft.name : 'Plan a budget' }}</h2>
 
       <form @submit.prevent="findPlan">
@@ -867,7 +867,7 @@ function onBuyTogether(item) {
 
   <!-- Buy Together pop-up: same as the one on the Notifications page -->
   <div v-if="buyItem" class="fd-entry-backdrop" @click.self="closeBuyTogether" @keydown.esc="closeBuyTogether">
-    <section class="fd-entry-dialog fd-budget-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-buy-title">
+    <section class="fd-entry-dialog fd-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="fd-buy-title">
       <h2 id="fd-buy-title" class="fd-page-title">Buy together</h2>
       <p class="fd-entry-description">
         {{ friendsFor(buyItem.productKey).length === 1 ? 'A friend' : 'Friends' }} saved
@@ -896,9 +896,9 @@ function onBuyTogether(item) {
         </ul>
       </fieldset>
 
-      <div v-if="inviteSent" class="alert alert-success mb-3" role="status">Sent! They'll Telegram you if keen.</div>
+      <div v-if="inviteSent" class="alert alert-success mb-3" role="status">Invite sent! They'll text you if they're interested.</div>
       <p v-else-if="allInvited(buyItem.productKey)" class="small text-secondary mb-3">
-        All invited. They'll Telegram you if keen.
+        Everyone's invited. They'll text you if they're interested.
       </p>
 
       <div class="fd-entry-actions">
@@ -933,7 +933,7 @@ function onBuyTogether(item) {
 
       <p v-else-if="verdictError" class="alert alert-danger" role="alert">
         {{ verdictError }}
-        <button class="btn btn-outline-dark btn-sm d-block mt-2" type="button" @click="openVerdict(verdictItem)">
+        <button class="btn btn-outline-dark d-block mt-2" type="button" @click="openVerdict(verdictItem)">
           Try again
         </button>
       </p>
@@ -1703,11 +1703,6 @@ function onBuyTogether(item) {
   font-size: var(--fd-small);
 }
 
-.fd-budget-dialog {
-  width: min(100%, 38rem);
-  max-height: calc(100svh - 2rem);
-  overflow-y: auto;
-}
 
 /* Your budgets list */
 /* Plan a budget tab: the search and sort row sits inside the scrolling area, so it does not

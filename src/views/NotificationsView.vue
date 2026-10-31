@@ -460,38 +460,41 @@ onMounted(load)
 
     <FdTelegramPrompt v-if="showTelegramPrompt" @close="showTelegramPrompt = false" />
 
-    <!-- Popup A: initiator picks friends to invite -->
+    <!-- Popup A: initiator picks friends to invite. Laid out like the Buy Together pop-up on the Wishlist. -->
     <div v-if="buyItem" class="fd-entry-backdrop" @click.self="closeBuyTogether" @keydown.esc="closeBuyTogether">
-      <section ref="buyDialog" class="fd-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-buy-title">
+      <section ref="buyDialog" class="fd-entry-dialog fd-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="fd-buy-title">
         <h2 id="fd-buy-title" class="fd-page-title">Buy together</h2>
         <p v-if="productName(buyItem)" class="fd-entry-description">
-          {{ buyFriends.length === 1 ? 'Your friend wants' : 'Your friends want' }}
-          <strong>{{ productName(buyItem) }}</strong> too! Buy it together and share the shipping. We'll send them your
-          Telegram so you can sort it out.
+          {{ buyFriends.length === 1 ? 'A friend' : 'Friends' }} saved
+          <strong>{{ productName(buyItem) }}</strong> too. Buy it together and share the shipping.
         </p>
-        <p v-else class="fd-entry-description">Buy it together and share the shipping. We'll send them your
-          Telegram so you can sort it out.</p>
+        <p v-else class="fd-entry-description">Buy it together and share the shipping.</p>
 
         <FdLoadingDots v-if="buyLoading" size="inline" message="Finding your friends" />
         <p v-else-if="buyError" class="alert alert-danger" role="alert">{{ buyError }}</p>
         <p v-else-if="!buyFriends.length" class="text-secondary">None of your friends has this product saved right now.</p>
 
-        <ul v-else class="fd-check-list text-start mb-4">
-          <li v-for="f in buyFriends" :key="f.firebaseUid">
-            <input
-              type="checkbox"
-              class="form-check-input"
-              :id="'chk-' + f.firebaseUid"
-              :checked="buySelected.has(f.firebaseUid)"
-              @change="toggleSelect(f.firebaseUid)"
-            />
-            <label :for="'chk-' + f.firebaseUid" class="fd-check-label">
-              <span class="fd-friend-name">{{ f.username }}</span>
-            </label>
-          </li>
-        </ul>
+        <div v-else class="mb-4">
+          <p class="fd-list-heading">Friends to invite</p>
+          <p class="small text-secondary mb-2">Tick who to invite. They get your Telegram and can message you if
+            they're keen.</p>
+          <ul class="fd-check-list">
+            <li v-for="f in buyFriends" :key="f.firebaseUid">
+              <input
+                type="checkbox"
+                class="form-check-input"
+                :id="'chk-' + f.firebaseUid"
+                :checked="buySelected.has(f.firebaseUid)"
+                @change="toggleSelect(f.firebaseUid)"
+              />
+              <label :for="'chk-' + f.firebaseUid" class="fd-check-label">
+                <span>{{ f.username }}</span>
+              </label>
+            </li>
+          </ul>
+        </div>
 
-        <div v-if="buyInviteSent" class="alert alert-success mb-3" role="status">Sent! They'll Telegram you if keen.</div>
+        <div v-if="buyInviteSent" class="alert alert-success mb-3" role="status">Invite sent! They'll text you if they're interested.</div>
 
         <div class="fd-entry-actions">
           <button v-if="!buyInviteSent && buyFriends.length" class="btn btn-dark" type="button"
@@ -505,32 +508,32 @@ onMounted(load)
       </section>
     </div>
 
-    <!-- Popup B: friend sees sender's telegram to coordinate -->
+    <!-- Popup B: friend sees sender's telegram to coordinate. Same layout as Popup A. -->
     <div v-if="inviteItem" class="fd-entry-backdrop" @click.self="closeGroupInvite" @keydown.esc="closeGroupInvite">
-      <section ref="inviteDialog" class="fd-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-invite-title">
+      <section ref="inviteDialog" class="fd-entry-dialog fd-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="fd-invite-title">
         <h2 id="fd-invite-title" class="fd-page-title">Buy together</h2>
         <p v-if="productName(inviteItem)" class="fd-entry-description">
-          {{ inviterName(inviteItem) }} wants to buy <strong>{{ productName(inviteItem) }}</strong> with you and share
-          the shipping. Message them on Telegram to sort it out.
+          {{ inviterName(inviteItem) }} invited you to buy <strong>{{ productName(inviteItem) }}</strong> together and
+          share the shipping.
         </p>
         <p v-else class="fd-entry-description">{{ inviteItem.body }}</p>
 
         <FdLoadingDots v-if="inviterLoading" size="inline" message="Loading their profile" />
         <p v-else-if="inviterError" class="alert alert-danger" role="alert">{{ inviterError }}</p>
 
-        <div v-else-if="inviterProfile" class="d-flex align-items-center justify-content-between gap-3 py-3 mb-4 border-bottom border-top">
-          <span class="fd-friend-name">{{ inviterProfile.username }}</span>
-          <a v-if="inviterProfile.telegramUsername"
+        <p v-else-if="inviterProfile && !inviterProfile.telegramUsername" class="small text-secondary">
+          {{ inviterProfile.username }} has not set a Telegram yet.
+        </p>
+
+        <!-- Full-size stacked buttons, like every other pop-up -->
+        <div class="fd-entry-actions">
+          <a v-if="inviterProfile && inviterProfile.telegramUsername"
             class="btn btn-dark"
             :href="'https://t.me/' + inviterProfile.telegramUsername"
             :aria-label="'Message ' + inviterProfile.username + ' on Telegram'"
             target="_blank" rel="noopener">
-            Message
+            Message on Telegram
           </a>
-          <span v-else class="small text-secondary">No Telegram set yet</span>
-        </div>
-
-        <div class="fd-entry-actions">
           <button class="btn btn-outline-dark" type="button" @click="closeGroupInvite">Close</button>
         </div>
       </section>
