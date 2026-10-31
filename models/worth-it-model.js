@@ -16,8 +16,8 @@
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
 // Primary model, then the backup used only on a 429 RESOURCE_EXHAUSTED.
-const WORTH_IT_MODEL = 'gemini-3.6-flash'
-const WORTH_IT_FALLBACK_MODEL = 'gemini-3.8-flash'
+const WORTH_IT_MODEL = 'gemini-3.1-flash-lite'
+const WORTH_IT_FALLBACK_MODEL = 'gemini-3.5-flash-lite'
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
