@@ -285,9 +285,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
           '/api/wishlist/' +
           encodeURIComponent(saved.productKey) +
           '/check-target'
-        ).then(response => {
-          console.log('[Target email] Check result:', response.data)
-        }).catch(error => {
+        ).catch(error => {
           console.warn(
             '[Target email] Check failed:',
             error.response?.data?.error || error.message
@@ -434,18 +432,11 @@ export const useWishlistStore = defineStore('wishlist', () => {
     try {
       // Get the cheapest comparable price from SerpApi
       const listing = await fetchCheapestLiveListing(item.name)
-      console.log('[Purchase Verdict] Selected listing:', listing)
 
       // Ignore outdated responses if the dialog has changed
       if (requestId !== verdictRequestId) return
 
       verdictLatestPrice.value = listing.price
-
-      console.log('[Sleep On It] Live ending price:', {
-        product: item.name,
-        store: listing.store,
-        price: listing.price
-      })
     } catch (error) {
       if (requestId !== verdictRequestId) return
 

@@ -50,7 +50,5 @@ FastDeal Team
         text: message
     })
 
-    console.log('Email accepted by SMTP server:', result.messageId)
-
     return result
 }

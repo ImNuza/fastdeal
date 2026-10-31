@@ -10,8 +10,8 @@ const accounts = [
 for (const account of accounts) {
   setup('log in as the demo ' + account.name + ' and save the session', async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('Username or Email').fill(account.email);
-    await page.getByPlaceholder('Password').fill(process.env.E2E_DEMO_PASSWORD ?? '');
+    await page.getByLabel('Username or Email', { exact: true }).fill(account.email);
+    await page.getByLabel('Password', { exact: true }).fill(process.env.E2E_DEMO_PASSWORD ?? '');
     await page.getByRole('button', { name: 'Log in', exact: true }).click();
 
     // Login is done when the page leaves /login.

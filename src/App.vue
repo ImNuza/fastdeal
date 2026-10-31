@@ -127,7 +127,7 @@ async function refreshUnread() {
     const res = await axios.get('/api/notifications', { quiet: true })
     unreadCount.value = res.data.filter(n => !n.read).length
   } catch (err) {
-    console.log(err)
+    // A missed check is fine; the next one will try again
   }
 }
 

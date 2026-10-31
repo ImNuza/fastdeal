@@ -25,7 +25,7 @@ test.describe('Wishlist target price alerts', () => {
     await page.goto('/wishlist');
 
     // Select the first product with a target price input.
-    const input = page.locator('input[aria-label^="Target price for"]').first();
+    const input = page.getByLabel(/^Target price for /).first();
     await expect(input).toBeVisible();
 
     const label = await input.getAttribute('aria-label');
@@ -81,7 +81,7 @@ test.describe('Wishlist target price alerts', () => {
   test('user can update a target price and keep it after reload @admin', async ({ page }) => {
     await page.goto('/wishlist');
 
-    const input = page.locator('input[aria-label^="Target price for"]').first();
+    const input = page.getByLabel(/^Target price for /).first();
     await expect(input).toBeVisible();
 
     const label = await input.getAttribute('aria-label');

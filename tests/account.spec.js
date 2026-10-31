@@ -34,7 +34,7 @@ test.describe('Account settings', () => {
   test('user can turn the email alerts checkbox on or off and keep it after a reload @user', async ({ page }) => {
     await page.goto('/account');
 
-    const emailAlerts = page.getByRole('checkbox', { name: 'Email me when a saved price drops' });
+    const emailAlerts = page.getByRole('checkbox', { name: 'Email me when a saved item reaches my target price' });
     await expect(emailAlerts).toBeVisible();
     const original = await emailAlerts.isChecked();
 
@@ -47,11 +47,11 @@ test.describe('Account settings', () => {
       await saved;
 
       await page.reload();
-      await expect(page.getByRole('checkbox', { name: 'Email me when a saved price drops' })).toBeChecked({ checked: !original });
+      await expect(page.getByRole('checkbox', { name: 'Email me when a saved item reaches my target price' })).toBeChecked({ checked: !original });
     } finally {
       // Put the old value back.
       await page.goto('/account');
-      const restore = page.getByRole('checkbox', { name: 'Email me when a saved price drops' });
+      const restore = page.getByRole('checkbox', { name: 'Email me when a saved item reaches my target price' });
       await expect(restore).toBeVisible();
       if ((await restore.isChecked()) !== original) {
         const restored = page.waitForResponse((response) =>
