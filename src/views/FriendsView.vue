@@ -105,7 +105,7 @@ async function refreshRequests() {
     return
   }
   try {
-    const [f, r, sentList] = await Promise.all([getFriends(), getIncomingRequests(), getSentRequests()])
+    const [f, r, sentList] = await Promise.all([getFriends({ quiet: true }), getIncomingRequests({ quiet: true }), getSentRequests({ quiet: true })])
     friends.value = f
     requests.value = r
     sent.value = sentList

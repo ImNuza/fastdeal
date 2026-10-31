@@ -30,7 +30,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
       // Restore the actual server data if a write fails.
       if (user.value) {
-        void axios.get('/api/wishlist').then(function (res) {
+        void axios.get('/api/wishlist', { quiet: true }).then(function (res) {
           if (user.value) user.value.wishlist = res.data
         })
       }

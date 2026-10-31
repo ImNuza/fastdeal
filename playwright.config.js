@@ -22,6 +22,10 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
+  /* The first requests after the servers start can be slow (MongoDB connect), so wait up to 10s per check. */
+  expect: { timeout: 10000 },
+  /* Each save goes to MongoDB Atlas, so a test with several saves can pass 30s when 7 workers run at once. */
+  timeout: 60000,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
