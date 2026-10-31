@@ -116,7 +116,7 @@ Each AI verdict is kept for the rest of the day.
 Two kinds of tests. Neither one calls SerpApi or Gemini: the tests use saved responses from
 tests/fixtures/.
 
-Unit tests (Vitest), 103 tests in 10 files, in the __tests__ folders:
+Unit tests (Vitest), 106 tests in 11 files, in the __tests__ folders:
   npm run test:unit
 They test the pure logic: the Deal check rules, price history, the budget planner, the AI verdict
 inputs, prompt and rule fallback, the SerpApi key fallback, keys, formats and search history.
