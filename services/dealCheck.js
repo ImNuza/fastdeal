@@ -1,6 +1,5 @@
 // Deal check for one product: how each store's price compares with the other stores
 // that sell the same product today, and whether a store sale is coming.
-// We have no price history, so every check uses only today's stores.
 // Plain functions with no database calls, so they are easy to test.
 import { SALE_EVENTS, STORE_SALES } from '../data/sale-calendar.js'
 import { sgDay } from './priceHistory.js'

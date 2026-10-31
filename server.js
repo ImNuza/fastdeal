@@ -19,7 +19,6 @@ import PriceDay from './models/price-day-model.js'
 import { sgDay } from './services/priceHistory.js'
 import { SALE_EVENTS, STORE_SALES } from './data/sale-calendar.js'
 import { toProductKey } from './models/product-key.js'
-import { error } from 'console'
 import Notification from './models/notification-model.js'
 import WishlistItem from './models/wishlist-item-model.js'
 import { getProduct } from './services/productService.js'
@@ -391,7 +390,20 @@ app.put('/api/friends/:pairKey/accept', requireUser, async (req, res) => {
       { new: true }
     )
     if (!f) return res.status(404).json({ error: 'Request not found' })
-    // No notification back to the sender: only new requests notify, answers do not.
+    // Tell the requester. A failed notification must not fail the accept.
+    try {
+      const me = await User.findOne({ firebaseUid: myUid }).select('username')
+      await Notification.create({
+        firebaseUid: f.requesterUid,
+        type: 'friend-accepted',
+        title: 'Friend request accepted',
+        body: (me?.username || 'Someone') + ' accepted your friend request.',
+        link: '/friends',
+        fromUid: myUid
+      })
+    } catch (notifyErr) {
+      console.error('[Friends] accept notification failed:', notifyErr)
+    }
     res.json(f)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -684,7 +696,7 @@ app.get('/api/trending' , async (req,res) =>{
       week: await topSince(weekAgo)
     })
   }catch (error){
-    console.log(error)
+    console.error('[Trending]', error)
     res.status(500).json({ error: 'Failed to load trending' })
   }
 
@@ -733,7 +745,7 @@ app.get('/api/searched-with',async (req,res)=>{
     end.sort((a, b) => b.count - a.count)
     res.json(end)
   }catch(error){
-    console.log(error)
+    console.error('[Searched with]', error)
     res.status(500).json({ error: 'Failed to load' })
   }
 })
@@ -944,7 +956,7 @@ app.get('/api/users/profile/:firebaseUid', requireUser, async (req, res) => {
 })
 
 // --- Wishlist routes ---
-// One row per saved product per user. The client keeps a copy in memory (src/mock/session.js)
+// One row per saved product per user. The client keeps a copy in the wishlist store (src/store/wishlist.js)
 // and writes every change through these routes.
 
 // The item shape the client uses. Dates go out as milliseconds, like the old browser wishlist.

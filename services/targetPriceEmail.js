@@ -365,13 +365,6 @@ export async function checkTargetPrice(uid, productKey) {
     )
   }
 
-  console.log(
-    '[Target email] Sent:',
-    claimed.productName,
-    'to',
-    owner.email
-  )
-
   return {
     checked: true,
     reached: true,

@@ -251,13 +251,11 @@ async function onTarget(item, event) {
       nextTarget > 0 &&
       listing.price <= nextTarget
     ) {
-      const response = await axios.post(
+      await axios.post(
         '/api/wishlist/' +
         encodeURIComponent(item.productKey) +
         '/check-target'
       )
-
-      console.log('[Target email] Check result:', response.data)
     }
   } catch (error) {
     console.warn(
@@ -361,12 +359,6 @@ function confirmSleep() {
     holdMs.value / 3600000,
     priceAtStart
   )
-
-  console.log('[Sleep On It] Starting from saved price:', {
-    product: item.name,
-    savedStore: item.savedStore,
-    price: priceAtStart
-  })
 
   closeSleep()
 }

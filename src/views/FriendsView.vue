@@ -67,6 +67,8 @@ const searchResults = computed(() =>
 )
 const loadingFriends = ref(false)
 const actionLoading = ref({}) // pairKey -> true while in flight
+const errorText = ref('') // shown at the top of the tab panel when an action fails
+const confirmKey = ref('') // pairKey of the friend whose Remove is waiting for a Yes
 
 const myUid = computed(() => firebaseUser.value?.uid)
 
@@ -74,6 +76,7 @@ const myUid = computed(() => firebaseUser.value?.uid)
 async function load() {
   if (!myUid.value) return
   loadingFriends.value = true
+  errorText.value = ''
   try {
     const [f, r, sentList] = await Promise.all([
       getFriends(),       // GET /api/friends
@@ -83,9 +86,8 @@ async function load() {
     friends.value = f
     requests.value = r
     sent.value = sentList
-    console.log('[Friends] loaded', f.length, 'friends,', r.length, 'pending requests')
   } catch (err) {
-    console.warn('[Friends] load failed:', err.message)
+    errorText.value = 'Could not load your friends. Try again.'
   } finally {
     loadingFriends.value = false
   }
@@ -283,11 +285,11 @@ watch(searchQuery, (q) => {
   }
   searchTimer = setTimeout(async () => {
     searching.value = true
+    errorText.value = ''
     try {
       allSearchResults.value = await searchUsers(q.trim())
-      console.log('[Friends] search results:', allSearchResults.value)
     } catch (err) {
-      console.warn('[Friends] search failed:', err.message)
+      errorText.value = 'Could not search. Try again.'
     } finally {
       searching.value = false
     }
@@ -298,14 +300,14 @@ watch(searchQuery, (q) => {
 // Mutate allSearchResults so the computed searchResults re-filters and the button updates.
 async function onSendRequest(result) {
   actionLoading.value[result.pairKey] = true
+  errorText.value = ''
   try {
     await sendRequest(result.firebaseUid)
     const hit = allSearchResults.value.find(r => r.pairKey === result.pairKey)
     if (hit) { hit.friendshipStatus = 'pending'; hit.iRequested = true }
     sent.value.push({ pairKey: result.pairKey, firebaseUid: result.firebaseUid, username: result.username })
-    console.log('[Friends] request sent to', result.username)
   } catch (err) {
-    console.warn('[Friends] send request failed:', err.message)
+    errorText.value = 'Could not send the request. Try again.'
   } finally {
     actionLoading.value[result.pairKey] = false
   }
@@ -314,13 +316,14 @@ async function onSendRequest(result) {
 // DELETE /api/friends/:pairKey on a request I sent: takes it back.
 async function onCancel(req) {
   actionLoading.value[req.pairKey] = true
+  errorText.value = ''
   try {
     await declineOrRemove(req.pairKey)
     sent.value = sent.value.filter(r => r.pairKey !== req.pairKey)
     const hit = allSearchResults.value.find(r => r.pairKey === req.pairKey)
     if (hit) { hit.friendshipStatus = null; hit.iRequested = null }
   } catch (err) {
-    console.warn('[Friends] cancel request failed:', err.message)
+    errorText.value = 'Could not cancel the request. Try again.'
   } finally {
     actionLoading.value[req.pairKey] = false
   }
@@ -330,15 +333,15 @@ async function onCancel(req) {
 // Move the accepted user out of requests and into the friends list locally.
 async function onAccept(req) {
   actionLoading.value[req.pairKey] = true
+  errorText.value = ''
   try {
     await acceptRequest(req.pairKey)
     requests.value = requests.value.filter(r => r.pairKey !== req.pairKey)
     friends.value.push(req)
     const hit = allSearchResults.value.find(r => r.pairKey === req.pairKey)
     if (hit) hit.friendshipStatus = 'accepted'
-    console.log('[Friends] accepted request from', req.username)
   } catch (err) {
-    console.warn('[Friends] accept failed:', err.message)
+    errorText.value = 'Could not accept the request. Try again.'
   } finally {
     actionLoading.value[req.pairKey] = false
   }
@@ -347,14 +350,14 @@ async function onAccept(req) {
 // DELETE /api/friends/:pairKey — removes the friendship row entirely (decline or cancel).
 async function onDecline(req) {
   actionLoading.value[req.pairKey] = true
+  errorText.value = ''
   try {
     await declineOrRemove(req.pairKey)
     requests.value = requests.value.filter(r => r.pairKey !== req.pairKey)
     const hit = allSearchResults.value.find(r => r.pairKey === req.pairKey)
     if (hit) { hit.friendshipStatus = null; hit.iRequested = null }
-    console.log('[Friends] declined request from', req.username)
   } catch (err) {
-    console.warn('[Friends] decline failed:', err.message)
+    errorText.value = 'Could not decline the request. Try again.'
   } finally {
     actionLoading.value[req.pairKey] = false
   }
@@ -362,16 +365,16 @@ async function onDecline(req) {
 
 // DELETE /api/friends/:pairKey — same endpoint, but used on an existing friend to unfriend.
 async function onRemove(friend) {
-  if (!confirm(`Remove ${friend.username || friend.email} from friends?`)) return
+  confirmKey.value = ''
   actionLoading.value[friend.pairKey] = true
+  errorText.value = ''
   try {
     await declineOrRemove(friend.pairKey)
     friends.value = friends.value.filter(f => f.pairKey !== friend.pairKey)
     const hit = allSearchResults.value.find(r => r.pairKey === friend.pairKey)
     if (hit) { hit.friendshipStatus = null; hit.iRequested = null }
-    console.log('[Friends] removed friend', friend.username)
   } catch (err) {
-    console.warn('[Friends] remove failed:', err.message)
+    errorText.value = 'Could not remove the friend. Try again.'
   } finally {
     actionLoading.value[friend.pairKey] = false
   }
@@ -412,6 +415,7 @@ function initials(f) {
 
     <!-- The open tab and this card are one piece, like a folder tab. -->
     <div class="friend-tabpanel" :class="{ 'is-first-open': activeTab === 'friends' }">
+      <p v-if="errorText" class="alert alert-danger" role="alert">{{ errorText }}</p>
       <!-- The search sits above the scrolling list, so the list and its scrollbar start together
            under it. Same pill as the Wishlist search. -->
       <div v-if="activeTab === 'friends' && !loadingFriends && friends.length" class="friend-search">
@@ -454,13 +458,30 @@ function initials(f) {
                     <div class="friend-username">{{ f.username || '(no username)' }}</div>
                     <div class="friend-email">{{ f.email }}</div>
                   </div>
+                  <div v-if="confirmKey === f.pairKey" class="friend-actions">
+                    <span class="friend-username">Remove {{ f.username || f.email }}?</span>
+                    <button
+                      class="btn btn-danger btn-sm"
+                      type="button"
+                      :disabled="actionLoading[f.pairKey]"
+                      :aria-label="'Yes, remove ' + (f.username || f.email)"
+                      @click="onRemove(f)"
+                    >Yes, remove</button>
+                    <button
+                      class="btn btn-outline-dark btn-sm"
+                      type="button"
+                      :aria-label="'Keep ' + (f.username || f.email)"
+                      @click="confirmKey = ''"
+                    >Cancel</button>
+                  </div>
                   <button
+                    v-else
                     class="btn btn-sm btn-outline-danger fd-icon-btn flex-shrink-0"
                     type="button"
                     :disabled="actionLoading[f.pairKey]"
                     :aria-label="'Remove ' + (f.username || f.email) + ' as a friend'"
                     title="Remove friend"
-                    @click="onRemove(f)"
+                    @click="confirmKey = f.pairKey"
                   >
                     <FdIcon name="trash" />
                   </button>

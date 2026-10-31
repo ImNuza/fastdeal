@@ -41,7 +41,6 @@ async function onSubmit() {
     const patch = { username: u }
     if (tg) patch.telegramUsername = tg
     const dbUser = await updateUser(patch)
-    console.log('[SetUsername] saved:', dbUser)
     if (user.value) {
       user.value.username = dbUser.username
       user.value.telegramUsername = dbUser.telegramUsername || null
@@ -65,7 +64,7 @@ async function onSubmit() {
   <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
       <h1 class="fd-page-title">Pick a username</h1>
-      <p class="fd-page-subtitle">Your username is how friends find you. You can change these later in Account settings.</p>
+      <p class="fd-page-subtitle">Your username is how friends find you. You can change your Telegram username later in Account.</p>
 
       <div class="card p-4">
         <p v-if="errorText" class="alert alert-danger mb-3">{{ errorText }}</p>

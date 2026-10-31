@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import searchIphone from './fixtures/search-iphone.json' with { type: 'json' };
 import productIphone from './fixtures/product-iphone.json' with { type: 'json' };
+import worthIt from './fixtures/worth-it.json' with { type: 'json' };
 
 // Live prices the wishlist finds for the two demo products. Any other name gets the saved iPhone search.
 // Sony: saved at S$489, now S$429, so it counts as a price drop. Kindle: saved at S$219, now S$219.
@@ -82,6 +83,9 @@ test.describe('Wishlist', () => {
 
     // The product page comes from the saved response too.
     await page.route('**/api/product/*', (route) => route.fulfill({ json: productIphone }));
+
+    // The product page asks Gemini for a Worth it verdict. Return the saved one.
+    await page.route('**/api/worth-it*', (route) => route.fulfill({ json: worthIt }));
   });
 
   test('user can save a product from its page, see it on the wishlist and remove it @user', async ({ page }) => {

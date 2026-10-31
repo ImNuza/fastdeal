@@ -135,7 +135,7 @@ async function saveTelegram() {
       <div class="card p-3">
         <div class="form-check form-switch mb-0">
           <input id="emailOn" class="form-check-input" type="checkbox" :checked="user.emailOn" @change="toggleEmail" />
-          <label class="form-check-label" for="emailOn">Email me when a saved price drops</label>
+          <label class="form-check-label" for="emailOn">Email me when a saved item reaches my target price</label>
         </div>
       </div>
 
