@@ -2,6 +2,16 @@
  // @ts-check
 import { test, expect } from '@playwright/test';
 
+// Open the wishlist and wait until the saved products and live prices are loaded. Typing before
+// that can be lost, because the list can load again and the input gets the saved value back.
+async function openWishlist(page) {
+  const loaded = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === '/api/wishlist' && response.request().method() === 'GET');
+  await page.goto('/wishlist');
+  await loaded;
+  await page.waitForLoadState('networkidle');
+}
+
 test.describe('Wishlist target price alerts', () => {
   // Run these tests one after another because they modify the same demo wishlist.
   test.describe.configure({ mode: 'serial' });
@@ -15,6 +25,12 @@ test.describe('Wishlist target price alerts', () => {
       json: { listings: [] }
     }));
 
+    // A saved product gets its live price from its product page. Return nothing, so the price search runs.
+    await page.route('**/api/product/*', (route) => route.fulfill({
+      status: 404,
+      json: { error: 'e2e-test' }
+    }));
+
     // Do not send real target price alert emails during testing.
     await page.route('**/api/wishlist/*/check-target', (route) => route.fulfill({
       json: { checked: false, reason: 'e2e-test' }
@@ -22,7 +38,7 @@ test.describe('Wishlist target price alerts', () => {
   });
 
   test('user can save a target price @admin', async ({ page }) => {
-    await page.goto('/wishlist');
+    await openWishlist(page);
 
     // Select the first product with a target price input.
     const input = page.getByLabel(/^Target price for /).first();
@@ -54,11 +70,12 @@ test.describe('Wishlist target price alerts', () => {
 
       // Refresh the Wishlist and check the saved target price.
       await page.reload();
+      await page.waitForLoadState('networkidle');
 
       await expect(page.getByLabel(label, { exact: true })).toHaveValue(newTarget);
     } finally {
       // Restore the original target price so the demo wishlist is unchanged.
-      await page.goto('/wishlist');
+      await openWishlist(page);
 
       const restoreInput = page.getByLabel(label, { exact: true });
       await expect(restoreInput).toBeVisible();
@@ -79,7 +96,7 @@ test.describe('Wishlist target price alerts', () => {
   });
 
   test('user can update a target price and keep it after reload @admin', async ({ page }) => {
-    await page.goto('/wishlist');
+    await openWishlist(page);
 
     const input = page.getByLabel(/^Target price for /).first();
     await expect(input).toBeVisible();
@@ -124,11 +141,12 @@ test.describe('Wishlist target price alerts', () => {
 
       // Refresh the page and verify the most recent target was saved.
       await page.reload();
+      await page.waitForLoadState('networkidle');
 
       await expect(page.getByLabel(label, { exact: true })).toHaveValue(secondTarget);
     } finally {
       // Restore the original target price.
-      await page.goto('/wishlist');
+      await openWishlist(page);
 
       const restoreInput = page.getByLabel(label, { exact: true });
       await expect(restoreInput).toBeVisible();

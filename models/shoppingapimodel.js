@@ -9,15 +9,14 @@
 // search term and a conservative minimum retail price (USD). Any Gemini failure
 // falls back to the raw query so search always runs.
 
-import { getJson } from 'serpapi'
+import { serpGet, hasSerpKey } from '../services/serpapiKeys.js'
 import { toProductKey } from './product-key.js'
 import SearchCache from './search-cache-model.js'
 import SearchLog from './search-log-model.js'
 import { recordPrices, storePrices } from '../services/priceHistory.js'
 
-// Keys are read at module scope; server.js does `import 'dotenv/config'` BEFORE it
-// imports this model, so process.env is already populated when these evaluate.
-const API_KEY = process.env.SERPAPI_API_KEY
+// The Gemini key is read at module scope; server.js does `import 'dotenv/config'` BEFORE it
+// imports this model. SerpApi keys are read by services/serpapiKeys.js.
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
 const GEMINI_MODEL = 'gemini-3.5-flash-lite'
@@ -128,7 +127,7 @@ async function logSearch(sessionId, query, productKey, searchTerm, listings) {
 }
 
 export async function search(q, sessionId) {
-  if (!API_KEY) throw new Error('SERPAPI_API_KEY is not set')
+  if (!hasSerpKey()) throw new Error('SERPAPI_API_KEY is not set')
 
   const rawQuery = String(q || '').trim()
   if (!rawQuery) throw new Error('Query is required')
@@ -157,15 +156,14 @@ export async function search(q, sessionId) {
     engine: 'google_shopping',
     q: fullQuery,
     hl: 'en',
-    gl: 'sg',
-    api_key: API_KEY
+    gl: 'sg'
   }
   if (pre.minPrice != null) {
     params.min_price = String(pre.minPrice)
   }
 
   // First attempt (with min_price when we have one).
-  let json = await getJson(params)
+  let json = await serpGet(params)
   let minPriceApplied = pre.minPrice
 
   // Empty-result retry: if min_price was set and nothing came back, drop it and retry.
@@ -173,7 +171,7 @@ export async function search(q, sessionId) {
   if (firstCount === 0 && params.min_price != null) {
     const retryParams = { ...params }
     delete retryParams.min_price
-    json = await getJson(retryParams)
+    json = await serpGet(retryParams)
     minPriceApplied = null
   }
 

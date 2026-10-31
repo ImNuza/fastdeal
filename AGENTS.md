@@ -39,11 +39,14 @@ Run `npm run build` and `npm run test:e2e` before a change goes to `main`.
 - Demo logins: `demo@smu.edu.sg` (admin, has the demo data) and `demo.user@smu.edu.sg` (normal user). Same password, read from `E2E_DEMO_PASSWORD` in `.env`. A test tagged `@admin` or `@user` in its title runs as that account. An untagged test runs logged out.
 - Selectors: `getByRole`, then `getByLabel`, then `data-testid="feature-element"`. Never CSS classes.
 - Tests must not create users. Run `npm run seed` before a full run. The seed keeps `demo@smu.edu.sg` as admin.
+- The seed uses real data only: products from `data/demo-products.json` (saved by team members), the team accounts
+  as demo's friends, and a friend request from `dewa`. `demo.user@smu.edu.sg` stays empty, with no friends.
 
 ## Keys
 - Keys live in `.env` (not tracked). Never print, paste or log a key value.
-- `SERPAPI_API_KEY`: free plan, 250 searches a month for the whole team, and graders use the app until Week 18. Every live search uses one.
-- `GEMINI_API_KEY`: used by `models/shoppingapimodel.js`.
+- `SERPAPI_API_KEY`, `SERPAPI_API_KEY_2`, `SERPAPI_API_KEY_3`: free plan keys from different members.
+  `services/serpapiKeys.js` moves to the next key when one runs out. Graders use the app until Week 18.
+- `GEMINI_API_KEY`: used by `models/shoppingapimodel.js` and `models/worth-it-model.js` (cached a day in `worthItCache`).
 - Render has its own copy of the keys. A new key must also be added in the Render dashboard.
 
 ## Gotchas

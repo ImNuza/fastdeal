@@ -128,8 +128,8 @@ Next batch, branch `test/trending-friends-notifications-admin`: 12 tests in 6 fi
 | 1 | `trending.spec.js` | none | The "Trending" table shows at least one row. |
 | 2 | `trending.spec.js` | none | A row's "Compare" link opens `/compare?q=...`. `/api/search` returns the fixture. |
 | 3 | `home.spec.js` | none | "Trending Today" and "Trending This Week" show items. |
-| 4 | `friends.spec.js` | `@admin` | "Search your friends" finds the seed friend `alex.tan`. Nonsense input shows "No friends match". |
-| 5 | `friends.spec.js` | `@admin` | The "Requests" tab shows the seed request from `marcus.lim`. |
+| 4 | `friends.spec.js` | `@admin` | "Search your friends" finds the team account `zoedharm` (a seed friend). Nonsense input shows "No friends match". |
+| 5 | `friends.spec.js` | `@admin` | The "Requests" tab shows the seed request from the team account `dewa`. |
 | 6 | `friends.spec.js` | `@user` | `demo.user` sends a request to `demo` from "Add Friend". In a second context with `playwright/.auth/admin.json`, `demo` sees it under "Requests" and in the "Friends" tab on Notifications. Cleanup: `demo.user` cancels the request. |
 | 7 | `notifications.spec.js` | `@admin` | Tabs filter: "Wishlist" shows the price drop and sale notices, "Friends" shows the friend request. `/api/notifications` returns a 3-item fixture, because the seed no longer creates notifications. |
 | 8 | `notifications.spec.js` | `@admin` | "Search notifications" narrows the list. "Dismiss" removes the unread dot. "Show: Unread only" hides it. The read endpoints are mocked. |
@@ -146,15 +146,32 @@ Batch 3, now unblocked (Zoe's wishlist is merged): 5 E2E tests in `wishlist.spec
 
 | # | Login | Test |
 |---|---|---|
-| 13 | `@user` | On a product page (product fixture), "Save" adds the product. It shows on `/wishlist`. "Remove <name>" takes it off again. |
+| 13 | `@user` | On a product page (product fixture), "Save" adds the product. It shows on `/wishlist`. "Remove <name>", then "Remove" in the pop-up, takes it off again. |
 | 14 | `@admin` | "Search your wishlist" narrows the list. "Sort by" changes the order. The tabs "Price drops" and "Sleeping on it" filter the list. Read only. |
 | 15 | `@user` | Save a product, then "Sleep on <name>" with a hold time. It shows under "Sleeping on it". Cleanup: remove the product. |
 | 16 | `@admin` | "Plan a budget" tab, "New budget": enter "Your budget". The plan keeps the total under the budget. Close without saving. If a save is tested, delete the draft with "Delete <name>" at the end. |
-| 17 | `@admin` | The "friends saved ... Buy together" button opens the "Buy together" dialog with the seed friends who saved the same product. Close without sending. |
+| 17 | `@admin` | The "friends saved ... Buy together" button opens the "Buy together" dialog with the team accounts that saved the same Sony headphones (ronald.s, jayden). Close without sending. |
 
 Added 2026-10-31 after Zoe's PR #38 (error pages): `tests/errors.spec.js` (unknown URL shows "Page not found"; a 500 from `/api/trending` shows "Server error" with "Try again") and `src/services/__tests__/errors.spec.js` (4 unit tests for `errorInfo`). The admin access test now checks the `/error/403` page instead of an alert.
 
 Ronald's AI verdict landed on 31 Oct (`/api/worth-it`, Gemini). `tests/fixtures/worth-it.json` is the saved verdict. `product.spec.js` and `wishlist.spec.js` route `**/api/worth-it*` to it, and `product.spec.js` tests the Show/Hide verdict panel.
+
+Batch 5 (31 Oct, freeze UI plan in `docs/freeze-ui-plan.md`): 7 E2E tests and 14 unit tests.
+The seed now uses real data only (`data/demo-products.json` and the team accounts), so tests 4, 5, 14, 16 and 17 read those names.
+
+| # | File | Login | Test |
+|---|---|---|---|
+| 18 | `friends.spec.js` | `@admin` | "Remove zoedharm as a friend" opens the "Remove friend" pop-up. Cancel and Esc close it. The friend stays. |
+| 19 | `wishlist.spec.js` | `@admin` | "Remove <name>" opens the "Remove from wishlist" pop-up. Cancel keeps the product. |
+| 20 | `compare.spec.js` | none | No price history: one line, no chart (`/api/price-history` mocked). |
+| 21 | `compare.spec.js` | none | 3 days of history: the chart and the verdict sit above the filters. |
+| 22 | `product.spec.js` | none | The AI "Worth it?" verdict shows without a click, with its "Based on" line. |
+| 23 | `product.spec.js` | none | "See what the AI read" opens `/product/:id/worth-it`: the inputs table, Sent and Not sent, and the prompt. |
+| 24 | `home.spec.js` | none | A trending product with no photo shows its initials. |
+
+Unit: `services/__tests__/worthItInputs.spec.js` (9 tests: the inputs from live stores, the sale calendar,
+history only with 3 or more days, the summary, the prompt) and `services/__tests__/serpapiKeys.spec.js`
+(5 tests: the next key after "run out of searches", keys that are not set, other errors).
 
 Batch 4, after Ronald's AI verdict merges: Compare filters and sort, the cheapest badge, the verdict (with a saved Gemini response). About 3 tests. Then check `product.spec.js` and `target-price-alert.spec.js`.
 

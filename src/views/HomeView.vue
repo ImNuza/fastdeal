@@ -7,6 +7,18 @@ import axios from 'axios'
 import { storeToRefs } from 'pinia'
 import { useTrendingStore } from '../store/trending.js'
 
+// Trending cards whose photo is missing or failed to load show the product's initials instead,
+// like the wishlist does.
+const brokenImages = ref({})
+
+function showImage(item) {
+  return Boolean(item.image) && !brokenImages.value[item.query]
+}
+
+function initials(name) {
+  return String(name || '').split(/\s+/).slice(0, 2).map(function (word) { return word.charAt(0) }).join('').toUpperCase()
+}
+
 // The values band under the hero: FastDeal's features in four groups. ai marks the AI-powered one.
 const values = [
   { icon: 'sparkles', title: 'Photo search', text: 'Snap it, AI finds it.', ai: true },
@@ -305,7 +317,9 @@ onBeforeUnmount(function () {
               :tabindex="copy === 1 && index < trendingToday.length ? 0 : -1"
               :aria-hidden="copy === 2 || index >= trendingToday.length"
             >
-              <img :src="item.image" alt="" class="fd-slide-img" />
+              <img v-if="showImage(item)" :src="item.image" alt="" class="fd-slide-img"
+                @error="brokenImages[item.query] = true" />
+              <span v-else class="fd-slide-img fd-img-tile" aria-hidden="true">{{ initials(itemName(item.query)) }}</span>
               <span class="fd-slide-name">{{ itemName(item.query) }}</span>
             </router-link>
           </template>
@@ -322,7 +336,9 @@ onBeforeUnmount(function () {
         <div class="col-6 col-md-4 col-lg-3" v-for="item in trendingWeek" :key="item._id">
           <router-link class="fd-week-link" :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
             <div class="card h-100 fd-week-card" style="padding: 1.25rem; border-radius: 1rem;">
-              <img :src="item.image"  class="card-img-top" style="display: block; width: 100%; height: 170px; padding: 1.25rem; object-fit: contain; border-radius: 0.75rem; background: var(--fd-white); margin-bottom: 1.25rem;">
+              <img v-if="showImage(item)" :src="item.image" alt="" class="card-img-top" style="display: block; width: 100%; height: 170px; padding: 1.25rem; object-fit: contain; border-radius: 0.75rem; background: var(--fd-white); margin-bottom: 1.25rem;"
+                @error="brokenImages[item.query] = true">
+              <span v-else class="fd-week-tile fd-img-tile" aria-hidden="true">{{ initials(itemName(item.query)) }}</span>
               <h5 class="card-title" style="margin: 0; font-size: var(--fd-body); font-weight: 600; line-height: 1.3;">{{ itemName(item.query) }}</h5>
             </div>
           </router-link>
@@ -445,6 +461,24 @@ onBeforeUnmount(function () {
   object-fit: contain;
 }
 
+/* No photo: the product's initials on the same white tile, like the wishlist. */
+.fd-img-tile {
+  display: grid;
+  place-items: center;
+  color: var(--fd-blue);
+  font-family: var(--fd-font-display);
+  font-size: var(--fd-page-title);
+  line-height: 1;
+}
+
+.fd-week-tile {
+  width: 100%;
+  height: 170px;
+  margin-bottom: 1.25rem;
+  border-radius: 0.75rem;
+  background: var(--fd-white);
+}
+
 .fd-slide-name {
   color: var(--fd-text);
   font-size: var(--fd-body);
@@ -559,7 +593,6 @@ onBeforeUnmount(function () {
   border: 1px solid transparent;
   border-radius: 1.25rem;
   background: transparent;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .fd-value-icon {
@@ -591,17 +624,6 @@ onBeforeUnmount(function () {
   text-transform: uppercase;
 }
 
-/* Hovering a card lights it up with a vanilla outline. */
-.fd-value:hover {
-  border-color: var(--fd-vanilla);
-  background: color-mix(in srgb, var(--fd-paper) 10%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fd-value {
-    transition: none;
-  }
-}
 
 /* Small AI tag beside the photo search title. */
 .fd-ai-badge {

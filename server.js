@@ -545,12 +545,16 @@ app.get('/api/product/:productId', async (req, res) => {
   }
 })
 
-// AI "Worth It" verdict: buy now or wait for a big sale, for one product + price.
+// AI "Worth It" verdict: buy now or wait for a big sale, for one product.
+// Reads the product from productCache (the product page just loaded it, so no SerpApi credit),
+// its tracked price history and the next big sale, then asks Gemini (models/worth-it-model.js).
 // Public, like /api/product. Never fails the page: the model returns a graceful
 // fallback verdict on any error, so this route always responds 200 with a verdict.
 app.get('/api/worth-it', async (req, res) => {
   try {
-    const verdict = await worthIt(req.query.name, req.query.price)
+    const product = await getProduct(text(req.query.productId), text(req.query.q))
+    const history = await trackedDays(toProductKey(product.title))
+    const verdict = await worthIt(product, history, nextBigSale())
     res.json(verdict)
   } catch (error) {
     // Defensive: worthIt() is designed never to throw, but keep the page safe anyway.
@@ -573,7 +577,8 @@ async function topSince(since) {
     { $group: {
         _id: { $toLower: { $trim: { input: { $ifNull: ['$productName', '$productKey'] } } } },
         query: { $first: '$productName' },
-        image: { $first: '$image' },
+        // Any photo the group has: the newest row can be one with no image.
+        image: { $max: '$image' },
         count: { $sum: 1 }
     } },
     { $sort: { count: -1 } },
@@ -713,19 +718,24 @@ app.get('/api/trending' , async (req,res) =>{
 
 })
 
+// The lowest real price on each of the last 14 days for one product key: [{ day, price }], oldest first.
+// Real prices only: seeded rows have no source and are left out.
+async function trackedDays(key) {
+  const since = sgDay(Date.now() - 13 * 24 * 3600000)
+  const days = await PriceDay.aggregate([
+    { $match: { productKey: key, day: { $gte: since }, source: { $in: ['search', 'product'] } } },
+    { $group: { _id: '$day', price: { $min: '$price' } } },
+    { $sort: { _id: 1 } }
+  ])
+  return days.map(function (d) { return { day: d._id, price: d.price } })
+}
+
 // Lowest price on each of the last 14 days for one searched product (priceDays, written by every fresh search).
 app.get('/api/price-history', async (req, res) => {
   const key = toProductKey(text(req.query.key))
   if (!key) return res.status(400).json({ error: 'key required' })
   try {
-    const since = sgDay(Date.now() - 13 * 24 * 3600000)
-    const days = await PriceDay.aggregate([
-      // Real prices only: seeded rows have no source and are left out.
-      { $match: { productKey: key, day: { $gte: since }, source: { $in: ['search', 'product'] } } },
-      { $group: { _id: '$day', price: { $min: '$price' } } },
-      { $sort: { _id: 1 } }
-    ])
-    res.json(days.map(function (d) { return { day: d._id, price: d.price } }))
+    res.json(await trackedDays(key))
   } catch (err) {
     res.status(500).json({ error: 'Failed to load price history' })
   }
@@ -1239,7 +1249,7 @@ app.get('/api/admin/stats', requireUser, requireAdmin, async (req, res) => {
       { $group: {
           _id: '$productKey',
           name: { $first: '$productName' },
-          image: { $first: '$image' },
+          image: { $max: '$image' },
           savers: { $sum: 1 },
           targets: { $sum: { $cond: [{ $gt: ['$targetPrice', null] }, 1, 0] } },
           avgSaved: { $avg: '$savedPrice' },

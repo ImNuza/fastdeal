@@ -12,6 +12,7 @@ import NotificationsView from '../views/NotificationsView.vue'
 import AccountView from '../views/AccountView.vue'
 import SetUsernameView from '../views/SetUsernameView.vue'
 import ProductView from '../views/ProductView.vue'
+import WorthItView from '../views/WorthItView.vue'
 import AdminView from '../views/AdminView.vue'
 import ErrorView from '../views/ErrorView.vue'
 
@@ -23,6 +24,8 @@ const router = createRouter({
     { path: '/search', component: HomeView, meta: { fullBleed: true, heroSearch: true } },
     { path: '/compare', component: CompareView },
     { path: '/product/:productId', component: ProductView },
+    // How the AI "Worth it?" verdict was made: what it read and the exact prompt.
+    { path: '/product/:productId/worth-it', component: WorthItView },
     { path: '/trending', component: TrendingView },
     { path: '/friends', component: FriendsView, meta: { requiresAuth: true } },
     { path: '/notifications', component: NotificationsView, meta: { requiresAuth: true } },

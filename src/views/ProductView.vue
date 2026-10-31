@@ -27,9 +27,13 @@ const worthItLoading = ref(false)
 // Seconds elapsed while the verdict is loading, so the user sees it is still working.
 const worthItElapsed = ref(0)
 let worthItTimer = null
-// Hidden on load: the verdict only shows after the user presses "Show". The fetch
-// still runs on load (below), so revealing it is instant — we gate display, not loading.
-const showWorthIt = ref(false)
+
+// Store icons from SerpApi. A store with no icon, or one that fails to load, shows its first letter.
+const brokenLogos = ref({})
+
+function storeInitial(store) {
+  return String(store || '?').trim().charAt(0).toUpperCase()
+}
 
 // Bootstrap badge/border tone for each decision.
 const WORTH_IT_TONE = {
@@ -58,7 +62,7 @@ onMounted(async function () {
       worthItElapsed.value += 1
     }, 1000)
     try {
-      worthItVerdict.value = await fetchWorthIt(product.value.title, cheapest.value.total)
+      worthItVerdict.value = await fetchWorthIt(product.value.productId, product.value.q || route.query.q)
     } finally {
       worthItLoading.value = false
       clearInterval(worthItTimer)
@@ -119,40 +123,38 @@ const breadcrumbs = computed(function () {
     <SaveSleepButtons :name="product.title" :listing="cheapest ? { store: cheapest.store, price: cheapest.price } : null"
       :product="saveInfo" />
 
-    <!-- Ronald: the AI "Buy now or wait?" verdict goes here. The API also returns
-         typicalPrice, each store's deal check, ratings and userReviews for it. -->
+    <!-- AI "Worth It" verdict: buy now or wait for a big sale. Open on load, right under the price,
+         because it is the main answer on this page. Sits above the Deal check. -->
+    <section v-if="cheapest && (worthItLoading || worthItVerdict)" id="fd-worth-it-panel"
+      class="card p-3 mt-3 mb-4 fd-worth-it"
+      :class="worthItVerdict ? 'border-' + (WORTH_IT_TONE[worthItVerdict.decision] || 'secondary') : ''"
+      aria-labelledby="fd-worth-it-title">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <h2 id="fd-worth-it-title" class="fd-section-title mb-0">Worth it?</h2>
+        <span class="fd-ai-tag">AI</span>
+      </div>
 
-    <!-- AI "Worth It" verdict: buy now or wait for a big sale. Sits above the Deal check.
-         Hidden on load; the button below reveals it. The fetch already ran on load. -->
-    <div v-if="cheapest && (worthItLoading || worthItVerdict)" class="mb-4">
-      <button type="button" class="btn btn-outline-dark"
-        :aria-expanded="showWorthIt ? 'true' : 'false'" aria-controls="fd-worth-it-panel"
-        @click="showWorthIt = !showWorthIt">
-        {{ showWorthIt ? 'Hide the “Worth it?” verdict' : 'Show the “Worth it?” verdict' }}
-      </button>
+      <p v-if="worthItLoading" class="small text-secondary mb-0 d-flex align-items-center gap-2">
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        <span>Asking our AI whether to buy now or wait…</span>
+        <span class="badge text-bg-secondary" aria-live="polite">{{ worthItElapsed }}s elapsed</span>
+      </p>
 
-      <section v-show="showWorthIt" id="fd-worth-it-panel"
-        class="card p-3 mt-3 fd-worth-it"
-        :class="worthItVerdict ? 'border-' + (WORTH_IT_TONE[worthItVerdict.decision] || 'secondary') : ''">
-        <h2 class="fd-section-title mb-2">Worth it?</h2>
-
-        <p v-if="worthItLoading" class="small text-secondary mb-0 d-flex align-items-center gap-2">
-          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-          <span>Asking our AI whether to buy now or wait…</span>
-          <span class="badge text-bg-secondary" aria-live="polite">{{ worthItElapsed }}s elapsed</span>
+      <template v-else-if="worthItVerdict">
+        <p class="mb-1">
+          <span class="badge" :class="'text-bg-' + (WORTH_IT_TONE[worthItVerdict.decision] || 'secondary')">
+            {{ worthItVerdict.headline }}</span>
         </p>
-
-        <template v-else-if="worthItVerdict">
-          <p class="mb-1">
-            <span class="badge" :class="'text-bg-' + (WORTH_IT_TONE[worthItVerdict.decision] || 'secondary')">
-              {{ worthItVerdict.headline }}</span>
-          </p>
-          <p v-if="worthItVerdict.reason" class="mb-0">{{ worthItVerdict.reason }}</p>
-          <p class="small text-secondary mb-0 mt-1">AI guidance for {{ product.title }} at {{ sgd(cheapest.total) }}.
-            Not financial advice.</p>
-        </template>
-      </section>
-    </div>
+        <p v-if="worthItVerdict.reason" class="mb-1">{{ worthItVerdict.reason }}</p>
+        <p v-if="worthItVerdict.summary" class="small text-secondary mb-1">Based on: {{ worthItVerdict.summary }}</p>
+        <p class="small text-secondary mb-2">AI guidance for {{ product.title }} at {{ sgd(cheapest.total) }}.
+          Not financial advice.</p>
+        <router-link v-if="worthItVerdict.inputs"
+          class="btn btn-sm btn-outline-dark align-self-start"
+          :to="{ path: '/product/' + product.productId + '/worth-it', query: { q: product.q || route.query.q, store: route.query.store } }">
+          See what the AI read</router-link>
+      </template>
+    </section>
 
     <section v-if="cheapest" class="card p-3 mb-4">
       <h2 class="fd-section-title mb-2">Deal check</h2>
@@ -182,7 +184,12 @@ const breadcrumbs = computed(function () {
         <tbody>
           <tr v-for="row in product.stores" :key="row.store">
             <td>
-              {{ row.store }}
+              <span class="d-flex align-items-center gap-2">
+                <img v-if="row.logo && !brokenLogos[row.store]" :src="row.logo" alt="" class="fd-store-logo"
+                  @error="brokenLogos[row.store] = true" />
+                <span v-else class="fd-store-logo fd-store-letter" aria-hidden="true">{{ storeInitial(row.store) }}</span>
+                <span>{{ row.store }}</span>
+              </span>
               <span v-if="row.note" class="d-block small text-secondary">{{ row.note }}</span>
               <span v-if="row.moreOffers" class="d-block small text-secondary">
                 +{{ row.moreOffers }} more {{ row.moreOffers === 1 ? 'offer' : 'offers' }} from {{ sgd(row.moreFrom) }}</span>
@@ -244,6 +251,37 @@ const breadcrumbs = computed(function () {
 </template>
 
 <style scoped>
+/* Small square store icon (or first letter) before each store name in All stores. */
+.fd-store-logo {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  border-radius: 0.375rem;
+  background: var(--fd-white);
+  object-fit: contain;
+}
+
+.fd-store-letter {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--fd-vanilla-line);
+  color: var(--fd-blue);
+  font-size: var(--fd-small);
+  font-weight: 700;
+}
+
+/* AI tag beside the Worth it? title, like the Photo search tag on Home. */
+.fd-ai-tag {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--fd-vanilla);
+  color: var(--fd-ink);
+  font-family: var(--fd-font-body);
+  font-size: var(--fd-small);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .fd-product-img {
   display: block;
   width: 100%;

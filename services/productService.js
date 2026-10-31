@@ -5,7 +5,7 @@
 //   3. Not saved, or the token no longer works: find the listing in the saved search
 //      (search again if that expired), then call SerpApi Google Immersive Product (1 credit).
 // The row stays 30 days, so a product link keeps working after the search cache expires.
-import { getJson } from 'serpapi'
+import { serpGet } from './serpapiKeys.js'
 import ProductCache from '../models/product-cache-model.js'
 import SearchCache from '../models/search-cache-model.js'
 import { toProductKey } from '../models/product-key.js'
@@ -44,13 +44,12 @@ async function findListing(productKey, productId, title) {
 // Returns product_results, or null when SerpApi refuses the token.
 async function fetchImmersive(token) {
   try {
-    const json = await getJson({
+    const json = await serpGet({
       engine: 'google_immersive_product',
       page_token: token,
       more_stores: true,
       hl: 'en',
-      gl: 'sg',
-      api_key: process.env.SERPAPI_API_KEY
+      gl: 'sg'
     })
     return json.product_results || null
   } catch (error) {
@@ -63,6 +62,8 @@ function toStore(row) {
   const price = Number(row.extracted_price) || 0
   return {
     store: row.name || 'Unknown',
+    // The store's small icon from Google Shopping. Older cached rows have none.
+    logo: row.logo || '',
     price: price,
     oldPrice: Number(row.extracted_original_price) || null,
     shipping: row.shipping || '',

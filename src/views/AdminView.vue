@@ -4,6 +4,7 @@ import { useAdminStore } from '../store/admin.js'
 import { useAuthStore } from '../store/auth.js'
 import { storeToRefs } from 'pinia'
 import FdIcon from '../components/FdIcon.vue'
+import FdConfirmDialog from '../components/FdConfirmDialog.vue'
 import { sgd } from '../services/format.js'
 
 const adminStore = useAdminStore()
@@ -629,29 +630,24 @@ async function confirmRoleChange() {
   </div>
 
   <!-- Confirm role change pop-up -->
-  <div v-if="pending" class="fd-entry-backdrop" @click.self="closeConfirm" @keydown.esc="closeConfirm">
-    <section class="fd-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-role-title">
-      <h2 id="fd-role-title" class="fd-page-title">{{ pending.newRole === 'admin' ? 'Promote user' : 'Demote user' }}</h2>
-      <p class="fd-entry-description">
-        <template v-if="pending.newRole === 'admin'">
-          Make <strong>{{ pending.user.username || pending.user.email }}</strong> an admin? They'll be able to see this
-          dashboard and change other users' roles.
-        </template>
-        <template v-else>
-          Remove admin access from <strong>{{ pending.user.username || pending.user.email }}</strong>?
-        </template>
-      </p>
-
-      <p v-if="roleError" class="alert alert-danger" role="alert">{{ roleError }}</p>
-
-      <div class="fd-entry-actions">
-        <button class="btn btn-dark" type="button" :disabled="saving" @click="confirmRoleChange">
-          {{ saving ? 'Saving…' : (pending.newRole === 'admin' ? 'Promote' : 'Demote') }}
-        </button>
-        <button class="btn btn-outline-dark" type="button" :disabled="saving" @click="closeConfirm">Cancel</button>
-      </div>
-    </section>
-  </div>
+  <FdConfirmDialog
+    v-if="pending"
+    :title="pending.newRole === 'admin' ? 'Promote user' : 'Demote user'"
+    :confirm-label="pending.newRole === 'admin' ? 'Promote' : 'Demote'"
+    :danger="pending.newRole !== 'admin'"
+    :busy="saving"
+    :error="roleError"
+    @confirm="confirmRoleChange"
+    @cancel="closeConfirm"
+  >
+    <template v-if="pending.newRole === 'admin'">
+      Make <strong>{{ pending.user.username || pending.user.email }}</strong> an admin? They'll be able to see this
+      dashboard and change other users' roles.
+    </template>
+    <template v-else>
+      Remove admin access from <strong>{{ pending.user.username || pending.user.email }}</strong>?
+    </template>
+  </FdConfirmDialog>
 </template>
 
 <style scoped>

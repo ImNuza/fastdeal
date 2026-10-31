@@ -18,4 +18,17 @@ test.describe('Home page trending', () => {
     const weekCards = page.getByRole('link').filter({ has: page.getByRole('heading', { level: 5 }) });
     await expect(weekCards.first()).toBeVisible();
   });
+
+  test('user sees the product initials when a trending product has no photo', async ({ page }) => {
+    // One trending product with no image, as the seeded searches used to have.
+    await page.route('**/api/trending', (route) => route.fulfill({
+      json: { today: [], week: [{ _id: 'sony wh-1000xm5', query: 'Sony WH-1000XM5', image: '', count: 3 }] }
+    }));
+    await page.goto('/');
+
+    const card = page.getByRole('link').filter({ has: page.getByRole('heading', { level: 5, name: 'Sony WH-1000XM5' }) });
+    await expect(card).toBeVisible();
+    await expect(card.getByText('SW', { exact: true })).toBeVisible();
+    await expect(card.getByRole('img')).toHaveCount(0);
+  });
 });

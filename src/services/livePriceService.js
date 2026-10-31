@@ -1,3 +1,4 @@
+import { fetchProduct } from './productApi.js'
 
 const excludedWords = /\b(case only|phone case|cover only|ear pads?|earpads|replacement|spare parts?|screen protector|charging cable|cable only|accessory)\b/i
 
@@ -34,7 +35,41 @@ function isComparable(productName, listing) {
   )
 }
 
-export async function fetchCheapestLiveListing(productName) {
+// A product saved from its product page has a Google Shopping productId. Its live price is the
+// cheapest store on that same product (GET /api/product/:id, cached on the server for 24 hours),
+// so a long product title never needs to match a new search word for word.
+async function cheapestStoreOf(saved) {
+  const product = await fetchProduct(saved.productId, saved.q || saved.name)
+  const stores = (product.stores || []).filter(store => Number(store.price) > 0)
+
+  if (!stores.length) {
+    throw new Error('No store price found for this product')
+  }
+
+  const cheapest = stores.reduce((lowest, store) =>
+    Number(store.price) < Number(lowest.price) ? store : lowest
+  )
+
+  return {
+    name: product.title,
+    store: cheapest.store,
+    link: cheapest.link,
+    price: Number(cheapest.price),
+    fetchedAt: product.fetchedAt
+  }
+}
+
+// saved: the wishlist item, when there is one. With a productId it uses the product's own stores.
+// Without one (older items), or when that fails, it searches by name as before.
+export async function fetchCheapestLiveListing(productName, saved) {
+  if (saved && saved.productId) {
+    try {
+      return await cheapestStoreOf(saved)
+    } catch (error) {
+      // Fall back to the search below.
+    }
+  }
+
   const response = await fetch(
     '/api/search?q=' + encodeURIComponent(productName)
   )

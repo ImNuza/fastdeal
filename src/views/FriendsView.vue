@@ -15,6 +15,7 @@ import {
 } from '../services/friendsApi.js'
 import FdIcon from '../components/FdIcon.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
+import FdConfirmDialog from '../components/FdConfirmDialog.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -68,7 +69,8 @@ const searchResults = computed(() =>
 const loadingFriends = ref(false)
 const actionLoading = ref({}) // pairKey -> true while in flight
 const errorText = ref('') // shown at the top of the tab panel when an action fails
-const confirmKey = ref('') // pairKey of the friend whose Remove is waiting for a Yes
+const confirmFriend = ref(null) // the friend whose Remove waits for a Yes in the pop-up
+const removeError = ref('') // shown inside the pop-up when the remove fails
 
 const myUid = computed(() => firebaseUser.value?.uid)
 
@@ -365,19 +367,24 @@ async function onDecline(req) {
 
 // DELETE /api/friends/:pairKey — same endpoint, but used on an existing friend to unfriend.
 async function onRemove(friend) {
-  confirmKey.value = ''
   actionLoading.value[friend.pairKey] = true
-  errorText.value = ''
+  removeError.value = ''
   try {
     await declineOrRemove(friend.pairKey)
     friends.value = friends.value.filter(f => f.pairKey !== friend.pairKey)
     const hit = allSearchResults.value.find(r => r.pairKey === friend.pairKey)
     if (hit) { hit.friendshipStatus = null; hit.iRequested = null }
+    confirmFriend.value = null
   } catch (err) {
-    errorText.value = 'Could not remove the friend. Try again.'
+    removeError.value = 'Could not remove the friend. Try again.'
   } finally {
     actionLoading.value[friend.pairKey] = false
   }
+}
+
+function askRemove(friend) {
+  removeError.value = ''
+  confirmFriend.value = friend
 }
 
 function initials(f) {
@@ -458,30 +465,13 @@ function initials(f) {
                     <div class="friend-username">{{ f.username || '(no username)' }}</div>
                     <div class="friend-email">{{ f.email }}</div>
                   </div>
-                  <div v-if="confirmKey === f.pairKey" class="friend-actions">
-                    <span class="friend-username">Remove {{ f.username || f.email }}?</span>
-                    <button
-                      class="btn btn-danger btn-sm"
-                      type="button"
-                      :disabled="actionLoading[f.pairKey]"
-                      :aria-label="'Yes, remove ' + (f.username || f.email)"
-                      @click="onRemove(f)"
-                    >Yes, remove</button>
-                    <button
-                      class="btn btn-outline-dark btn-sm"
-                      type="button"
-                      :aria-label="'Keep ' + (f.username || f.email)"
-                      @click="confirmKey = ''"
-                    >Cancel</button>
-                  </div>
                   <button
-                    v-else
                     class="btn btn-sm btn-outline-danger fd-icon-btn flex-shrink-0"
                     type="button"
                     :disabled="actionLoading[f.pairKey]"
                     :aria-label="'Remove ' + (f.username || f.email) + ' as a friend'"
                     title="Remove friend"
-                    @click="confirmKey = f.pairKey"
+                    @click="askRemove(f)"
                   >
                     <FdIcon name="trash" />
                   </button>
@@ -612,6 +602,20 @@ function initials(f) {
       <p v-if="barText" class="friend-bar-count" aria-live="polite">{{ barText }}</p>
     </div>
   </div>
+
+  <FdConfirmDialog
+    v-if="confirmFriend"
+    title="Remove friend"
+    confirm-label="Remove"
+    danger
+    :busy="actionLoading[confirmFriend.pairKey]"
+    :error="removeError"
+    @confirm="onRemove(confirmFriend)"
+    @cancel="confirmFriend = null"
+  >
+    Remove <strong>{{ confirmFriend.username || confirmFriend.email }}</strong> from your friends?
+    You can send a new request later.
+  </FdConfirmDialog>
 </template>
 
 <style scoped>

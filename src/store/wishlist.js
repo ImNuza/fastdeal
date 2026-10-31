@@ -263,15 +263,15 @@ export const useWishlistStore = defineStore('wishlist', () => {
     liveErrors.value[name] = ''
 
     try {
-      const listing = await fetchCheapestLiveListing(name)
-
-      // Display the best price in Wishlist.
-      livePrices.value[name] = listing
-
       // Find the saved product in MongoDB-backed wishlist state.
       const saved = user.value?.wishlist?.find(
         item => item.name === name
       )
+
+      const listing = await fetchCheapestLiveListing(name, saved)
+
+      // Display the best price in Wishlist.
+      livePrices.value[name] = listing
 
       // Only ask the backend to check when the displayed price
       // meets the user's target threshold.
@@ -431,7 +431,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
     try {
       // Get the cheapest comparable price from SerpApi
-      const listing = await fetchCheapestLiveListing(item.name)
+      const listing = await fetchCheapestLiveListing(item.name, item)
 
       // Ignore outdated responses if the dialog has changed
       if (requestId !== verdictRequestId) return
