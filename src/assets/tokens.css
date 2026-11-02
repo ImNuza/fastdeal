@@ -58,6 +58,11 @@
   --fd-radius: 1rem;
   --fd-border: 2px;
 
+  /* Padding: one inside padding for every card and panel, and one for list rows (like the
+     Wishlist's), so every page has the same breathing room. Pop-ups keep their own, larger one. */
+  --fd-card-pad: 1.25rem;
+  --fd-row-pad: 0.75rem 1.25rem;
+
   /* The one soft shadow, for the search bar and its dropdown so they pop */
   --fd-shadow: 0 0.75rem 2rem rgb(0 0 0 / 0.15);
 

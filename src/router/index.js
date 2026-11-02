@@ -12,7 +12,6 @@ import NotificationsView from '../views/NotificationsView.vue'
 import AccountView from '../views/AccountView.vue'
 import SetUsernameView from '../views/SetUsernameView.vue'
 import ProductView from '../views/ProductView.vue'
-import WorthItView from '../views/WorthItView.vue'
 import AdminView from '../views/AdminView.vue'
 import ErrorView from '../views/ErrorView.vue'
 
@@ -24,8 +23,6 @@ const router = createRouter({
     { path: '/search', component: HomeView, meta: { fullBleed: true, heroSearch: true } },
     { path: '/compare', component: CompareView },
     { path: '/product/:productId', component: ProductView },
-    // How the AI "Worth it?" verdict was made: what it read and the exact prompt.
-    { path: '/product/:productId/worth-it', component: WorthItView },
     { path: '/trending', component: TrendingView },
     { path: '/friends', component: FriendsView, meta: { requiresAuth: true } },
     { path: '/notifications', component: NotificationsView, meta: { requiresAuth: true } },
@@ -41,6 +38,12 @@ const router = createRouter({
   ],
   // A new page opens at the top. Back and forward return to where you were.
   scrollBehavior(to, from, savedPosition) {
+    // A "#section" link on the same page scrolls to that section instead of the top.
+    // The section's scroll-margin-top keeps it clear of the sticky navbar.
+    if (to.hash && to.path === from.path) {
+      const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      return { el: to.hash, behavior: still ? 'auto' : 'smooth' }
+    }
     return savedPosition || { top: 0 }
   }
 })

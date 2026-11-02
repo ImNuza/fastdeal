@@ -77,9 +77,9 @@ async function saveProduct(page) {
 
   const saved = page.waitForResponse((response) =>
     new URL(response.url()).pathname === '/api/wishlist' && response.request().method() === 'POST');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('button', { name: 'Save to wishlist', exact: true }).click();
   await saved;
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved to wishlist', exact: true })).toBeVisible();
 }
 
 test.describe('Wishlist', () => {

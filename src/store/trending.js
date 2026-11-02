@@ -5,6 +5,8 @@ import axios from 'axios'
 // What people searched on FastDeal, from /api/trending: { query, image, count } per product.
 export const useTrendingStore = defineStore('trending', () => {
   const today = ref([])
+  // 'yesterday' while today has fewer than 4 products and the server sent yesterday's list instead.
+  const todayFrom = ref('today')
   const week = ref([])
   const loaded = ref(false)
   const error = ref('')
@@ -25,6 +27,7 @@ export const useTrendingStore = defineStore('trending', () => {
     try {
       const res = await axios.get('/api/trending')
       today.value = res.data.today
+      todayFrom.value = res.data.todayFrom || 'today'
       week.value = res.data.week
       loaded.value = true
     } catch (err) {
@@ -41,5 +44,5 @@ export const useTrendingStore = defineStore('trending', () => {
     return pending
   }
 
-  return { today, week, loaded, error, topToday, weekExtras, fetchTrending, ensureTrending }
+  return { today, todayFrom, week, loaded, error, topToday, weekExtras, fetchTrending, ensureTrending }
 })

@@ -187,11 +187,11 @@ onMounted(async function () {
     <FdBreadcrumbs :items="[{ label: 'FastDeal', to: '/' }, { label: itemName(route.query.q) }]" />
     <p v-if="route.query.from === 'photo'" class="small text-secondary mb-1">Identified from your photo</p>
     <h1 class="fd-page-title">{{ result.name }}</h1>
-    <p class="fd-page-subtitle">{{ result.listings.length }} listings. Cheapest now is {{ sgd(cheapest) }}.</p>
+    <p class="fd-page-subtitle">Cheapest now is {{ sgd(cheapest) }}.</p>
 
     <p v-if="note" class="small mb-3" role="status">{{ note }}</p>
 
-    <div class="card p-3 mb-3">
+    <div class="card fd-card-pad mb-3">
       <div class="row g-2">
         <div class="col-6 col-md-2">
           <label class="form-label small" for="min">Min price</label>
@@ -239,55 +239,64 @@ onMounted(async function () {
 
     <p v-if="!rows.length" class="alert alert-warning">No listings match these filters.</p>
 
-    <ul v-else class="fd-card-grid" role="list">
-      <li v-for="row in rows" :key="rowKey(row)">
-        <article class="fd-listing-card" :class="{ cheapest: row.price === lowInView }">
-          <div class="fd-listing-media">
-            <img
-              v-if="hasImage(row)"
-              :src="row.image"
-              :alt="row.name || result.name"
-              class="fd-listing-img"
-              loading="lazy"
-              @error="onImgError(row)"
-            />
-            <div v-else class="fd-listing-ph" aria-hidden="true">{{ storeInitial(row) }}</div>
-            <span v-if="row.price === lowInView" class="badge text-bg-success fd-listing-badge">
-              Cheapest
-            </span>
-            <span v-if="savedFrom(rowName(row), row.productId) === row.store" class="badge text-bg-dark fd-listing-saved">
-              Saved
-            </span>
-          </div>
+    <div v-else class="fd-listings">
+      <ul class="fd-card-grid" role="list">
+        <li v-for="row in rows" :key="rowKey(row)">
+          <article class="fd-listing-card" :class="{ cheapest: row.price === lowInView }">
+            <div class="fd-listing-media">
+              <img
+                v-if="hasImage(row)"
+                :src="row.image"
+                :alt="row.name || result.name"
+                class="fd-listing-img"
+                loading="lazy"
+                @error="onImgError(row)"
+              />
+              <div v-else class="fd-listing-ph" aria-hidden="true">{{ storeInitial(row) }}</div>
+              <span v-if="row.price === lowInView" class="badge text-bg-success fd-listing-badge">
+                Cheapest
+              </span>
+              <span v-if="savedFrom(rowName(row), row.productId) === row.store" class="badge text-bg-dark fd-listing-saved">
+                Saved
+              </span>
+            </div>
+  
+            <div class="fd-listing-body">
+              <h3 class="fd-listing-name" :title="row.name || result.name">
+                <!-- stretched-link makes the whole card open the product page -->
+                <router-link v-if="row.productId" class="fd-listing-link stretched-link"
+                  :to="{ path: '/product/' + row.productId, query: { q: route.query.q, store: row.store } }">{{ row.name || result.name }}</router-link>
+                <template v-else>{{ row.name || result.name }}</template>
+              </h3>
+              <p class="fd-listing-price">
+                {{ sgd(row.price) }}
+                <span v-if="row.price === lowInView" class="visually-hidden">(cheapest listing)</span>
+              </p>
+              <p class="fd-listing-store">{{ row.store }}</p>
+              <p class="fd-listing-meta">
+                <span :aria-label="'Rating ' + row.rating.toFixed(1) + ' out of 5'">★ {{ row.rating.toFixed(1) }}</span>
+                <span aria-hidden="true"> · </span>
+                <span>{{ row.reviews }} reviews</span>
+              </p>
+            </div>
+  
+            <button
+              class="btn btn-sm btn-outline-dark fd-listing-save"
+              type="button"
+              :disabled="savedFrom(rowName(row), row.productId) === row.store"
+              @click="onSaveFrom(row)"
+            >{{ savedFrom(rowName(row), row.productId) === row.store ? 'Saved' : isSaved(rowName(row), row.productId) ? 'Save from here instead' : 'Save from here' }}</button>
+          </article>
+        </li>
+      </ul>
 
-          <div class="fd-listing-body">
-            <h3 class="fd-listing-name" :title="row.name || result.name">
-              <!-- stretched-link makes the whole card open the product page -->
-              <router-link v-if="row.productId" class="fd-listing-link stretched-link"
-                :to="{ path: '/product/' + row.productId, query: { q: route.query.q, store: row.store } }">{{ row.name || result.name }}</router-link>
-              <template v-else>{{ row.name || result.name }}</template>
-            </h3>
-            <p class="fd-listing-price">
-              {{ sgd(row.price) }}
-              <span v-if="row.price === lowInView" class="visually-hidden">(cheapest listing)</span>
-            </p>
-            <p class="fd-listing-store">{{ row.store }}</p>
-            <p class="fd-listing-meta">
-              <span :aria-label="'Rating ' + row.rating.toFixed(1) + ' out of 5'">★ {{ row.rating.toFixed(1) }}</span>
-              <span aria-hidden="true"> · </span>
-              <span>{{ row.reviews }} reviews</span>
-            </p>
-          </div>
-
-          <button
-            class="btn btn-sm btn-outline-dark fd-listing-save"
-            type="button"
-            :disabled="savedFrom(rowName(row), row.productId) === row.store"
-            @click="onSaveFrom(row)"
-          >{{ savedFrom(rowName(row), row.productId) === row.store ? 'Saved' : isSaved(rowName(row), row.productId) ? 'Save from here instead' : 'Save from here' }}</button>
-        </article>
-      </li>
-    </ul>
+      <!-- Sticks to the bottom of the screen while the listings scroll past, like the Wishlist's total bar. -->
+      <div class="fd-listings-bar">
+        <p class="fd-listings-count" aria-live="polite">
+          {{ rows.length === result.listings.length ? rows.length + ' listings' : rows.length + ' of ' + result.listings.length + ' listings' }}
+        </p>
+      </div>
+    </div>
 
     <section v-if="searchedWith.length" class="mb-4 mt-4">
       <h2 class="fd-section-title">Customers who viewed this also viewed:</h2>
@@ -310,6 +319,30 @@ onMounted(async function () {
 </template>
 
 <style scoped>
+/* Sticks to the bottom of the screen while scrolling through the listings and settles under
+   the last card, like the Wishlist's total bar. */
+.fd-listings-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  /* Same height as the Wishlist's bar, which holds a full-size button. */
+  min-height: calc(var(--fd-control) + 1.5rem + var(--fd-border));
+  margin-bottom: 1.5rem;
+  padding: 0.75rem 0;
+  border-top: var(--fd-border) solid var(--fd-vanilla-line);
+  background: var(--fd-beige);
+}
+
+/* Same type as the Wishlist's total: small, muted. */
+.fd-listings-count {
+  margin: 0;
+  color: var(--fd-text-muted);
+  font-size: var(--fd-small);
+}
+
 /* Listings as a responsive card grid: 4 per row on wide screens, down to 1 on phones. */
 .fd-card-grid {
   display: grid;
@@ -343,11 +376,12 @@ onMounted(async function () {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 0.75rem;
+  padding: var(--fd-card-pad);
   border: var(--fd-border, 1px) solid var(--fd-vanilla-line, #e4ddcf);
   border-radius: 1rem;
   background: var(--fd-paper, #fff);
   color: var(--fd-text, #1a1a1a);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 /* The cheapest listing is highlighted, mirroring the old table row. */
@@ -355,6 +389,18 @@ onMounted(async function () {
   border-color: var(--fd-green, #2f6b47);
   box-shadow: 0 0 0 2px var(--fd-green, #2f6b47);
 }
+
+/* Hovering (or tabbing to) a card highlights it with a blue outline. It never grows. */
+.fd-listing-card:hover,
+.fd-listing-card:has(.fd-listing-link:focus-visible) {
+  border-color: var(--fd-blue);
+}
+
+.fd-listing-card.cheapest:hover,
+.fd-listing-card.cheapest:has(.fd-listing-link:focus-visible) {
+  box-shadow: 0 0 0 2px var(--fd-blue);
+}
+
 
 .fd-listing-media {
   position: relative;
@@ -406,8 +452,8 @@ onMounted(async function () {
 
 .fd-listing-name {
   margin: 0 0 0.25rem;
-  font-size: var(--fd-body, 1rem);
-  font-weight: 600;
+  font-size: var(--fd-body);
+  font-weight: 700;
   line-height: 1.3;
   /* Clamp long titles to two lines so cards stay even height. */
   display: -webkit-box;
@@ -449,7 +495,6 @@ onMounted(async function () {
   text-decoration: none;
 }
 
-.fd-listing-link:hover,
 .fd-listing-link:focus-visible {
   text-decoration: underline;
 }

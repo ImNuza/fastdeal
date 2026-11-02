@@ -628,7 +628,7 @@ onMounted(load)
   flex-direction: column;
   margin-bottom: 1.5rem;
   margin-top: calc(var(--fd-border) * -1);
-  padding: 1.25rem;
+  padding: var(--fd-card-pad);
   border: var(--fd-border) solid var(--notif-line);
   border-radius: var(--fd-radius);
   background: var(--fd-paper);

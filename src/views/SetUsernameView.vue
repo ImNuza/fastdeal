@@ -88,7 +88,7 @@ async function onUseDifferentAccount() {
       <h1 class="fd-page-title">Pick a username</h1>
       <p class="fd-page-subtitle">Your username is how friends find you. You can change your Telegram username later in Account.</p>
 
-      <div class="card p-4">
+      <div class="card fd-card-pad">
         <p v-if="errorText" class="alert alert-danger mb-3">{{ errorText }}</p>
 
         <form @submit.prevent="onSubmit">

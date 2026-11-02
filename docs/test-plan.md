@@ -166,7 +166,7 @@ The seed now uses real data only (`data/demo-products.json` and the team account
 | 20 | `compare.spec.js` | none | Removed 31 Oct (batch 6). No price history: one line, no chart (`/api/price-history` mocked). |
 | 21 | `compare.spec.js` | none | Removed 31 Oct (batch 6). 3 days of history: the chart and the verdict sit above the filters. |
 | 22 | `product.spec.js` | none | The AI "Worth it?" verdict shows without a click, with its "Based on" line. |
-| 23 | `product.spec.js` | none | "See what the AI read" opens `/product/:id/worth-it`: the inputs table, Sent and Not sent, and the prompt. |
+| 23 | `product.spec.js` | none | "See how the AI decided" opens a pop-up with the decision steps and their numbers (no price history), and Got it closes it. |
 | 24 | `home.spec.js` | none | A trending product with no photo shows its initials. |
 | 25 | `notifications.spec.js` | `@admin` | A Buy together invite from someone who is no longer a friend says the invite expired, with no Telegram link (`/api/users/profile/*` mocked as 403). |
 | 26 | `product.spec.js` | none | When the AI did not answer, the verdict card says it is an estimate from fixed rules. |

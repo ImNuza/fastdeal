@@ -147,6 +147,9 @@ defineExpose({ toTop })
 }
 
 .fd-scroll-area-list {
+  /* Positioned, so absolutely positioned things inside (such as Bootstrap's visually-hidden
+     screen reader text) scroll and clip with the list instead of stretching the page below it. */
+  position: relative;
   flex: 1;
   min-width: 0;
   overflow-y: auto;

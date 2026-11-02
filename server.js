@@ -569,9 +569,10 @@ app.get('/api/worth-it', async (req, res) => {
 })
 
 //helper function to retrieve trending page
-async function topSince(since) {
+// Searches from since up to until (default: now).
+async function topSince(since, until) {
   return SearchLog.aggregate([
-    { $match: { searchedAt: { $gte: since } } },
+    { $match: { searchedAt: until ? { $gte: since, $lt: until } : { $gte: since } } },
     { $sort: { searchedAt: -1 } },
     // Group by the product name the shopping API returned, not the words typed, so
     // "pooh" and "winnie the pooh" (both "Winnie the Pooh") count as one product.
@@ -699,6 +700,9 @@ app.get('/api/home-stats', async (req, res) => {
   }
 })
 
+// Trending Today shows yesterday's list until today has at least this many products.
+const TRENDING_TODAY_MIN = 4
+
 //retrieve data for trending page
 app.get('/api/trending' , async (req,res) =>{
   try {
@@ -708,8 +712,24 @@ app.get('/api/trending' , async (req,res) =>{
     const weekAgo = new Date()
     weekAgo.setDate(weekAgo.getDate() - 7)
 
+    // Early in the day only a few products have been searched, so Home's Trending Today belt would
+    // roll one or two cards. Until today has TRENDING_TODAY_MIN products, show yesterday's instead
+    // (when yesterday has more), and say so with todayFrom.
+    let today = await topSince(startOfToday)
+    let todayFrom = 'today'
+    if (today.length < TRENDING_TODAY_MIN) {
+      const startOfYesterday = new Date(startOfToday)
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1)
+      const yesterday = await topSince(startOfYesterday, startOfToday)
+      if (yesterday.length > today.length) {
+        today = yesterday
+        todayFrom = 'yesterday'
+      }
+    }
+
     res.json({
-      today: await topSince(startOfToday),
+      today: today,
+      todayFrom: todayFrom,
       week: await topSince(weekAgo)
     })
   }catch (error){

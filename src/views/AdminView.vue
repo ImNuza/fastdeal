@@ -755,7 +755,7 @@ async function confirmRoleChange() {
 =================================== */
 
 .fd-chart-card {
-  padding: 1.25rem;
+  padding: var(--fd-card-pad);
 }
 
 .fd-chart-head {
@@ -998,7 +998,6 @@ async function confirmRoleChange() {
   border: 3px solid var(--fd-beige);
   border-radius: 50%;
   background: var(--fd-white);
-  transition: transform 0.15s ease;
 }
 
 .fd-stage-slot.is-1 .fd-stage-image {
@@ -1064,12 +1063,7 @@ async function confirmRoleChange() {
   height: 3rem;
 }
 
-/* Hover: the photo lifts and the block brightens */
-.fd-stage-link:hover .fd-stage-image,
-.fd-stage-link:focus-visible .fd-stage-image {
-  transform: translateY(-4px);
-}
-
+/* Hover: the block brightens. Nothing moves or grows. */
 .fd-stage-link:hover .fd-stage-block,
 .fd-stage-link:focus-visible .fd-stage-block {
   background: rgb(244 237 227 / 38%);
@@ -1110,13 +1104,13 @@ async function confirmRoleChange() {
   box-shadow: 0 0.5rem 1.25rem rgb(0 0 0 / 18%);
   color: var(--fd-text);
   text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: box-shadow 0.15s ease;
 }
 
+/* Hover highlights the row with a blue outline, keeping its shadow. It never moves. */
 .fd-board-row:hover,
 .fd-board-row:focus-visible {
-  box-shadow: 0 0.75rem 1.5rem rgb(0 0 0 / 24%);
-  transform: translateY(-3px);
+  box-shadow: 0 0 0 var(--fd-border) var(--fd-blue), 0 0.5rem 1.25rem rgb(0 0 0 / 18%);
 }
 
 .fd-board-row:focus-visible {
@@ -1284,7 +1278,7 @@ async function confirmRoleChange() {
 .fd-role-panel {
   position: relative;
   margin-top: calc(var(--fd-border) * -1);
-  padding: 1.25rem;
+  padding: var(--fd-card-pad);
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: var(--fd-radius);
   background: var(--fd-paper);

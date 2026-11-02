@@ -102,19 +102,24 @@ function onSleep() {
 </script>
 
 <template>
-  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-    <template v-if="saved">
-      <button class="btn btn-dark" type="button" disabled>Saved</button>
+  <!-- Top-aligned, so the buttons stay level when Remove sits under Saved to wishlist. -->
+  <div class="d-flex flex-wrap align-items-start gap-2">
+    <!-- Saved: the button with Remove centred underneath it. -->
+    <div v-if="saved" class="d-flex flex-column align-items-center">
+      <button class="btn btn-dark" type="button" disabled>Saved to wishlist</button>
       <!-- No Remove while on hold, or removing and saving again would skip the hold. -->
       <button v-if="!asleep" class="btn btn-link btn-sm px-1" type="button"
         :aria-label="'Remove ' + name + ' from wishlist'" @click="onRemove">Remove</button>
-    </template>
-    <button v-else class="btn btn-dark" type="button" :disabled="!listing" @click="onSave">Save</button>
+    </div>
+    <button v-else class="btn btn-dark" type="button" :disabled="!listing" @click="onSave">Save to wishlist</button>
 
     <button v-if="asleep" class="btn btn-outline-dark" type="button" disabled>On hold, {{ leftText }}</button>
     <button v-else class="btn btn-outline-dark" type="button" :disabled="!listing" @click="onSleep">Sleep on it</button>
 
-    <span v-if="note" class="small" role="status">{{ note }}</span>
-    <span v-if="!user" class="small text-secondary">Log in to save or hold this product.</span>
+    <!-- Any extra buttons from the page, such as Go to store, sit after Sleep on it and before the notes. -->
+    <slot />
+
+    <span v-if="note" class="small align-self-center" role="status">{{ note }}</span>
+    <span v-if="!user" class="small text-secondary align-self-center">Log in to save or hold this product.</span>
   </div>
 </template>

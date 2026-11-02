@@ -154,7 +154,7 @@ async function onResetSubmit() {
       <h1 class="fd-page-title">Log in</h1>
       <p class="fd-page-subtitle">Log in to see your wishlist, your price alerts, and your friends.</p>
 
-      <div class="card p-4">
+      <div class="card fd-card-pad">
         <p v-if="errorText" class="alert alert-danger mb-3">{{ errorText }}</p>
 
         <!-- Username or Email + Password -->
