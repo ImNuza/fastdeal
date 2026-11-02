@@ -23,8 +23,9 @@ const compareStore = useCompareStore()
 const { result, loading, failed, cheapest } = storeToRefs(compareStore)
 const { loadResult, showFailed } = compareStore
 
-const minPrice = ref(0)
-const maxPrice = ref(0)
+// The price boxes start empty; an empty box does not filter.
+const minPrice = ref('')
+const maxPrice = ref('')
 const storeName = ref('All')
 const minRating = ref(0)
 const freeOnly = ref(false)
@@ -80,7 +81,10 @@ const rows = computed(function () {
   const next = []
   for (let i = 0; i < result.value.listings.length; i++) {
     const row = result.value.listings[i]
-    if (row.price < Number(minPrice.value) || row.price > Number(maxPrice.value)) {
+    if (minPrice.value !== '' && row.price < Number(minPrice.value)) {
+      continue
+    }
+    if (maxPrice.value !== '' && row.price > Number(maxPrice.value)) {
       continue
     }
     if (storeName.value !== 'All' && row.store !== storeName.value) {
@@ -141,27 +145,6 @@ function onSaveFrom(row) {
   note.value = 'Saved ' + rowName(row) + ' from ' + row.store + '.'
 }
 
-// Seed the price-range filter from whatever listings ended up on the result.
-function seedPriceRange(listings) {
-  if (!listings.length) {
-    minPrice.value = 0
-    maxPrice.value = 0
-    return
-  }
-  let low = listings[0].price
-  let high = listings[0].price
-  for (let i = 1; i < listings.length; i++) {
-    if (listings[i].price < low) {
-      low = listings[i].price
-    }
-    if (listings[i].price > high) {
-      high = listings[i].price
-    }
-  }
-  minPrice.value = low
-  maxPrice.value = high
-}
-
 onMounted(async function () {
   const q = String(route.query.q || '').trim()
   if (!q || q.toLowerCase() === 'fail') {
@@ -169,9 +152,6 @@ onMounted(async function () {
     return
   }
   await loadResult(q)
-  if (result.value) {
-    seedPriceRange(result.value.listings)
-  }
   searchedWith.value = await fetchSearchedWith(q,sessionId())
 })
 </script>
@@ -195,11 +175,11 @@ onMounted(async function () {
       <div class="row g-2">
         <div class="col-6 col-md-2">
           <label class="form-label small" for="min">Min price</label>
-          <input id="min" v-model.number="minPrice" class="form-control form-control-sm" type="number" />
+          <input id="min" v-model.number="minPrice" class="form-control form-control-sm" type="number" min="0" placeholder="Any" />
         </div>
         <div class="col-6 col-md-2">
           <label class="form-label small" for="max">Max price</label>
-          <input id="max" v-model.number="maxPrice" class="form-control form-control-sm" type="number" />
+          <input id="max" v-model.number="maxPrice" class="form-control form-control-sm" type="number" min="0" placeholder="Any" />
         </div>
         <div class="col-6 col-md-2">
           <label class="form-label small" for="store">Store</label>

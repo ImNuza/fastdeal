@@ -594,7 +594,8 @@ async function topSince(since, until) {
 //   drops:     the biggest real price drops on wishlists right now (latest checked price below
 //              the saved price), one per product, as a percentage. Only 3% to 50%: a bigger
 //              "drop" almost always means the check found a different, cheaper listing, and
-//              under 3% is noise, so neither is shown to shoppers.
+//              under 3% is noise, so neither is shown to shoppers. The top 3 only.
+//   moreDrops: how many more products dropped beyond those 3
 //   comparing: this week's biggest saving: the product and day with at least 3 real store prices
 //              and the biggest cheapest-to-priciest gap, as its cheapest, median, and priciest store
 //   nextSale:  the next big double-day sale from data/sale-calendar.js, and the stores that join it
@@ -643,7 +644,8 @@ app.get('/api/home-stats', async (req, res) => {
         best[key] = { name: name, percent: percent, saved: item.savedPrice, now: item.latestPrice, store: item.latestStore }
       }
     }
-    const drops = Object.values(best).sort(function (a, b) { return b.percent - a.percent }).slice(0, 4)
+    const allDrops = Object.values(best).sort(function (a, b) { return b.percent - a.percent })
+    const drops = allDrops.slice(0, 3)
 
     // Comparing pays: per product and day, cheapest vs priciest store, real prices only.
     const since = sgDay(Date.now() - 6 * 24 * 3600000)
@@ -691,6 +693,7 @@ app.get('/api/home-stats', async (req, res) => {
 
     res.json({
       drops: drops,
+      moreDrops: allDrops.length - drops.length,
       comparing: comparing,
       nextSale: nextBigSale(),
       mostSaved: mostSaved.map(function (m) { return { name: m._id, count: m.count } })

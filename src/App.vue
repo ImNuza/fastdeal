@@ -156,6 +156,12 @@ watch([() => route.path, user], maybeShowEntryDialog)
 </script>
 
 <style scoped>
+.nav-account-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
 .nav-username {
   color: var(--fd-beige);
   font-family: var(--fd-font-body);
@@ -167,6 +173,22 @@ watch([() => route.path, user], maybeShowEntryDialog)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Phone menu: the username small under "Account", the same size as the footer's small print. */
+@media (max-width: 991.98px) {
+  .nav-account-text {
+    gap: 0.25rem;
+  }
+
+  .nav-username {
+    max-width: none;
+  }
+
+  /* On the Account page the username turns yellow with the rest of the link. */
+  .active .nav-username {
+    color: var(--fd-vanilla);
+  }
 }
 </style>
 
@@ -216,8 +238,12 @@ watch([() => route.path, user], maybeShowEntryDialog)
           <li v-else class="nav-item">
             <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/account') }" active-class="" exact-active-class="" to="/account">
               <FdIcon name="account" />
-              <span v-if="username" class="nav-username">{{ username }}</span>
-              <span class="fd-icon-label">Account</span>
+              <!-- Phone menu: "Account", then the username small under it. Desktop: the username
+                   beside the icon, with "Account" as the hover tooltip. -->
+              <span class="nav-account-text">
+                <span class="fd-icon-label">Account</span>
+                <span v-if="username" class="nav-username">{{ username }}</span>
+              </span>
             </router-link>
           </li>
         </ul>
