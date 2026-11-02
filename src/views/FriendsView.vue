@@ -743,7 +743,7 @@ function initials(f) {
 .friend-tabpanel {
   position: relative;
   margin-top: calc(var(--fd-border) * -1);
-  padding: 1.25rem;
+  padding: var(--fd-card-pad);
   border: var(--fd-border) solid var(--friends-line);
   border-radius: var(--fd-radius);
   /* Fills the screen down to the total bar: the search on top, the scrolling list under it */

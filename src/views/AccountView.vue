@@ -132,7 +132,7 @@ async function saveTelegram() {
 
     <section class="mt-5">
       <h2 class="fd-section-title">Settings</h2>
-      <div class="card p-3">
+      <div class="card fd-card-pad">
         <div class="form-check form-switch mb-0">
           <input id="emailOn" class="form-check-input" type="checkbox" :checked="user.emailOn" @change="toggleEmail" />
           <label class="form-check-label" for="emailOn">Email me when a saved item reaches my target price</label>
@@ -147,7 +147,7 @@ async function saveTelegram() {
 
 <style scoped>
 .fd-account-card {
-  padding: 1.25rem;
+  padding: var(--fd-card-pad);
 }
 
 .fd-account-head {

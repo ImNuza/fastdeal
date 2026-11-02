@@ -571,19 +571,41 @@ tr.cheapest td {
 
 /* cards */
 
+/* The standard card padding, for Bootstrap cards that used p-3 or p-4. */
+.fd-card-pad {
+  padding: var(--fd-card-pad);
+}
+
 .fd-item-link {
+  display: block;
+  height: 100%;
+  border-radius: 1rem;
   text-decoration: none;
 }
 
 .fd-item {
-  padding: 0.75rem;
+  padding: var(--fd-card-pad);
   border-radius: 1rem;
+  transition: border-color 0.2s ease;
 }
+
+/* Hovering (or tabbing to) a card highlights it with a blue outline, like the Trending This Week
+   cards on the home page. It never grows. */
+.fd-item-link:hover .fd-item,
+.fd-item-link:focus-visible .fd-item {
+  border-color: var(--fd-blue);
+}
+
+.fd-item-link:focus-visible {
+  outline: 3px solid var(--fd-vanilla);
+  outline-offset: 3px;
+}
+
 
 .fd-item-title {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: var(--fd-body);
+  font-weight: 700;
   line-height: 1.3;
 }
 

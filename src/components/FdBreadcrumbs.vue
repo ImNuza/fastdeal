@@ -25,10 +25,14 @@ defineProps({
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  margin: 0 0 1rem;
+  margin: 0 0 2.5rem;
   padding: 0;
   list-style: none;
-  font-size: var(--fd-body);
+  /* Table header type, like the Friends tabs: small bold capitals. */
+  font-size: var(--fd-table-header);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* A slash between items, drawn by CSS so screen readers do not read it out. */
@@ -39,18 +43,18 @@ defineProps({
 }
 
 .fd-breadcrumbs a {
-  color: var(--fd-blue);
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-color: var(--fd-vanilla-line);
-  text-underline-offset: 0.2em;
+  color: var(--fd-text);
+  text-decoration: none;
 }
 
 .fd-breadcrumbs a:hover {
-  text-decoration-color: var(--fd-blue);
+  text-decoration: underline;
 }
 
+/* Only the page you are on is blue and underlined. */
 .fd-breadcrumbs [aria-current='page'] {
-  color: var(--fd-text);
+  color: var(--fd-blue);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 </style>

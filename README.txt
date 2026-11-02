@@ -29,7 +29,7 @@ Logged out:
 - Compare (/compare?q=...): every listing for the search, with filters (price, store, rating, free
   shipping, on sale) and sort.
 - Product page: every store for one product, cheapest total first, and the AI "Worth it?"
-  verdict. "See what the AI read" opens a page with every input the AI used and the exact prompt.
+  verdict. "See how the AI decided" opens a pop-up with the steps behind the verdict and the numbers it used.
   If both Gemini models are busy, the card shows an estimate from fixed rules and says so.
 - Trending (/trending): the most searched products.
 
@@ -137,7 +137,7 @@ End-to-end tests (Playwright), 34 tests in 11 files, in tests/:
 What the E2E tests cover:
 - smoke.spec.js: home page, search, login redirect, admin access and the 403 page
 - trending.spec.js, home.spec.js: Trending lists, links to Compare, photo fallback
-- product.spec.js: the product page, the AI verdict, and the "See what the AI read" page
+- product.spec.js: the product page, the AI verdict, and the "See how the AI decided" pop-up
 - wishlist.spec.js: save and remove, search, sort, tabs, Sleep on it, Plan a budget, Buy Together,
   the remove pop-up
 - target-price-alert.spec.js: set and change a target price

@@ -1233,7 +1233,7 @@ function onBuyTogether(item) {
   flex-direction: column;
   margin-bottom: 1.5rem;
   margin-top: calc(var(--fd-border) * -1);
-  padding: 1.25rem;
+  padding: var(--fd-card-pad);
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: var(--fd-radius);
   background: var(--fd-paper);
@@ -1384,7 +1384,7 @@ function onBuyTogether(item) {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.75rem 1.25rem;
+  padding: var(--fd-row-pad);
 }
 
 /* The header pill sits above the scrolling cards, clear of the scrollbar's column */

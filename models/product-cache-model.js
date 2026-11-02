@@ -40,6 +40,13 @@ const productCacheSchema = new mongoose.Schema(
       default: ''
     },
 
+    // The product's Google Shopping page, from the search listing. It has every review,
+    // so the product page links there for more than the 3 it shows.
+    googleLink: {
+      type: String,
+      default: ''
+    },
+
     brand: {
       type: String,
       default: null

@@ -212,6 +212,7 @@ async function loadFromSerpApi(productId, productKey, q, cached) {
     searchTerm: searchTerm || old.searchTerm || '',
     immersiveToken: token,
     title: info.title || old.title || from.name || '',
+    googleLink: from.link || old.googleLink || '',
     brand: info.brand || old.brand || null,
     image: (info.thumbnails || [])[0] || old.image || from.image || null,
     rating: Number(info.rating) || old.rating || from.rating || null,
@@ -234,6 +235,39 @@ async function loadFromSerpApi(productId, productKey, q, cached) {
     }), 'product')
   }
   return row
+}
+
+// Every other listing from the saved search for q (the Compare page's listings), so the product
+// page lists everything Compare showed, one row per listing, even several from one store.
+// Only this product's own listing is skipped, since its stores are already in the list.
+// Like Compare, only the first 10 listings with a price count. Read from searchCache, so no SerpApi credit.
+async function searchStores(productKey, productId) {
+  const saved = await SearchCache.findOne({ queryKey: productKey, expiresAt: { $gt: new Date() } }).lean()
+  if (!saved) {
+    return []
+  }
+  return saved.listings
+    .filter(function (row) { return Number(row.price) > 0 })
+    .slice(0, 10)
+    .filter(function (row) { return row.productId !== productId })
+    .map(function (row) {
+      return {
+        store: row.store,
+        logo: '',
+        price: row.price,
+        oldPrice: row.oldPrice || null,
+        shipping: row.freeShipping ? 'Free' : '',
+        total: row.price,
+        link: storeUrl(row.link),
+        tag: '',
+        note: '',
+        moreOffers: 0,
+        moreFrom: null,
+        // The listing's own name: it can be a different model from this product.
+        name: row.name || '',
+        fromSearch: true
+      }
+    })
 }
 
 export async function getProduct(productId, q) {
@@ -268,8 +302,14 @@ export async function getProduct(productId, q) {
     features: product.features,
     ratings: product.ratings,
     userReviews: product.userReviews,
+    // Every review: the product's Google Shopping page, or a Google Shopping search for its name
+    // for rows saved before the page was kept.
+    reviewsLink: product.googleLink ||
+      'https://www.google.com/search?udm=28&q=' + encodeURIComponent(product.title + ' reviews'),
     typicalPrice: typical,
     stores: stores,
+    // Shown in the same All stores list, but left out of the cheapest, typical price and verdict.
+    searchStores: await searchStores(toProductKey(q || product.q || ''), product.productId),
     fetchedAt: product.storesFetchedAt
   }
 }

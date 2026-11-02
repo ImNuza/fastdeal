@@ -29,7 +29,7 @@ const values = [
 
 // Trending lists come from the trending store, shared with the Trending page and the search bar.
 const trendingStore = useTrendingStore()
-const { topToday: trendingToday, weekExtras: trendingWeek } = storeToRefs(trendingStore)
+const { topToday: trendingToday, todayFrom: trendingFrom, weekExtras: trendingWeek } = storeToRefs(trendingStore)
 
 // Trending Today belt: the cards roll past nonstop, like a conveyor belt. One pass repeats
 // the items until it holds at least BELT_MIN cards (so a short list still fills the screen),
@@ -296,7 +296,8 @@ onBeforeUnmount(function () {
   <!-- Trending today: cream, with the carousel in the container. -->
   <section id="fd-trending" class="fd-trending-section fd-trending-today">
     <div class="container">
-      <h2 class="fd-page-title">Trending Today</h2>
+      <!-- Early in the day the server sends yesterday's list, so the title says so. -->
+      <h2 class="fd-page-title">{{ trendingFrom === 'yesterday' ? 'Trending Yesterday' : 'Trending Today' }}</h2>
       <p v-if="!trendingToday.length" class="fd-trending-empty">Nothing trending yet today.</p>
       <div
         v-else
@@ -335,7 +336,7 @@ onBeforeUnmount(function () {
       <div class="row g-3">
         <div class="col-6 col-md-4 col-lg-3" v-for="item in trendingWeek" :key="item._id">
           <router-link class="fd-week-link" :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
-            <div class="card h-100 fd-week-card" style="padding: 1.25rem; border-radius: 1rem;">
+            <div class="card h-100 fd-week-card fd-card-pad" style="border-radius: 1rem;">
               <img v-if="showImage(item)" :src="item.image" alt="" class="card-img-top" style="display: block; width: 100%; height: 170px; padding: 1.25rem; object-fit: contain; border-radius: 0.75rem; background: var(--fd-white); margin-bottom: 1.25rem;"
                 @error="brokenImages[item.query] = true">
               <span v-else class="fd-week-tile fd-img-tile" aria-hidden="true">{{ initials(itemName(item.query)) }}</span>
@@ -429,19 +430,19 @@ onBeforeUnmount(function () {
   display: flex;
   flex: 0 0 var(--card);
   flex-direction: column;
-  padding: 1.25rem;
+  padding: var(--fd-card-pad);
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: 1rem;
   background: var(--fd-paper);
   color: var(--fd-text);
   text-decoration: none;
-  transition: border-color 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
+/* Hover highlights the slide with a blue outline. It never grows. */
 .fd-slide:hover,
 .fd-slide:focus-visible {
   border-color: var(--fd-blue);
-  transform: scale(1.03);
 }
 
 .fd-slide:focus-visible {
@@ -486,18 +487,8 @@ onBeforeUnmount(function () {
   line-height: 1.3;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .fd-slide {
-    transition: none;
-  }
 
-  .fd-slide:hover,
-  .fd-slide:focus-visible {
-    transform: none;
-  }
-}
-
-/* Trending This Week cards: hovering (or tabbing to) one gives it a blue outline and lifts it a little. */
+/* Trending This Week cards: hovering (or tabbing to) one highlights it with a blue outline. It never grows. */
 .fd-week-link {
   display: block;
   height: 100%;
@@ -505,13 +496,12 @@ onBeforeUnmount(function () {
 }
 
 .fd-week-card {
-  transition: border-color 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
 .fd-week-link:hover .fd-week-card,
 .fd-week-link:focus-visible .fd-week-card {
   border-color: var(--fd-blue);
-  transform: scale(1.03);
 }
 
 .fd-week-link:focus-visible {
@@ -519,16 +509,6 @@ onBeforeUnmount(function () {
   outline-offset: 3px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .fd-week-card {
-    transition: none;
-  }
-
-  .fd-week-link:hover .fd-week-card,
-  .fd-week-link:focus-visible .fd-week-card {
-    transform: none;
-  }
-}
 
 /* Trending This Week follows straight on, so only one section's padding sits between them. */
 .fd-trending-section + .fd-trending-section {
@@ -735,7 +715,7 @@ onBeforeUnmount(function () {
 }
 
 .fd-card {
-  padding: 1.25rem;
+  padding: var(--fd-card-pad);
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: 1.25rem;
   background: var(--fd-paper);

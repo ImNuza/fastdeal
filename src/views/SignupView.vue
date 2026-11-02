@@ -116,7 +116,7 @@ async function onEmailSignUp() {
       <h1 class="fd-page-title">Sign up</h1>
       <p class="fd-page-subtitle">Make an account to save products, hear when prices drop, and shop with friends.</p>
 
-      <div class="card p-4">
+      <div class="card fd-card-pad">
         <p v-if="errorText" :class="['alert mb-3', route.query.error === 'not-registered' ? 'alert-warning' : 'alert-danger']">{{ errorText }}</p>
 
         <!-- Username + Email + Password -->
