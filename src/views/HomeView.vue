@@ -554,7 +554,8 @@ onBeforeUnmount(function () {
   list-style: none;
 }
 
-@media (min-width: 576px) {
+/* One column of four on phones and small tablets; two by two from 768px. */
+@media (min-width: 768px) {
   .fd-values {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -778,37 +779,17 @@ onBeforeUnmount(function () {
 }
 
 @media (min-width: 1200px) {
+  /* The graph takes 59% and stays the big card; the other two stack beside it with a 1rem gap,
+     in the grid rather than pinned, so longer text pushes them apart instead of overlapping. */
   .fd-cluster {
-    display: block;
-    min-height: 36rem;
+    grid-template-columns: 59% 1fr;
+    align-items: start;
   }
 
-  .fd-card {
-    position: absolute;
-  }
-
+  /* Centred down the height of the two cards beside it. */
   .fd-card--history {
-    top: 6rem;
-    left: 0;
-    width: 59%;
-    z-index: 1;
-  }
-
-  /* Narrower than the space beside the graph, leaving a 1rem gap so the two never overlap
-     (the graph keeps its 59% and stays the big card). */
-  .fd-card--stores {
-    top: 0;
-    right: 0;
-    width: calc(41% - 1rem);
-    z-index: 2;
-  }
-
-  /* Same width as the card above it, so it sits the same 1rem from the graph. */
-  .fd-card--saving {
-    bottom: 0;
-    right: 0;
-    width: calc(41% - 1rem);
-    z-index: 3;
+    grid-row: span 2;
+    align-self: center;
   }
 }
 

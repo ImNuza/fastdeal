@@ -123,17 +123,15 @@ small {
   line-height: 1;
 }
 
-/* Navbar search: its own full-width row under the logo on phones, beside the logo on desktop. */
+/* Navbar search: the first thing in the phone menu, beside the logo on desktop. */
 .fd-nav-search {
-  order: 3;
-  flex: 1 0 100%;
-  margin-top: 0.75rem;
+  margin: 1.25rem 0 0.5rem;
 }
 
-/* The opened phone menu drops below the search row. */
+/* Room between the search and the first menu link. */
 @media (max-width: 991.98px) {
-  .fd-nav .navbar-collapse {
-    order: 4;
+  .fd-nav-search + .navbar-nav {
+    padding-top: 1rem;
   }
 }
 
@@ -141,7 +139,6 @@ small {
   /* Sits small beside the logo; once tapped it stretches across to the icons.
      The auto right margin takes the spare space, so the icons stay on the right. */
   .fd-nav-search {
-    order: 0;
     flex: 1 1 auto;
     max-width: 20rem;
     margin: 0 auto 0 1.5rem;
@@ -150,11 +147,6 @@ small {
 
   .fd-nav-search:focus-within {
     max-width: 100%;
-  }
-
-  .fd-nav-search ~ .navbar-collapse {
-    flex-grow: 0;
-    margin-left: 1.5rem;
   }
 }
 

@@ -11,6 +11,8 @@ import { storeToRefs } from 'pinia'
 import { useProductStore } from '../store/product.js'
 import { itemName } from '../services/itemName.js'
 import { fetchWorthIt } from '../services/productApi.js'
+import FdPager from '../components/FdPager.vue'
+import { useListPages } from '../services/listPages.js'
 
 // One product: the listings from its search (the same ones Compare shows), cheapest first, with the
 // one the shopper clicked as Your pick, the AI verdict, what buyers say and the product details.
@@ -264,6 +266,13 @@ const breadcrumbs = computed(function () {
   items.push({ label: route.query.store || (product.value && product.value.title) || 'Product' })
   return items
 })
+
+// Phones: 10 rows a page, with the page buttons in the bar. Wider: the count only.
+const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal, isPhone: listOnPhone } = useListPages(
+  allStores,
+  null
+)
+const storeTable = ref(null)
 </script>
 
 <template>
@@ -389,7 +398,7 @@ const breadcrumbs = computed(function () {
     </p>
     <!-- Built like the Wishlist table: a blue header pill, then one card per listing. Roles keep it a
          table for screen readers. Google Shopping gives no shipping amount, so there is no Total column. -->
-    <div class="fd-store-table fd-store-panel" role="table" aria-label="All listings">
+    <div ref="storeTable" class="fd-store-table fd-store-panel" role="table" aria-label="All listings">
       <div class="fd-store-head" role="row">
         <span role="columnheader">Store</span>
         <span role="columnheader">Price</span>
@@ -399,7 +408,7 @@ const breadcrumbs = computed(function () {
       <!-- Three listings at a time; the rest scroll inside, with the brand scrollbar like the Wishlist. -->
       <FdScrollArea label="All listings" class="fd-store-scroll" :style="{ maxHeight: storesHeight }">
       <div ref="storeRows" class="fd-store-rows" role="rowgroup">
-        <div v-for="(row, i) in allStores" :key="i + row.store" class="fd-store-row" role="row">
+        <div v-for="(row, i) in pageRows" :key="i + row.store" class="fd-store-row" role="row">
           <div class="fd-store-cell fd-store-cell-name" role="cell">
             <strong class="d-block">{{ row.store }}</strong>
             <span v-if="row.note" class="d-block small text-secondary">{{ row.note }}</span>
@@ -438,7 +447,9 @@ const breadcrumbs = computed(function () {
       </FdScrollArea>
     </div>
     <!-- The total under the card, worded and placed like the Friends and Wishlist totals. -->
-    <p class="fd-store-total">Total: {{ allStores.length }} {{ allStores.length === 1 ? 'listing' : 'listings' }}</p>
+    <div v-if="listTotal > 0" class="fd-store-foot" :class="{ 'has-pager': listOnPhone && listTotal > 0 }">
+      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" noun="listings" label="Listings" :top="storeTable" />
+    </div>
 
     <!-- What buyers say: one card per review, in a row that scrolls sideways. -->
     <section v-if="product.userReviews.length" id="fd-reviews" class="mb-5">
@@ -529,6 +540,13 @@ const breadcrumbs = computed(function () {
   text-transform: uppercase;
 }
 
+/* Phones: the listings have no scrollbar (see FdScrollArea), so no room is kept for one. */
+@media (max-width: 767.98px) {
+  .fd-store-head {
+    margin-right: 0;
+  }
+}
+
 /* The card around All listings: paper, vanilla line and corners, like the Wishlist and Friends
    cards, without their folder tabs. */
 .fd-store-panel {
@@ -541,13 +559,15 @@ const breadcrumbs = computed(function () {
 /* Under the card, on the right: small and muted like the Wishlist's total. It belongs to the
    card, so the next section starts closer under it: the card's bottom to the next title is about
    the same as the 48px between the other sections. */
-.fd-store-total {
+/* The pager on the left (phones only), the total on the right */
+.fd-store-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem 1rem;
   margin: 0 0 1.25rem;
   padding: 0.5rem 0 0;
-  color: var(--fd-text-muted);
-  font-size: var(--fd-small);
-  text-align: right;
 }
+
 
 .fd-store-rows {
   display: grid;
@@ -814,6 +834,15 @@ const breadcrumbs = computed(function () {
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+
+/* Phones: the page buttons centred, with their "Showing" line under them. */
+.fd-store-foot.has-pager {
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem 0 1.25rem;
 }
 
 </style>

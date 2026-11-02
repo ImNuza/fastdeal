@@ -11,6 +11,9 @@ import axios from 'axios'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../store/auth.js'
 import { useWishlistStore } from '../store/wishlist.js'
+import { useTabReachesCorner } from '../services/folderTabs.js'
+import FdPager from '../components/FdPager.vue'
+import { useListPages } from '../services/listPages.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -121,29 +124,6 @@ function untilText(item) {
   })
 }
 
-// Total for the bottom bar: how many are saved and sleeping, or how many a search shows.
-const sleepingCount = computed(function () {
-  return user.value ? user.value.wishlist.filter(asleep).length : 0
-})
-
-const countText = computed(function () {
-  // The Plan a budget tab counts saved budgets, not products
-  if (activeTab.value === 'budget') {
-    const budgets = drafts.value.length
-    const budgetNoun = budgets === 1 ? 'budget plan' : 'budget plans'
-    if (budgetQuery.value.trim()) {
-      return shownDrafts.value.length + ' of ' + budgets + ' ' + budgetNoun + ' shown'
-    }
-    return 'Total: ' + budgets + ' ' + budgetNoun
-  }
-  const total = user.value ? user.value.wishlist.length : 0
-  const noun = total === 1 ? 'product' : 'products'
-  if (query.value.trim() || activeTab.value !== 'all') {
-    return shownItems.value.length + ' of ' + total + ' ' + noun + ' shown'
-  }
-  return 'Total: ' + total + ' ' + noun + (sleepingCount.value ? ' (' + sleepingCount.value + ' sleeping)' : '')
-})
-
 // Folder tabs like the Friends and Notifications pages: everything, price drops, and items on hold.
 const TABS = [
   { id: 'all', label: 'All' },
@@ -152,6 +132,11 @@ const TABS = [
   { id: 'budget', label: 'Plan a budget' }
 ]
 const activeTab = ref('all')
+
+// Squares the card's top right corner while the open tab reaches it.
+const tabsEl = ref(null)
+const panelEl = ref(null)
+const tabAtCorner = useTabReachesCorner(tabsEl, panelEl, activeTab)
 const scrollArea = ref(null)
 
 const tabFilters = {
@@ -517,6 +502,12 @@ function onBuyTogether(item) {
   }
   openBuyTogether(item)
 }
+
+// Phones: 10 rows a page, with the page buttons in the bar. Wider: the count only.
+const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal, isPhone: listOnPhone } = useListPages(
+  function () { return activeTab.value === 'budget' ? shownDrafts.value : shownItems.value },
+  [activeTab, query, budgetQuery, sortBy, budgetSort]
+)
 </script>
 
 <template>
@@ -524,12 +515,12 @@ function onBuyTogether(item) {
     <h1 class="fd-page-title">Wishlist</h1>
     <p class="fd-page-subtitle">What you saved, next to the best price right now. If another store is cheaper, it shows as a
       price drop.<br />
-      Not sure yet? Sleep on it. Got a budget? Plan one to see what fits best.</p>
+      Not sure yet? Sleep on it. Got a budget?<br class="d-md-none" /> Plan one to see what fits best.</p>
 
     <!-- Always shown, even with nothing saved: like Notifications, the card stays open with an
          empty message inside, and Plan a budget is still there. -->
     <template v-if="user">
-      <div class="fd-wish-tabs" role="tablist" aria-label="Wishlist">
+      <div ref="tabsEl" class="fd-wish-tabs" role="tablist" aria-label="Wishlist">
         <button v-for="(tab, i) in TABS" :id="'fd-wtab-' + tab.id" :key="tab.id" class="fd-wish-tab"
           :class="{ 'is-active': activeTab === tab.id }" type="button" role="tab"
           :aria-selected="activeTab === tab.id" aria-controls="fd-wish-panel"
@@ -540,10 +531,10 @@ function onBuyTogether(item) {
 
       <!-- The open tab and this card are one piece, like a folder tab. Search, the column header,
            and the product cards all sit inside it; the cards scroll inside the card. -->
-      <div id="fd-wish-panel" class="fd-wish-panel" :class="{ 'is-first-open': activeTab === 'all' }"
+      <div ref="panelEl" id="fd-wish-panel" class="fd-wish-panel" :class="{ 'is-first-open': activeTab === 'all', 'is-corner-open': tabAtCorner }"
         role="tabpanel" :aria-labelledby="'fd-wtab-' + activeTab">
       <!-- Plan a budget: tick, rank, set a budget, and save it as a draft for later -->
-      <FdScrollArea v-if="activeTab === 'budget'" ref="scrollArea" label="Plan a budget">
+      <FdScrollArea v-if="activeTab === 'budget'" ref="scrollArea" label="Plan a budget" :bar="drafts.length > 0">
         <!-- Your budgets: every saved draft, newest first, and a button to start a new one -->
         <div>
           <!-- No budgets: the empty message with New budget centred under it -->
@@ -554,7 +545,7 @@ function onBuyTogether(item) {
           </div>
 
           <template v-else>
-            <!-- Search and sort like the product tabs. New budget sits in the bottom bar. -->
+            <!-- Search and sort like the product tabs. New budget sits at the bottom right of the card. -->
             <div class="fd-wish-tools fd-drafts-tools">
               <div class="fd-wish-search">
                 <input v-model="budgetQuery" class="fd-wish-search-input" type="text" placeholder="Search your budgets"
@@ -576,7 +567,7 @@ function onBuyTogether(item) {
               <p class="fd-empty-text">No budgets match "{{ budgetQuery.trim() }}".</p>
             </div>
             <ul v-else class="fd-drafts list-unstyled mb-0">
-            <li v-for="d in shownDrafts" :key="d._id" class="fd-draft">
+            <li v-for="d in pageRows" :key="d._id" class="fd-draft">
               <button class="fd-draft-open" type="button" @click="openBudget(d, $event)">
                 <span class="fd-draft-name">{{ d.name }}</span>
                 <span class="small text-secondary">
@@ -595,6 +586,17 @@ function onBuyTogether(item) {
           <p v-if="draftError" class="small text-danger mt-2 mb-0">{{ draftError }}</p>
         </div>
 
+
+        <!-- With saved budgets: New budget at the bottom right of the card, beside the full-height
+             scrollbar. From md down it is a round plus button; the label stays for screen readers. -->
+        <template v-if="drafts.length" #footer>
+          <div class="fd-budget-add">
+            <button class="btn btn-dark fd-budget-new" type="button" @click="openBudget(null, $event)">
+              <FdIcon name="plus" />
+              <span class="fd-budget-new-text">New budget</span>
+            </button>
+          </div>
+        </template>
       </FdScrollArea>
 
       <template v-else>
@@ -628,14 +630,14 @@ function onBuyTogether(item) {
           </div>
         </div>
 
-        <FdScrollArea ref="scrollArea" label="Saved products">
+        <FdScrollArea ref="scrollArea" label="Saved products" :bar="tabItems.length > 0">
         <!-- Nothing in this tab: the same icon-and-line empty state as Notifications -->
         <div v-if="!shownItems.length" class="fd-empty-state">
           <FdIcon :name="emptyIcon" class="fd-empty-icon" />
           <p class="fd-empty-text">{{ emptyText }}</p>
         </div>
         <div v-else class="fd-wish-rows" role="rowgroup">
-          <div v-for="item in shownItems" :key="item.name" class="fd-wish-row" :class="{ 'is-asleep': asleep(item) }"
+          <div v-for="item in pageRows" :key="item.name" class="fd-wish-row" :class="{ 'is-asleep': asleep(item) }"
             role="row">
             <div class="fd-wish-cell fd-wish-cell-product" role="cell">
               <router-link class="fd-wish-product" :to="productLink(item)">
@@ -704,7 +706,7 @@ function onBuyTogether(item) {
                   </button>
                 </div>
               </div>
-              <div class="fd-wish-cell" role="cell">
+              <div class="fd-wish-cell fd-wish-target-cell" role="cell">
                 <span class="fd-wish-label" aria-hidden="true">Target price alert</span>
                 <div class="fd-target-row">
                   <div class="input-group fd-target-input">
@@ -759,11 +761,8 @@ function onBuyTogether(item) {
 
 
     <!-- Last in the page so it can stick to the bottom of the screen and stop above the footer. -->
-    <div class="fd-budget-bar">
-      <!-- Plan a budget with saved budgets: New budget on the left, the total on the right -->
-      <button v-if="activeTab === 'budget' && drafts.length" class="btn btn-dark fd-budget-new" type="button"
-        @click="openBudget(null, $event)">New budget</button>
-      <p class="fd-budget-count" aria-live="polite">{{ countText }}</p>
+    <div v-if="listTotal > 0" class="fd-budget-bar" :class="{ 'has-pager': listOnPhone && listTotal > 0 }">
+      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" :noun="activeTab === 'budget' ? 'budgets' : 'products'" label="Wishlist" :top="panelEl" />
     </div>
   </div>
 
@@ -1166,7 +1165,8 @@ function onBuyTogether(item) {
   flex-shrink: 0;
   align-items: center;
   min-height: 3.5rem;
-  padding: 0 1.75rem;
+  /* Shrinks with the window, so all four tabs still fit across the card on small tablets. */
+  padding: 0 clamp(0.75rem, 2vw, 1.75rem);
   border: var(--fd-border) solid transparent;
   border-bottom: 0;
   border-radius: var(--fd-radius) var(--fd-radius) 0 0;
@@ -1243,6 +1243,11 @@ function onBuyTogether(item) {
   border-top-left-radius: 0;
 }
 
+/* Same on the right, while the open tab reaches the card's top right corner. */
+.fd-wish-panel.is-corner-open {
+  border-top-right-radius: 0;
+}
+
 /* The column header, then the scrolling cards filling the rest of the card */
 .fd-wish-table {
   display: flex;
@@ -1297,6 +1302,13 @@ function onBuyTogether(item) {
   flex-wrap: wrap;
   gap: 0.75rem;
   margin: 0 1.75rem 1rem 0;
+}
+
+/* Phones: the list has no scrollbar (see FdScrollArea), so no room is kept for one. */
+@media (max-width: 767.98px) {
+  .fd-wish-tools {
+    margin-right: 0;
+  }
 }
 
 .fd-wish-search {
@@ -1686,9 +1698,24 @@ function onBuyTogether(item) {
   }
 }
 
+/* Phones: the saved price and the best price side by side, so they are easy to compare;
+   under them the target alert, with the buttons beside it lined up on its input. */
 @media (max-width: 767.98px) {
   .fd-wish-row {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fd-wish-countdown {
+    grid-column: 1 / -1;
+  }
+
+  .fd-wish-cell.fd-wish-action-cell {
+    grid-column: auto;
+    align-self: end;
+  }
+
+  .fd-wish-action-cell .fd-wish-actions {
+    justify-content: flex-end;
   }
 
   .fd-wish-image {
@@ -1726,16 +1753,50 @@ function onBuyTogether(item) {
   background: var(--fd-beige);
 }
 
-/* Pushes the total over to the right */
-.fd-budget-new {
-  margin-right: auto;
+/* New budget: bottom right of the card, in the list's column, so it ends where the Sort by
+   menu ends and the scrollbar runs past it to the bottom. */
+.fd-budget-add {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 1rem;
 }
 
-.fd-budget-count {
-  margin: 0;
-  color: var(--fd-text-muted);
-  font-size: var(--fd-small);
+.fd-budget-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
+
+.fd-budget-new .fd-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* From md down: a round plus button, the size of a full button */
+@media (max-width: 991.98px) {
+  .fd-budget-new {
+    justify-content: center;
+    width: var(--fd-control);
+    height: var(--fd-control);
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .fd-budget-new .fd-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .fd-budget-new-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
 
 
 /* Your budgets list */
@@ -1965,4 +2026,13 @@ function onBuyTogether(item) {
 .fd-hold-end strong {
   color: var(--fd-blue);
 }
+
+/* Phones: the page buttons centred, with their "Showing" line under them. */
+.fd-budget-bar.has-pager {
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem 0 1.25rem;
+}
+
 </style>

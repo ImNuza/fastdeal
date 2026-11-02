@@ -17,11 +17,12 @@ test.describe('Product page', () => {
 
     await expect(page.getByRole('heading', { level: 1, name: productIphone.title })).toBeVisible();
 
-    // One row per Compare listing, plus the header row. The list says how many, as Compare does.
+    // One row per Compare listing, plus the header row (all of them on a wide screen; phones
+    // show 10 a page). The line under the list says how many.
     await expect(page.getByRole('heading', { name: 'All listings' })).toBeVisible();
     const table = page.getByRole('table', { name: 'All listings' });
     await expect(table.getByRole('row')).toHaveCount(productIphone.stores.length + 1);
-    await expect(page.getByText('Total: ' + productIphone.stores.length + ' listings')).toBeVisible();
+    await expect(page.getByText(new RegExp('of ' + productIphone.stores.length + ' listings$'))).toBeVisible();
 
     // The listing clicked on Compare is Your pick.
     const pick = table.getByRole('row', { name: new RegExp(productIphone.pick.store) });

@@ -8,6 +8,9 @@ import axios from 'axios'
 import FdIcon from '../components/FdIcon.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
 import FdTelegramPrompt from '../components/FdTelegramPrompt.vue'
+import { useTabReachesCorner } from '../services/folderTabs.js'
+import FdPager from '../components/FdPager.vue'
+import { useListPages } from '../services/listPages.js'
 
 const showTelegramPrompt = ref(false)
 
@@ -56,6 +59,11 @@ function openNotification(n) {
 
 const activeTab = ref(TABS.some(function (t) { return t.id === route.query.tab }) ? route.query.tab : 'all')
 
+// Squares the card's top right corner while the open tab reaches it.
+const tabsEl = ref(null)
+const panelEl = ref(null)
+const tabAtCorner = useTabReachesCorner(tabsEl, panelEl, activeTab)
+
 function inTab(tab, n) {
   return !tab.types || tab.types.includes(n.type)
 }
@@ -86,14 +94,6 @@ const shown = computed(function () {
 
 const totalUnread = computed(function () {
   return notifications.value.filter(function (n) { return !n.read }).length
-})
-
-// The bottom bar, worded like the Wishlist's and Friends': "Total: 12 notifications (3 unread)"
-// for the open tab.
-const barText = computed(function () {
-  const total = tabItems.value.length
-  const unread = tabItems.value.filter(function (n) { return !n.read }).length
-  return 'Total: ' + total + ' ' + (total === 1 ? 'notification' : 'notifications') + ' (' + unread + ' unread)'
 })
 
 // Arrow keys move between tabs, as tab lists do.
@@ -332,6 +332,12 @@ async function openGroupInvite(n) {
 function closeGroupInvite() { inviteItem.value = null }
 
 onMounted(load)
+
+// Phones: 10 rows a page, with the page buttons in the bar. Wider: the count only.
+const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal, isPhone: listOnPhone } = useListPages(
+  shown,
+  [activeTab, query, show]
+)
 </script>
 
 <template>
@@ -339,7 +345,7 @@ onMounted(load)
     <h1 class="fd-page-title">Notifications</h1>
     <p class="fd-page-subtitle">Price drops, Sleep on it reminders, and news from your friends.</p>
 
-    <div class="notif-tabs" role="tablist" aria-label="Notifications">
+    <div ref="tabsEl" class="notif-tabs" role="tablist" aria-label="Notifications">
       <button
         v-for="(tab, i) in TABS"
         :id="'fd-ntab-' + tab.id"
@@ -362,9 +368,10 @@ onMounted(load)
     </div>
 
     <!-- The open tab and this card are one piece, like a folder tab. -->
-    <div id="fd-ntabpanel" class="notif-tabpanel" :class="{ 'is-first-open': activeTab === 'all' }"
+    <div ref="panelEl" id="fd-ntabpanel" class="notif-tabpanel" :class="{ 'is-first-open': activeTab === 'all', 'is-corner-open': tabAtCorner }"
       role="tabpanel" :aria-labelledby="'fd-ntab-' + activeTab">
-      <div class="notif-tools">
+      <!-- Search and the filter only once the open tab has something to search, like the Wishlist. -->
+      <div v-if="tabItems.length" class="notif-tools">
         <div class="notif-search">
           <input v-model="query" class="notif-search-input" type="text" placeholder="Search notifications"
             aria-label="Search notifications" autocomplete="off" />
@@ -403,7 +410,7 @@ onMounted(load)
             <!-- One list with a line between rows: round icon, title with an unread dot, time,
                  then the message. Buy Together rows keep their buttons under the message. -->
             <ul v-else class="notif-rows">
-              <li v-for="n in shown" :key="n._id" class="notif-row-item">
+              <li v-for="n in pageRows" :key="n._id" class="notif-row-item">
                 <div v-if="isBuyTogether(n) || isGroupInvite(n)" class="notif-row">
                   <span class="notif-icon" aria-hidden="true"><FdIcon :name="iconFor(n)" /></span>
                   <div class="notif-main">
@@ -436,7 +443,7 @@ onMounted(load)
         </div>
 
         <!-- Hidden from screen readers: the list itself scrolls with the keyboard. -->
-        <div class="fd-scrollbar" aria-hidden="true">
+        <div v-if="tabItems.length" class="fd-scrollbar" aria-hidden="true">
           <button class="fd-scrollbar-arrow" type="button" tabindex="-1" @click="scrollStep(-1)">
             <FdIcon name="chevron-up" />
           </button>
@@ -456,8 +463,8 @@ onMounted(load)
     </div>
 
     <!-- Sticks to the bottom of the screen, like the Friends and Wishlist bars. -->
-    <div class="notif-bar">
-      <p class="notif-bar-count" aria-live="polite">{{ barText }}</p>
+    <div v-if="listTotal > 0 || totalUnread" class="notif-bar" :class="{ 'has-pager': listOnPhone && listTotal > 0 }">
+      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" noun="notifications" label="Notifications" :top="panelEl" />
       <button v-if="totalUnread" class="btn btn-outline-dark" type="button" @click="markAllRead">Mark all as read</button>
     </div>
 
@@ -638,6 +645,11 @@ onMounted(load)
   border-top-left-radius: 0;
 }
 
+/* Same on the right, while the open tab reaches the card's top right corner. */
+.notif-tabpanel.is-corner-open {
+  border-top-right-radius: 0;
+}
+
 /* Search and the Unread only filter, ending where the cards end so the scrollbar's column
    stays free on the right. */
 .notif-tools {
@@ -733,6 +745,26 @@ onMounted(load)
 
 .notif-scroll::-webkit-scrollbar {
   display: none;
+}
+
+/* Phones: no box inside the card, like the Wishlist. The list runs its full length, the page
+   scrolls instead, and the search no longer leaves room for a scrollbar. */
+@media (max-width: 767.98px) {
+  .notif-body {
+    max-height: none;
+  }
+
+  .notif-scroll {
+    overflow-y: visible;
+  }
+
+  .notif-body .fd-scrollbar {
+    display: none;
+  }
+
+  .notif-tools {
+    margin-right: 0;
+  }
 }
 
 .notif-scroll:focus-visible {
@@ -925,11 +957,6 @@ onMounted(load)
   background: var(--fd-beige);
 }
 
-.notif-bar-count {
-  margin: 0;
-  color: var(--fd-text-muted);
-  font-size: var(--fd-small);
-}
 
 .empty-state {
   text-align: center;
@@ -988,4 +1015,13 @@ onMounted(load)
     height: 2.5rem;
   }
 }
+
+/* Phones: the page buttons centred, with their "Showing" line under them. */
+.notif-bar.has-pager {
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem 0 1.25rem;
+}
+
 </style>

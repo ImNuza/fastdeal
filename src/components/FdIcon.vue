@@ -48,6 +48,16 @@ defineProps({
     <template v-else-if="name === 'chevron-down'">
       <path d="m6 9 6 6 6-6" />
     </template>
+    <template v-else-if="name === 'plus'">
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </template>
+    <template v-else-if="name === 'chevron-left'">
+      <path d="m15 18-6-6 6-6" />
+    </template>
+    <template v-else-if="name === 'chevron-right'">
+      <path d="m9 18 6-6-6-6" />
+    </template>
     <template v-else-if="name === 'tag'">
       <path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4Z" />
       <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />
