@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import { verdictInputs, verdictPrompt, ruleVerdict } from '../worthItInputs.js'
 
-// A store row as the product page has it
+// A listing row as the product page has it
 function store(name, price, oldPrice) {
   return { store: name, price: price, total: price, oldPrice: oldPrice || null }
 }
@@ -23,11 +23,11 @@ function row(rows, key) {
 }
 
 describe('TestSuite1: verdictInputs', () => {
-  it('Test1: reads the cheapest total, typical price and range from the live stores', () => {
+  it('Test1: reads the cheapest listing, typical price and range from the search listings', () => {
     const { rows } = verdictInputs(PRODUCT, SALE)
     expect(row(rows, 'cheapest').value).toBe('S$30.00 at Shopee')
-    expect(row(rows, 'typical').value).toBe('S$40.00, the middle total of 3 stores')
-    expect(row(rows, 'range').value).toBe('S$30.00 to S$60.00 across 3 stores')
+    expect(row(rows, 'typical').value).toBe('S$40.00, the middle price of 3 listings')
+    expect(row(rows, 'range').value).toBe('S$30.00 to S$60.00 across 3 listings')
   })
 
   it('Test2: lists the stores that show a was price', () => {
@@ -43,7 +43,7 @@ describe('TestSuite1: verdictInputs', () => {
 
   it('Test4: has no price history row, because FastDeal does not track price history', () => {
     const { rows } = verdictInputs(PRODUCT, SALE)
-    expect(rows.map(function (r) { return r.key })).toEqual(['product', 'cheapest', 'typical', 'range', 'sale-now', 'rating', 'next-sale'])
+    expect(rows.map(function (r) { return r.key })).toEqual(['product', 'pick', 'cheapest', 'typical', 'range', 'sale-now', 'rating', 'next-sale'])
   })
 
   it('Test5: marks a missing typical price and rating as not sent', () => {
@@ -52,11 +52,23 @@ describe('TestSuite1: verdictInputs', () => {
     expect(row(rows, 'typical').sent).toBe(false)
     expect(row(rows, 'rating').sent).toBe(false)
     expect(row(rows, 'next-sale').sent).toBe(false)
-    expect(row(rows, 'range').value).toBe('S$99.00 to S$99.00 across 1 store')
+    expect(row(rows, 'range').value).toBe('S$99.00 to S$99.00 across 1 listing')
   })
 
   it('Test6: writes a short Based on summary', () => {
-    expect(verdictInputs(PRODUCT, SALE).summary).toBe('Cheapest S$30.00, typical S$40.00, 1 on sale now, 11.11 in 11 days.')
+    expect(verdictInputs(PRODUCT, SALE).summary).toBe('Your pick S$30.00 (the cheapest), typical S$40.00, 1 on sale now, 11.11 in 11 days.')
+  })
+
+  it('Test7: reads the listing the shopper picked, and names a listing that can be another model', () => {
+    const pick = { ...store('Lazada', 40), name: 'Pikachu Plush 30cm' }
+    const { rows, summary } = verdictInputs({ ...PRODUCT, pick: pick }, SALE)
+    expect(row(rows, 'pick').value).toBe('S$40.00 at Lazada, listed as "Pikachu Plush 30cm"')
+    expect(summary).toBe('Your pick S$40.00, cheapest S$30.00, typical S$40.00, 1 on sale now, 11.11 in 11 days.')
+  })
+
+  it('Test8: uses the cheapest listing as the pick when the search no longer has the clicked one', () => {
+    const { rows } = verdictInputs({ ...PRODUCT, pick: null }, SALE)
+    expect(row(rows, 'pick').value).toBe('S$30.00 at Shopee')
   })
 })
 
@@ -64,7 +76,8 @@ describe('TestSuite2: verdictPrompt', () => {
   it('Test1: puts only the sent rows in the prompt', () => {
     const { rows } = verdictInputs(PRODUCT, SALE)
     const prompt = verdictPrompt(rows)
-    expect(prompt).toContain('- Cheapest total now: S$30.00 at Shopee')
+    expect(prompt).toContain('- Your pick: S$30.00 at Shopee')
+    expect(prompt).toContain('- Cheapest listing: S$30.00 at Shopee')
     expect(prompt).toContain('- Next big sale: 11.11 sale on 11 Nov, in 11 days')
     expect(prompt).not.toContain('Price history')
   })
@@ -74,14 +87,19 @@ describe('TestSuite2: verdictPrompt', () => {
     expect(prompt).toContain('Do not invent past prices')
     expect(prompt).toContain('"decision": "buy" | "wait"')
   })
+
+  it('Test3: tells the AI that a listing can be a different model', () => {
+    const prompt = verdictPrompt(verdictInputs(PRODUCT, SALE).rows)
+    expect(prompt).toContain('A listing can be a different model, size or condition')
+  })
 })
 
 describe('TestSuite3: ruleVerdict', () => {
-  it('Test1: says buy when the cheapest is 10% or more under the typical price', () => {
+  it('Test1: says buy when the pick is 10% or more under the typical price', () => {
     const verdict = ruleVerdict(PRODUCT, SALE)
     expect(verdict.decision).toBe('buy')
     expect(verdict.source).toBe('rules')
-    expect(verdict.reason).toBe('The cheapest total S$30.00 is 25% under the typical S$40.00 across 3 stores.')
+    expect(verdict.reason).toBe('Your pick S$30.00 is 25% under the typical S$40.00 across 3 listings.')
   })
 
   it('Test2: says wait when the price is close to typical and a big sale is near', () => {
@@ -102,5 +120,11 @@ describe('TestSuite3: ruleVerdict', () => {
     const product = { title: 'Rare thing', stores: [store('eBay', 99)] }
     expect(ruleVerdict(product, { ...SALE, daysAway: 40 })).toBe(null)
     expect(ruleVerdict(product, SALE).decision).toBe('wait')
+  })
+
+  it('Test5: judges the pick, not the cheapest listing, and says wait when it is 10% or more over typical', () => {
+    const verdict = ruleVerdict({ ...PRODUCT, pick: store('Amazon.sg', 60) }, { ...SALE, daysAway: 40 })
+    expect(verdict.decision).toBe('wait')
+    expect(verdict.reason).toBe('Your pick S$60.00 is 50% over the typical S$40.00 across 3 listings. Check the cheaper listings below.')
   })
 })

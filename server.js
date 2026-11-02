@@ -536,7 +536,7 @@ app.post('/api/identify-image', upload.single('photo'), async (req, res) => {
   }
 })
 
-// One product with every store and the typical price.
+// One product: the Compare listings for its search, the clicked one, and the typical price.
 // q is the search it came from, so the page still works after a reload.
 app.get('/api/product/:productId', async (req, res) => {
   try {

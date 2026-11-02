@@ -112,8 +112,9 @@ test.describe('Wishlist', () => {
       const demo = demoProducts.find((product) => product.productId === id);
       if (!demo) return route.fulfill({ json: productIphone });
       const price = LIVE_PRICES[demo.name];
+      const shopee = { ...productIphone.stores[0], store: 'Shopee', price, total: price, productId: id };
       return route.fulfill({
-        json: { ...productIphone, productId: id, title: demo.name, stores: [{ ...productIphone.stores[0], store: 'Shopee', price, total: price }] }
+        json: { ...productIphone, productId: id, title: demo.name, stores: [shopee], pick: shopee }
       });
     });
 
