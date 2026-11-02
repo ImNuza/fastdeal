@@ -4,7 +4,6 @@ import 'dotenv/config'
 import express from 'express'
 import { initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
-import fs from 'fs'
 import mongoose from 'mongoose'
 import multer from 'multer'
 import path from 'path'
@@ -35,7 +34,6 @@ const app = express()
 app.use(express.json())
 
 const PORT = process.env.PORT || 3000
-const proposalPath = path.join(__dirname, 'data', 'proposal.json')
 const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd-v4.html')
 const erdV3Path = path.join(__dirname, 'docs', 'fastdeal-erd-v3.html')
 const erdPresentPath = path.join(__dirname, 'docs', 'fastdeal-erd-present.html')
@@ -443,11 +441,6 @@ app.delete('/api/friends/:pairKey', requireUser, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
-})
-
-app.get('/api/proposal', (req, res) => {
-  const raw = fs.readFileSync(proposalPath, 'utf8')
-  res.json(JSON.parse(raw))
 })
 
 // Run a Google Shopping search (or reuse the saved one from the last 6 hours) and return it.

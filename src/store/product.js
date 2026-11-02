@@ -52,5 +52,5 @@ export const useProductStore = defineStore('product', () => {
     }
   }
 
-  return { product, loading, errorText, searchedWith, cheapest, ratingTotal, percentOf, loadProduct }
+  return { product, loading, errorText, searchedWith, cheapest, percentOf, loadProduct }
 })

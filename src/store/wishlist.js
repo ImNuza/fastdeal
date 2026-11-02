@@ -7,6 +7,158 @@ import { fetchCheapestLiveListing } from '../services/livePriceService.js'
 import { planBudget } from '../services/budgetPlanner.js'
 import { createBudget, updateBudget, deleteBudget } from '../services/userApi.js'
 
+// ---------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------
+// A price drop worth flagging: some store now sells it for at least 10% less than the saved price.
+// Smaller drops are left out so the tag only shows for real savings.
+const DROP_PERCENT = 10
+
+// ---------------------------------------------------------------
+// Helpers (they do not use the store's own state)
+// ---------------------------------------------------------------
+// user.value.wishlist is the in-memory copy. Every change updates it at once, then is written
+// to MongoDB through /api/wishlist. Writes run one after another.
+let writes = Promise.resolve()
+
+function write(request) {
+  // Queue the database write, allowing later writes
+  // to proceed even if an earlier one failed.
+  const operation = writes.then(request)
+
+  writes = operation.catch(function (err) {
+    console.error('[Wishlist] Could not save the change:', err)
+
+    // Restore the actual server data if a write fails.
+    if (user.value) {
+      void axios.get('/api/wishlist', { quiet: true }).then(function (res) {
+        if (user.value) user.value.wishlist = res.data
+      })
+    }
+  })
+
+  // Return the original operation so callers can detect failures.
+  return operation
+}
+
+function keyPath(item) {
+  return '/api/wishlist/' + encodeURIComponent(toProductKey(item.name))
+}
+
+// Sleep on it: when a countdown ends, tell the server once so it can notify the user.
+const pendingSleepNotifications = new Set()
+const completedSleepNotifications = new Set()
+
+async function checkExpiredSleepTimers() {
+  const currentUser = user.value
+  const uid = firebaseUser.value?.uid
+
+  if (!currentUser || !uid) return
+
+  const currentTime = Date.now()
+
+  for (const item of currentUser.wishlist || []) {
+    const expiry = Number(item.sleepUntil)
+    const startingPrice = Number(item.sleepPriceAtStart)
+
+    // Only check completed countdowns with a valid starting price.
+    if (
+      !Number.isFinite(expiry) ||
+      expiry <= 0 ||
+      expiry > currentTime ||
+      !Number.isFinite(startingPrice) ||
+      startingPrice <= 0
+    ) {
+      continue
+    }
+
+    const key = `${uid}:${item.name}:${expiry}`
+
+    if (
+      pendingSleepNotifications.has(key) ||
+      completedSleepNotifications.has(key)
+    ) {
+      continue
+    }
+    pendingSleepNotifications.add(key)
+    try {
+      // axios sends the login token (src/services/http.js). The server takes the uid from it.
+      await axios.post('/api/notifications/sleep-ended', {
+        productName: item.name,
+        sleepUntil: expiry
+      })
+      completedSleepNotifications.add(key)
+    } catch (error) {
+      console.error('[Sleep On It] Notification failed:', error)
+    } finally {
+      pendingSleepNotifications.delete(key)
+    }
+  }
+}
+
+// Calculate the percentage change and purchase verdict
+function verdictData(item, latest) {
+  const start = Number(item.sleepPriceAtStart)
+
+  if (
+    !Number.isFinite(start) ||
+    start <= 0 ||
+    !Number.isFinite(latest) ||
+    latest <= 0
+  ) {
+    return null
+  }
+
+  // Percentage change formula
+  const percent = ((latest - start) / start) * 100
+
+  // Absolute price difference
+  const difference = latest - start
+
+  let title = ''
+  let message = ''
+
+  if (percent <= -10) {
+    title = 'A better deal is available!'
+    message =
+      'The cheapest matching listing found is at least 10% below your saved price. ' +
+      'You may be able to save money by choosing this offer.'
+
+  } else if (percent < 0) {
+    title = 'A small saving is available'
+    message =
+      'The cheapest matching listing found is slightly cheaper than your saved price. ' +
+      'Consider whether the savings are worthwhile.'
+
+  } else if (percent === 0) {
+    title = 'No better deal found yet'
+    message =
+      'The cheapest matching listing found is the same as your saved price.'
+
+  } else {
+    title = 'No cheaper deal found'
+    message =
+      'The cheapest matching listing found costs more than your saved price. ' +
+      'Your original saved offer may still be better, if it remains available.'
+  }
+
+  return {
+    start,
+    latest,
+    percent,
+    difference,
+    title,
+    message
+  }
+}
+
+function pickKey(list) {
+  return (list || []).map(function (item) { return item.name }).sort().join('|')
+}
+
+// ---------------------------------------------------------------
+// Wishlist store
+// ---------------------------------------------------------------
 export const useWishlistStore = defineStore('wishlist', () => {
   // ---------------------------------------------------------------
   // Clock: the view ticks this every 30 seconds so "left" timers stay current
@@ -15,34 +167,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
   // ---------------------------------------------------------------
   // Wishlist
-  // user.value.wishlist is the in-memory copy. Every change updates it at once, then is written
-  // to MongoDB through /api/wishlist. Writes run one after another.
   // ---------------------------------------------------------------
-  let writes = Promise.resolve()
-
-  function write(request) {
-    // Queue the database write, allowing later writes
-    // to proceed even if an earlier one failed.
-    const operation = writes.then(request)
-
-    writes = operation.catch(function (err) {
-      console.error('[Wishlist] Could not save the change:', err)
-
-      // Restore the actual server data if a write fails.
-      if (user.value) {
-        void axios.get('/api/wishlist', { quiet: true }).then(function (res) {
-          if (user.value) user.value.wishlist = res.data
-        })
-      }
-    })
-
-    // Return the original operation so callers can detect failures.
-    return operation
-  }
-
-  function keyPath(item) {
-    return '/api/wishlist/' + encodeURIComponent(toProductKey(item.name))
-  }
 
   function saveProduct(name, listing, product) {
     if (!user.value || !listing || !(listing.price > 0)) {
@@ -177,57 +302,8 @@ export const useWishlistStore = defineStore('wishlist', () => {
   }
 
   // ---------------------------------------------------------------
-  // Sleep on it: when a countdown ends, tell the server once so it can notify the user.
+  // Sleep on it: check for ended countdowns after login, when the wishlist changes, and every 30 seconds
   // ---------------------------------------------------------------
-  const pendingSleepNotifications = new Set()
-  const completedSleepNotifications = new Set()
-
-  async function checkExpiredSleepTimers() {
-    const currentUser = user.value
-    const uid = firebaseUser.value?.uid
-
-    if (!currentUser || !uid) return
-
-    const currentTime = Date.now()
-
-    for (const item of currentUser.wishlist || []) {
-      const expiry = Number(item.sleepUntil)
-      const startingPrice = Number(item.sleepPriceAtStart)
-
-      // Only check completed countdowns with a valid starting price.
-      if (
-        !Number.isFinite(expiry) ||
-        expiry <= 0 ||
-        expiry > currentTime ||
-        !Number.isFinite(startingPrice) ||
-        startingPrice <= 0
-      ) {
-        continue
-      }
-
-      const key = `${uid}:${item.name}:${expiry}`
-
-      if (
-        pendingSleepNotifications.has(key) ||
-        completedSleepNotifications.has(key)
-      ) {
-        continue
-      }
-      pendingSleepNotifications.add(key)
-      try {
-        // axios sends the login token (src/services/http.js). The server takes the uid from it.
-        await axios.post('/api/notifications/sleep-ended', {
-          productName: item.name,
-          sleepUntil: expiry
-        })
-        completedSleepNotifications.add(key)
-      } catch (error) {
-        console.error('[Sleep On It] Notification failed:', error)
-      } finally {
-        pendingSleepNotifications.delete(key)
-      }
-    }
-  }
 
   // Check after login or when the wishlist changes.
   watch(
@@ -300,9 +376,6 @@ export const useWishlistStore = defineStore('wishlist', () => {
     }
   }
 
-  // A price drop worth flagging: some store now sells it for at least 10% less than the saved price.
-  // Smaller drops are left out so the tag only shows for real savings.
-  const DROP_PERCENT = 10
 
   function saving(item) {
     const listing = best(item)
@@ -356,67 +429,11 @@ export const useWishlistStore = defineStore('wishlist', () => {
     )
   }
 
-  // Calculate the percentage change and purchase verdict
-  function verdictData(item) {
-    const start = Number(item.sleepPriceAtStart)
-    const latest = verdictLatestPrice.value
-
-    if (
-      !Number.isFinite(start) ||
-      start <= 0 ||
-      !Number.isFinite(latest) ||
-      latest <= 0
-    ) {
-      return null
-    }
-
-    // Percentage change formula
-    const percent = ((latest - start) / start) * 100
-
-    // Absolute price difference
-    const difference = latest - start
-
-    let title = ''
-    let message = ''
-
-    if (percent <= -10) {
-      title = 'A better deal is available!'
-      message =
-        'The cheapest matching listing found is at least 10% below your saved price. ' +
-        'You may be able to save money by choosing this offer.'
-
-    } else if (percent < 0) {
-      title = 'A small saving is available'
-      message =
-        'The cheapest matching listing found is slightly cheaper than your saved price. ' +
-        'Consider whether the savings are worthwhile.'
-
-    } else if (percent === 0) {
-      title = 'No better deal found yet'
-      message =
-        'The cheapest matching listing found is the same as your saved price.'
-
-    } else {
-      title = 'No cheaper deal found'
-      message =
-        'The cheapest matching listing found costs more than your saved price. ' +
-        'Your original saved offer may still be better, if it remains available.'
-    }
-
-    return {
-      start,
-      latest,
-      percent,
-      difference,
-      title,
-      message
-    }
-  }
 
   // Automatically calculate the currently displayed verdict
   const activeVerdict = computed(() => {
     return verdictItem.value
-      ? verdictData(verdictItem.value)
+      ? verdictData(verdictItem.value, verdictLatestPrice.value)
       : null
   })
 
@@ -639,9 +656,6 @@ export const useWishlistStore = defineStore('wishlist', () => {
       : []
   })
 
-  function pickKey(list) {
-    return (list || []).map(function (item) { return item.name }).sort().join('|')
-  }
 
   function closeDraft() {
     editing.value = false
@@ -789,15 +803,15 @@ export const useWishlistStore = defineStore('wishlist', () => {
   return {
     now,
     saveProduct, savedFrom, isSaved, setTarget, removeSaved,
-    sleepOn, markSleepVerdictSeen, isAsleep, sleepEndsAt, asleep,
-    livePrices, liveLoading, liveErrors, best, loadLivePrice, saving, cheaper, savingPercent, reached,
-    verdictItem, verdictLatestPrice, verdictLoading, verdictError, hasFinishedSleep, activeVerdict,
+    sleepOn, isAsleep, sleepEndsAt, asleep,
+    liveLoading, liveErrors, best, loadLivePrice, saving, cheaper, savingPercent, reached,
+    verdictItem, verdictLoading, verdictError, hasFinishedSleep, activeVerdict,
     openVerdict, closeVerdict,
     budget, included, plan, planIndex, budgetError, plannable, heldCount, clearPlan, findPlan,
     nextOption, option, rankOf, setRank, pickedItems, missedItems, cheapestPlannable,
-    drafts, editing, editingId, editingDraft, draftName, draftSaving, draftError, draftChanged,
+    drafts, editing, editingDraft, draftName, draftSaving, draftError, draftChanged,
     startDraft, closeDraft, saveDraft, removeDraft,
-    friendOverlap, buyItem, selected, inviting, inviteSent, error,
+    buyItem, selected, inviting, inviteSent, error,
     fetchFriendOverlap, friendsFor, allInvited, openBuyTogether, closeBuyTogether, sendInvites
   }
 })

@@ -5,18 +5,31 @@ import { toProductKey } from '../../models/product-key.js'
 import { watchAuthState, signOutUser } from '../services/auth.js'
 import { getUser, updateUser } from '../services/userApi.js'
 
-const OLD_USERS_KEY = 'fastdeal-users'
+// ---------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------
+// A refresh while the server is restarting must not look like a logout: only a 404 means the
+// user is really not registered. Any other failure (server down, MongoDB not ready) is retried
+// for about 10 seconds. The router guard waits for this, so the page is not sent to /login.
+const PROFILE_TRIES = 5
+const PROFILE_RETRY_MS = 2000
 
-// Raw refs, shared with the wishlist store and the Pinia store below: one source of truth.
+// ---------------------------------------------------------------
+// State shared with the wishlist store, which imports user, firebaseUser and findSaved
+// ---------------------------------------------------------------
 export const user = ref(null)
 export const firebaseUser = ref(null)
-export const authReady = ref(false)
+const authReady = ref(false)
 
 let _signupInProgress = false
-export function startSignup() { _signupInProgress = true }
-export function endSignup()   { _signupInProgress = false }
 
-export function applyDbUser(dbUser, fbUser) {
+// ---------------------------------------------------------------
+// Helpers (only the store below and the Firebase listener use these)
+// ---------------------------------------------------------------
+function startSignup() { _signupInProgress = true }
+function endSignup() { _signupInProgress = false }
+
+function applyDbUser(dbUser, fbUser) {
   user.value = {
     email: fbUser.email,
     displayName: fbUser.displayName || '',
@@ -48,33 +61,12 @@ async function loadWishlist(email) {
     const { data } = await axios.get('/api/wishlist')
     if (!user.value || user.value.email !== email) return
     user.value.wishlist = data
-    await copyOldWishlist(email)
   } catch (err) {
     console.error('[Wishlist] Could not load:', err)
   }
 }
 
-async function copyOldWishlist(email) {
-  let list = []
-  try { list = JSON.parse(localStorage.getItem(OLD_USERS_KEY) || '[]') } catch { list = [] }
-  const mine = list.find(function (entry) { return entry.email === email })
-  if (!mine) return
-  for (const old of mine.wishlist || []) {
-    if (!old.name || !(Number(old.savedPrice) > 0) || findSaved(old.name)) continue
-    const { data } = await axios.post('/api/wishlist', {
-      name: old.name, store: old.savedStore, price: old.savedPrice,
-      targetPrice: old.targetPrice, savedAt: old.savedAt,
-      sleepUntil: old.sleepUntil, sleepPriceAtStart: old.sleepPriceAtStart,
-      sleepVerdictSeen: old.sleepVerdictSeen
-    })
-    user.value.wishlist.push(data)
-  }
-  const rest = list.filter(function (entry) { return entry.email !== email })
-  if (rest.length) { localStorage.setItem(OLD_USERS_KEY, JSON.stringify(rest)) }
-  else { localStorage.removeItem(OLD_USERS_KEY) }
-}
-
-export async function toggleEmail() {
+async function toggleEmail() {
   if (!user.value || !firebaseUser.value) {
     return
   }
@@ -85,12 +77,6 @@ export async function toggleEmail() {
     console.warn('[FastDeal] Could not sync emailAlertsOn to MongoDB:', err.message)
   }
 }
-
-// A refresh while the server is restarting must not look like a logout: only a 404 means the
-// user is really not registered. Any other failure (server down, MongoDB not ready) is retried
-// for about 10 seconds. The router guard waits for this, so the page is not sent to /login.
-const PROFILE_TRIES = 5
-const PROFILE_RETRY_MS = 2000
 
 async function loadDbUser() {
   for (let attempt = 1; ; attempt++) {
@@ -123,12 +109,14 @@ watchAuthState(async function (fbUser) {
   }
 })
 
-// Pinia store — wraps the refs above and adds isLoggedIn / isAdmin computed.
+// ---------------------------------------------------------------
+// Auth store
 // Usage: const auth = useAuthStore()
 //        auth.user / auth.isAdmin / auth.authReady / auth.startSignup() …
+// ---------------------------------------------------------------
 export const useAuthStore = defineStore('auth', () => {
-  const isLoggedIn = computed(() => !!user.value)
+  // ---------- Getters ----------
   const isAdmin = computed(() => user.value?.role === 'admin')
 
-  return { user, authReady, firebaseUser, isLoggedIn, isAdmin, startSignup, endSignup, applyDbUser, toggleEmail }
+  return { user, authReady, firebaseUser, isAdmin, startSignup, endSignup, applyDbUser, toggleEmail }
 })
