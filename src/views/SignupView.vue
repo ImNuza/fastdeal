@@ -82,10 +82,13 @@ async function onEmailSignUp() {
   }
   loading.value = true
   startSignup()
+  let fbUser = null
+  let profileCreated = false
   try {
     const { updateUser } = await import('../services/userApi.js')
-    const fbUser = await signUpWithEmail(email.value, password.value)
+    fbUser = await signUpWithEmail(email.value, password.value)
     const dbUser = await createOrGetUser(u)
+    profileCreated = true
     if (tg) {
       try { await updateUser({ telegramUsername: tg }) } catch {}
       dbUser.telegramUsername = tg
@@ -94,6 +97,16 @@ async function onEmailSignUp() {
     const next = route.query.next
     router.push(typeof next === 'string' && next.startsWith('/') ? next : '/wishlist')
   } catch (err) {
+    // The Firebase account was made but the profile was not (for example the username is taken).
+    // Remove the account so the same email can sign up again, not stay stuck.
+    if (fbUser && !profileCreated) {
+      try {
+        await fbUser.delete()
+      } catch(error){
+        console.error(error)
+      }
+      
+    }
     if (err.code === 'auth/email-already-in-use') {
       errorText.value = 'That email already has an account.'
     } else if (err.response?.status === 409) {
