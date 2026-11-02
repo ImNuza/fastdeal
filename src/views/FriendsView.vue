@@ -430,7 +430,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
       <div v-else-if="activeTab === 'add'" class="friend-search">
         <input v-model="searchQuery" class="friend-search-input" type="text" placeholder="Type a username"
           aria-label="Search people by username" autocomplete="off" />
-        <FdLoadingDots v-if="searching" size="inline" message="Searching" class="text-secondary" />
+        <FdLoadingDots v-if="searching" size="inline" message="Searching" class="text-secondary friend-search-busy" />
         <span v-else class="friend-search-icon" aria-hidden="true">
           <FdIcon name="search" />
         </span>
@@ -657,6 +657,15 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
   width: 2.25rem;
   height: 2.25rem;
   color: var(--fd-blue);
+}
+
+/* Searching, in place of the icon: one line, centred in the bar, so it never wraps under the input. */
+.friend-search-busy {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-self: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 /* Every outline on the page is the vanilla line, like the rest of the app's components. */
