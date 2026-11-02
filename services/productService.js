@@ -1,4 +1,5 @@
-// Product page data: every store for one product, buyer reviews and the typical price.
+// Product page data: the Compare listings, the clicked one as "Your pick", buyer reviews and the
+// typical price. Google Immersive Product gives the photo, rating, reviews and description.
 // Flow: ProductView -> GET /api/product/:productId?q= -> getProduct(productId, q)
 //   1. productCache has it and the prices are under 24 hours old: use it, no SerpApi credit.
 //   2. productCache has it but the prices are older: refresh with the saved token (1 credit).
@@ -237,37 +238,50 @@ async function loadFromSerpApi(productId, productKey, q, cached) {
   return row
 }
 
-// Every other listing from the saved search for q (the Compare page's listings), so the product
-// page lists everything Compare showed, one row per listing, even several from one store.
-// Only this product's own listing is skipped, since its stores are already in the list.
-// Like Compare, only the first 10 listings with a price count. Read from searchCache, so no SerpApi credit.
-async function searchStores(productKey, productId) {
-  const saved = await SearchCache.findOne({ queryKey: productKey, expiresAt: { $gt: new Date() } }).lean()
-  if (!saved) {
+// The product page lists the same listings as Compare (the team agreed this on 2 Nov): the first
+// 10 Google Shopping listings with a price, for the search q. The other stores from Google
+// Immersive Product are not shown. search() reuses the saved search for 6 hours, so this costs no
+// SerpApi credit when the shopper comes from Compare. Returns [] when there is no search or it fails.
+async function searchListings(q) {
+  if (!q) {
     return []
   }
-  return saved.listings
-    .filter(function (row) { return Number(row.price) > 0 })
-    .slice(0, 10)
-    .filter(function (row) { return row.productId !== productId })
-    .map(function (row) {
-      return {
-        store: row.store,
-        logo: '',
-        price: row.price,
-        oldPrice: row.oldPrice || null,
-        shipping: row.freeShipping ? 'Free' : '',
-        total: row.price,
-        link: storeUrl(row.link),
-        tag: '',
-        note: '',
-        moreOffers: 0,
-        moreFrom: null,
-        // The listing's own name: it can be a different model from this product.
-        name: row.name || '',
-        fromSearch: true
-      }
-    })
+  try {
+    const result = await search(q)
+    return result.listings.filter(function (row) { return Number(row.price) > 0 }).slice(0, 10)
+  } catch (error) {
+    return []
+  }
+}
+
+// One search listing in the row shape the product page uses. Google Shopping gives no shipping
+// amount, only free shipping or nothing, so the total is the price.
+function toListingRow(row) {
+  return {
+    store: row.store,
+    logo: '',
+    price: row.price,
+    oldPrice: row.oldPrice || null,
+    shipping: row.freeShipping ? 'Free' : '',
+    total: row.price,
+    link: storeUrl(row.link),
+    tag: '',
+    note: '',
+    moreOffers: 0,
+    moreFrom: null,
+    // The listing's own name: it can be a different model from this product.
+    name: row.name || '',
+    productId: row.productId || ''
+  }
+}
+
+// The listing the shopper clicked on Compare: the same product id, else the same title,
+// because Google can give a product a new id in a new search.
+function findPick(rows, productId, title) {
+  const titleKey = title ? toProductKey(title) : ''
+  return rows.find(function (row) { return row.productId === productId }) ||
+    rows.find(function (row) { return titleKey && toProductKey(row.name) === titleKey }) ||
+    null
 }
 
 export async function getProduct(productId, q) {
@@ -279,15 +293,19 @@ export async function getProduct(productId, q) {
     product = await loadFromSerpApi(productId, productKey, q, product)
   }
 
-  const typical = typicalPrice(product.stores)
-  const stores = product.stores
-    .map(function (store) {
-      // storeUrl here also fixes rows saved in productCache before this change.
+  // The Compare listings. Without a search (it failed, or the link has no q), the stores saved
+  // from Google Immersive Product, so the page is never empty.
+  let stores = (await searchListings(q || product.q)).map(toListingRow)
+  if (!stores.length) {
+    // storeUrl here also fixes rows saved in productCache before the link fix.
+    stores = product.stores.map(function (store) {
       return Object.assign({}, store, { link: storeUrl(store.link) })
     })
-    .sort(function (a, b) {
-      return a.total - b.total
-    })
+  }
+  stores.sort(function (a, b) {
+    return a.total - b.total
+  })
+  const pick = findPick(stores, product.productId, product.title)
 
   return {
     productId: product.productId,
@@ -306,10 +324,11 @@ export async function getProduct(productId, q) {
     // for rows saved before the page was kept.
     reviewsLink: product.googleLink ||
       'https://www.google.com/search?udm=28&q=' + encodeURIComponent(product.title + ' reviews'),
-    typicalPrice: typical,
+    // The middle price of the listings. They can be different models, so the AI is told so.
+    typicalPrice: typicalPrice(stores),
     stores: stores,
-    // Shown in the same All stores list, but left out of the cheapest, typical price and verdict.
-    searchStores: await searchStores(toProductKey(q || product.q || ''), product.productId),
+    // The clicked listing ("Your pick"), or null when the search no longer has it.
+    pick: pick,
     fetchedAt: product.storesFetchedAt
   }
 }

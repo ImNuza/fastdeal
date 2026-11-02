@@ -1,7 +1,8 @@
 // Server-side (Node/Express) "Worth It" verdict model for FastDeal.
 // Flow: ProductView -> GET /api/worth-it?productId=&q= -> server.js loads the product (cached)
 // and the next big sale -> worthIt(product, sale) -> Gemini.
-// Gemini reads the rows from services/worthItInputs.js (live store prices and the sale calendar),
+// Gemini reads the rows from services/worthItInputs.js (the search listings, the shopper's pick and
+// the sale calendar),
 // and returns buy now or wait. The answer, the rows and the
 // exact prompt go back together, so the "How this verdict was made" page can show what the AI read.
 //
@@ -130,7 +131,8 @@ const DAY = 24 * 3600000
 // Part of the cache key. Change it when the inputs change, so no saved verdict shows old inputs.
 // v2: price history removed (31 Oct).
 // v3: the verdict carries the next sale's name, for the "Wait for 11.11" tag (2 Nov).
-const INPUTS_VERSION = 'v3'
+// v4: reads the Compare listings and the shopper's pick, not Google Immersive's stores (2 Nov).
+const INPUTS_VERSION = 'v4'
 
 // Public entry point. product: from getProduct.
 // sale: the next big sale ({ name, day, daysAway }) or null.
@@ -141,19 +143,21 @@ export async function worthIt(product, sale) {
   const cheapest = (product.stores || []).filter(function (row) { return row.total > 0 })
     .reduce(function (low, row) { return !low || row.total < low.total ? row : low }, null)
   if (!cheapest) return fallbackVerdict('No store price was found for this product.')
+  // The verdict is about the listing the shopper clicked, else the cheapest.
+  const pick = product.pick && product.pick.total > 0 ? product.pick : cheapest
 
   const prompt = verdictPrompt(rows)
   const extra = {
     inputs: rows,
     summary: summary,
     prompt: prompt,
-    price: cheapest.total,
+    price: pick.total,
     // "11.11", so the tag can say "Wait for 11.11". Empty when no big sale is coming.
     saleName: sale ? sale.name.replace(/ sale$/, '') : '',
     product: { productId: product.productId, q: product.q || '', title: product.title, image: product.image || '' }
   }
 
-  const key = INPUTS_VERSION + '|' + product.productId + '|' + cheapest.total.toFixed(2) + '|' + sgDay(Date.now())
+  const key = INPUTS_VERSION + '|' + product.productId + '|' + pick.total.toFixed(2) + '|' + cheapest.total.toFixed(2) + '|' + sgDay(Date.now())
   try {
     const saved = await WorthItCache.findOne({ key: key, expiresAt: { $gt: new Date() } }).lean()
     if (saved) return Object.assign({}, saved.verdict, { cached: true })
