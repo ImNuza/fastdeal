@@ -6,6 +6,9 @@ import { storeToRefs } from 'pinia'
 import FdIcon from '../components/FdIcon.vue'
 import FdConfirmDialog from '../components/FdConfirmDialog.vue'
 import { sgd } from '../services/format.js'
+import { useTabReachesCorner } from '../services/folderTabs.js'
+import FdPager from '../components/FdPager.vue'
+import { useListPages } from '../services/listPages.js'
 
 const adminStore = useAdminStore()
 const { stats, users, loading, error } = storeToRefs(adminStore)
@@ -23,19 +26,10 @@ const ROLE_TABS = [
 ]
 const roleFilter = ref('all')
 
-// The count under the list, worded like Friends and Wishlist: "Total: 5 admins", or
-// "2 of 5 admins shown" while searching.
-const userCount = computed(function () {
-  const total = roleFilter.value === 'all'
-    ? users.value.length
-    : users.value.filter(function (u) { return u.role === roleFilter.value }).length
-  const word = roleFilter.value === 'admin' ? 'admin' : 'user'
-  const noun = total === 1 ? word : word + 's'
-  if (search.value.trim()) {
-    return filteredUsers.value.length + ' of ' + total + ' ' + noun + ' shown'
-  }
-  return 'Total: ' + total + ' ' + noun
-})
+// Squares the card's top right corner while the open tab reaches it.
+const tabsEl = ref(null)
+const panelEl = ref(null)
+const tabAtCorner = useTabReachesCorner(tabsEl, panelEl, roleFilter)
 
 // Arrow keys move between tabs, as tab lists do.
 function onTabKey(event, index) {
@@ -205,6 +199,13 @@ function sortName(u) {
   return (u.username || u.email || '').toLowerCase()
 }
 
+// Everyone in the open role tab, before the search. While it is empty the search and sort hide.
+const roleUsers = computed(function () {
+  return users.value.filter(function (u) {
+    return roleFilter.value === 'all' || u.role === roleFilter.value
+  })
+})
+
 const filteredUsers = computed(function () {
   const q = search.value.trim().toLowerCase()
   const list = users.value.filter(function (u) {
@@ -369,6 +370,12 @@ async function confirmRoleChange() {
     saving.value = false
   }
 }
+
+// Phones: 10 rows a page, with the page buttons in the bar. Wider: the count only.
+const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal, isPhone: listOnPhone } = useListPages(
+  filteredUsers,
+  [roleFilter, search, userSort]
+)
 </script>
 
 <template>
@@ -549,7 +556,7 @@ async function confirmRoleChange() {
     <section class="fd-manage">
     <h2 class="fd-section-title">Manage Users</h2>
 
-    <div class="fd-role-tabs" role="tablist" aria-label="Users by role">
+    <div ref="tabsEl" class="fd-role-tabs" role="tablist" aria-label="Users by role">
       <button v-for="(tab, i) in ROLE_TABS" :id="'fd-role-tab-' + tab.id" :key="tab.id" class="fd-role-tab"
         :class="{ 'is-active': roleFilter === tab.id }" type="button" role="tab"
         :aria-selected="roleFilter === tab.id" aria-controls="fd-role-panel"
@@ -558,9 +565,10 @@ async function confirmRoleChange() {
       </button>
     </div>
 
-    <div id="fd-role-panel" class="fd-role-panel" :class="{ 'is-first-open': roleFilter === 'all' }"
+    <div ref="panelEl" id="fd-role-panel" class="fd-role-panel" :class="{ 'is-first-open': roleFilter === 'all', 'is-corner-open': tabAtCorner }"
       role="tabpanel" :aria-labelledby="'fd-role-tab-' + roleFilter">
-      <div class="fd-admin-tools">
+      <!-- Search and sort only once the open tab has someone to search, like the Wishlist. -->
+      <div v-if="roleUsers.length" class="fd-admin-tools">
         <div class="fd-admin-search">
           <input v-model="search" class="fd-admin-search-input" type="text" placeholder="Search name or email"
             aria-label="Search users by username or email" autocomplete="off" />
@@ -581,7 +589,7 @@ async function confirmRoleChange() {
       <div class="fd-user-body">
       <div ref="listEl" class="fd-user-scroll" tabindex="0" aria-label="Users list" @scroll="updateBar">
       <div v-if="filteredUsers.length" class="fd-user-rows">
-        <div v-for="u in filteredUsers" :key="u.firebaseUid" class="fd-user-card">
+        <div v-for="u in pageRows" :key="u.firebaseUid" class="fd-user-card">
           <div class="fd-avatar" aria-hidden="true">{{ initials(u) }}</div>
           <div class="fd-user-info">
             <div class="fd-user-name">
@@ -604,11 +612,12 @@ async function confirmRoleChange() {
         </div>
       </div>
 
-      <p v-else class="alert alert-secondary mb-0">No users match your search.</p>
+      <p v-else-if="roleUsers.length" class="alert alert-secondary mb-0">No users match your search.</p>
+      <p v-else class="alert alert-secondary mb-0">No {{ roleFilter === 'admin' ? 'admins' : 'users' }} here yet.</p>
       </div>
 
         <!-- Hidden from screen readers: the list itself scrolls with the keyboard. -->
-        <div class="fd-scrollbar" aria-hidden="true">
+        <div v-if="roleUsers.length" class="fd-scrollbar" aria-hidden="true">
           <button class="fd-scrollbar-arrow" type="button" tabindex="-1" @click="scrollStep(-1)">
             <FdIcon name="chevron-up" />
           </button>
@@ -623,8 +632,8 @@ async function confirmRoleChange() {
       </div>
     </div>
 
-    <div class="fd-admin-bar">
-      <p class="fd-admin-bar-count" aria-live="polite">{{ userCount }}</p>
+    <div v-if="listTotal > 0" class="fd-admin-bar" :class="{ 'has-pager': listOnPhone && listTotal > 0 }">
+      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" :noun="roleFilter === 'admin' ? 'admins' : 'users'" label="Users" :top="panelEl" />
     </div>
     </section>
   </div>
@@ -1269,11 +1278,6 @@ async function confirmRoleChange() {
   background: var(--fd-beige);
 }
 
-.fd-admin-bar-count {
-  margin: 0;
-  color: var(--fd-text-muted);
-  font-size: var(--fd-small);
-}
 
 .fd-role-panel {
   position: relative;
@@ -1286,6 +1290,11 @@ async function confirmRoleChange() {
 
 .fd-role-panel.is-first-open {
   border-top-left-radius: 0;
+}
+
+/* Same on the right, while the open tab reaches the card's top right corner. */
+.fd-role-panel.is-corner-open {
+  border-top-right-radius: 0;
 }
 
 /* Search and Sort by in one row, like the Wishlist's */
@@ -1388,6 +1397,26 @@ async function confirmRoleChange() {
 /* The search and sort end where the cards end, leaving the scrollbar's column free */
 .fd-role-panel > .fd-admin-tools {
   margin-right: 1.75rem;
+}
+
+/* Phones: no box inside the card, like the Wishlist. The list runs its full length, the page
+   scrolls instead, and the search no longer leaves room for a scrollbar. */
+@media (max-width: 767.98px) {
+  .fd-user-body {
+    height: auto;
+  }
+
+  .fd-user-scroll {
+    overflow-y: visible;
+  }
+
+  .fd-user-body .fd-scrollbar {
+    display: none;
+  }
+
+  .fd-role-panel > .fd-admin-tools {
+    margin-right: 0;
+  }
 }
 
 .fd-scrollbar {
@@ -1556,6 +1585,15 @@ async function confirmRoleChange() {
   .fd-role-panel {
     padding: 1rem;
   }
+}
+
+
+/* Phones: the page buttons centred, with their "Showing" line under them. */
+.fd-admin-bar.has-pager {
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem 0 1.25rem;
 }
 
 </style>

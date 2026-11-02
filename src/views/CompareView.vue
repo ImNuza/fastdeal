@@ -12,6 +12,8 @@ import { sessionId } from '../services/searchSession.js'
 import { fetchSearchedWith } from '../services/productApi.js'
 import { useCompareStore } from '../store/compare.js'
 import axios from 'axios'
+import FdPager from '../components/FdPager.vue'
+import { useListPages } from '../services/listPages.js'
 
 const route = useRoute()
 const { user } = storeToRefs(useAuthStore())
@@ -154,6 +156,13 @@ onMounted(async function () {
   await loadResult(q)
   searchedWith.value = await fetchSearchedWith(q,sessionId())
 })
+
+// Phones: 10 rows a page, with the page buttons in the bar. Wider: the count only.
+const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal, isPhone: listOnPhone } = useListPages(
+  rows,
+  [minPrice, maxPrice, storeName, minRating, freeOnly, saleOnly, sortBy]
+)
+const listingsEl = ref(null)
 </script>
 
 <template>
@@ -219,9 +228,9 @@ onMounted(async function () {
 
     <p v-if="!rows.length" class="alert alert-warning">No listings match these filters.</p>
 
-    <div v-else class="fd-listings">
+    <div v-else ref="listingsEl" class="fd-listings">
       <ul class="fd-card-grid" role="list">
-        <li v-for="row in rows" :key="rowKey(row)">
+        <li v-for="row in pageRows" :key="rowKey(row)">
           <article class="fd-listing-card" :class="{ cheapest: row.price === lowInView }">
             <div class="fd-listing-media">
               <img
@@ -271,10 +280,8 @@ onMounted(async function () {
       </ul>
 
       <!-- Sticks to the bottom of the screen while the listings scroll past, like the Wishlist's total bar. -->
-      <div class="fd-listings-bar">
-        <p class="fd-listings-count" aria-live="polite">
-          {{ rows.length === result.listings.length ? rows.length + ' listings' : rows.length + ' of ' + result.listings.length + ' listings' }}
-        </p>
+      <div class="fd-listings-bar" :class="{ 'has-pager': listOnPhone && listTotal > 0 }">
+        <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" noun="listings" label="Listings" :top="listingsEl" />
       </div>
     </div>
 
@@ -317,11 +324,6 @@ onMounted(async function () {
 }
 
 /* Same type as the Wishlist's total: small, muted. */
-.fd-listings-count {
-  margin: 0;
-  color: var(--fd-text-muted);
-  font-size: var(--fd-small);
-}
 
 /* Listings as a responsive card grid: 4 per row on wide screens, down to 1 on phones. */
 .fd-card-grid {
@@ -478,4 +480,13 @@ onMounted(async function () {
 .fd-listing-link:focus-visible {
   text-decoration: underline;
 }
+
+/* Phones: the page buttons centred, with their "Showing" line under them. */
+.fd-listings-bar.has-pager {
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem 0 1.25rem;
+}
+
 </style>

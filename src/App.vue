@@ -150,6 +150,46 @@ onMounted(() => {
 
 onBeforeUnmount(() => navObserver?.disconnect())
 
+// Phone menu. With a mouse it opens when the hamburger is hovered and closes when the mouse
+// leaves the navbar; on touch screens it only opens and closes on tap.
+const navMenu = ref(null)
+const menuOpen = ref(false)
+let openedByHover = false
+
+function menu() {
+  return window.bootstrap.Collapse.getOrCreateInstance(navMenu.value, { toggle: false })
+}
+
+function canHover() {
+  return window.matchMedia('(hover: hover)').matches
+}
+
+function openMenuOnHover() {
+  if (!canHover() || menuOpen.value) return
+  openedByHover = true
+  menu().show()
+}
+
+// A click right after hovering would otherwise close the menu the hover just opened.
+function onTogglerClick() {
+  if (openedByHover) {
+    openedByHover = false
+    return
+  }
+  menuOpen.value ? menu().hide() : menu().show()
+}
+
+function closeMenuOnLeave() {
+  openedByHover = false
+  if (canHover() && menuOpen.value) menu().hide()
+}
+
+// Bootstrap ignores show and hide mid-animation, so its own events say whether the menu is open.
+onMounted(() => {
+  navMenu.value.addEventListener('show.bs.collapse', () => { menuOpen.value = true })
+  navMenu.value.addEventListener('hide.bs.collapse', () => { menuOpen.value = false })
+})
+
 // Wait for the first route to resolve, otherwise every page looks like '/' on load.
 onMounted(async () => {
   await router.isReady()
@@ -196,15 +236,23 @@ watch([() => route.path, user], maybeShowEntryDialog)
 </style>
 
 <template>
-  <nav ref="navBar" class="navbar navbar-expand-lg navbar-dark fd-nav sticky-top">
+  <nav ref="navBar" @mouseleave="closeMenuOnLeave" class="navbar navbar-expand-lg navbar-dark fd-nav sticky-top">
     <div class="container">
       <router-link class="navbar-brand" to="/" aria-label="FastDeal home"><FdLogo /></router-link>
-      <!-- Search sits beside the logo on every page except Home, which has its own in the hero. -->
-      <FdSearchBar v-if="!route.meta.heroSearch" compact class="fd-nav-search" />
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#fdNav">
+      <button
+        class="navbar-toggler"
+        type="button"
+        aria-controls="fdNav"
+        aria-label="Menu"
+        :aria-expanded="menuOpen"
+        @click="onTogglerClick"
+        @mouseenter="openMenuOnHover"
+      >
         <span class="navbar-toggler-icon"></span>
       </button>
-      <div class="collapse navbar-collapse" id="fdNav">
+      <div ref="navMenu" class="collapse navbar-collapse" id="fdNav">
+        <!-- Top of the phone menu, beside the logo on desktop. Not on Home, which has its own in the hero. -->
+        <FdSearchBar v-if="!route.meta.heroSearch" compact class="fd-nav-search" />
         <ul class="navbar-nav ms-auto align-items-lg-center fd-nav-right">
           <li class="nav-item">
             <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/wishlist') }" active-class="" exact-active-class="" to="/wishlist">

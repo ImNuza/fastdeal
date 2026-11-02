@@ -9,6 +9,11 @@ defineProps({
   label: {
     type: String,
     default: 'List'
+  },
+  // False while the list has nothing in it, so an empty tab shows no scrollbar
+  bar: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -113,14 +118,19 @@ defineExpose({ toTop })
 
 <template>
   <div class="fd-scroll-area">
-    <div ref="listEl" class="fd-scroll-area-list" tabindex="0" :aria-label="label" @scroll="updateBar">
-      <div ref="contentEl">
-        <slot />
+    <!-- The list, with an optional footer under it that stays put, such as New budget. The
+         scrollbar beside them runs the full height of both. -->
+    <div class="fd-scroll-area-main">
+      <div ref="listEl" class="fd-scroll-area-list" tabindex="0" :aria-label="label" @scroll="updateBar">
+        <div ref="contentEl">
+          <slot />
+        </div>
       </div>
+      <slot name="footer" />
     </div>
 
     <!-- Hidden from screen readers: the list itself scrolls with the keyboard. -->
-    <div class="fd-scrollbar" aria-hidden="true">
+    <div v-if="bar" class="fd-scrollbar" aria-hidden="true">
       <button class="fd-scrollbar-arrow" type="button" tabindex="-1" @click="scrollStep(-1)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round"><path d="m18 15-6-6-6 6" /></svg>
@@ -146,12 +156,21 @@ defineExpose({ toTop })
   min-height: 0;
 }
 
+.fd-scroll-area-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
 .fd-scroll-area-list {
   /* Positioned, so absolutely positioned things inside (such as Bootstrap's visually-hidden
      screen reader text) scroll and clip with the list instead of stretching the page below it. */
   position: relative;
   flex: 1;
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -168,6 +187,22 @@ defineExpose({ toTop })
 /* Room after the last item, so at the end of the scroll its bottom edge shows above the line */
 .fd-scroll-area-list > div {
   padding-bottom: 1.25rem;
+}
+
+/* Phones: no box inside the card. The list runs its full length and the page scrolls instead.
+   Important, so it also beats the heights pages set on the area (inline on Product). */
+@media (max-width: 767.98px) {
+  .fd-scroll-area {
+    max-height: none !important;
+  }
+
+  .fd-scroll-area-list {
+    overflow-y: visible;
+  }
+
+  .fd-scrollbar {
+    display: none !important;
+  }
 }
 
 .fd-scrollbar {
