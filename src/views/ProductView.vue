@@ -12,8 +12,8 @@ import { useProductStore } from '../store/product.js'
 import { itemName } from '../services/itemName.js'
 import { fetchWorthIt } from '../services/productApi.js'
 
-// One product: every store that sells it, cheapest total first, the AI verdict,
-// what buyers say and the product details.
+// One product: the listings from its search (the same ones Compare shows), cheapest first, with the
+// one the shopper clicked as Your pick, the AI verdict, what buyers say and the product details.
 // URL: /product/:productId?q=<the search it came from>
 const route = useRoute()
 
@@ -62,29 +62,31 @@ const worthItLabel = computed(function () {
 })
 
 
-// All stores: this product's own stores and the other stores from the Compare search, as one
-// list, cheapest total first. Only the product's own stores count for the cheapest and the verdict.
+// All listings: the listings from the search, the same ones and the same number as on Compare,
+// cheapest first (the server sorts them). The verdict reads the same rows.
 const allStores = computed(function () {
-  if (!product.value) {
-    return []
-  }
-  return product.value.stores.concat(product.value.searchStores || [])
-    .sort(function (a, b) { return a.total - b.total })
+  return product.value ? product.value.stores : []
 })
 
-// All stores compares every row with the store picked on Compare (?store=), or, from a shared link
-// with no store, this product's cheapest store. The product's own row wins over a search row
-// from the same store.
-const baseRow = computed(function () {
-  const picked = route.query.store
-  if (picked) {
-    const own = allStores.value.find(function (row) { return row.store === picked && !row.fromSearch })
-    const any = allStores.value.find(function (row) { return row.store === picked })
-    if (own || any) {
-      return own || any
-    }
+// Your pick: the listing the shopper clicked on Compare. Every other row is compared with it, and the
+// price, Save and Go to store at the top are its own. When the search no longer has that listing,
+// the store picked on Compare (?store=), else the cheapest listing.
+const pickedRow = computed(function () {
+  const pick = product.value && product.value.pick
+  if (pick) {
+    return allStores.value.find(function (row) { return row.productId === pick.productId }) || null
   }
-  return cheapest.value
+  const picked = route.query.store
+  return picked ? allStores.value.find(function (row) { return row.store === picked }) || null : null
+})
+
+const baseRow = computed(function () {
+  return pickedRow.value || cheapest.value
+})
+
+// The search, as a product name, for the All listings line: "Apple iPhone 16 Pro".
+const searchName = computed(function () {
+  return itemName((product.value && product.value.q) || route.query.q || '')
 })
 
 // How much more (+) or less (-) a row's total is than the base row's, in cents-safe dollars.
@@ -92,9 +94,9 @@ function diffFromBase(row) {
   return Math.round((row.total - baseRow.value.total) * 100) / 100
 }
 
-// The cheapest store's saving against its own crossed-out "was" price, or null when it shows none.
+// Your pick's saving against its own crossed-out "was" price, or null when it shows none.
 const saving = computed(function () {
-  const row = cheapest.value
+  const row = baseRow.value
   if (!row || !row.oldPrice || row.oldPrice <= row.price) {
     return null
   }
@@ -102,7 +104,7 @@ const saving = computed(function () {
   return { amount: amount, percent: Math.round((amount / row.oldPrice) * 100) }
 })
 
-// All stores shows STORES_IN_VIEW rows at a time and scrolls for the rest. Rows differ in height
+// All listings shows STORES_IN_VIEW rows at a time and scrolls for the rest. Rows differ in height
 // (a "Listed as" line, a note), so the box is measured to end exactly at the bottom of the third row.
 // Re-measured whenever the rows change size: a new product, or the screen width changing.
 const STORES_IN_VIEW = 3
@@ -153,8 +155,8 @@ const aiReadOpen = ref(false)
 const aiReadDialog = ref(null)
 let aiReadOpener = null
 
-// The steps follow the prompt the AI is given (services/worthItInputs.js): the cheapest total,
-// then the typical price and range, any store already on sale, then the next big sale.
+// The steps follow the prompt the AI is given (services/worthItInputs.js): your pick, the cheapest
+// listing, then the typical price and range, any listing already on sale, then the next big sale.
 // When the AI did not answer, the fixed rules that made the verdict instead.
 // A value quoted mid-sentence starts lower case ("no store shows..."), unless it starts with a
 // name or number such as "S$" or "11.11".
@@ -173,17 +175,20 @@ const aiSteps = computed(function () {
     input[row.key] = row
   }
   const steps = []
+  if (input.pick) {
+    steps.push('Took your pick: ' + input.pick.value + '.')
+  }
   if (input.cheapest) {
-    steps.push('Found the cheapest total today: ' + input.cheapest.value + '.')
+    steps.push('Found the cheapest listing in your search: ' + input.cheapest.value + '.')
   }
   if (input.typical && input.typical.sent) {
     steps.push('Compared it with the typical price, ' + input.typical.value + ', and the range, ' +
       (input.range ? input.range.value : 'not shown') + '.')
   } else if (input.range) {
-    steps.push('Too few stores for a typical price, so it used the range instead: ' + input.range.value + '.')
+    steps.push('Too few listings for a typical price, so it used the range instead: ' + input.range.value + '.')
   }
   if (input['sale-now']) {
-    steps.push('Checked for a store already on sale: ' + midSentence(input['sale-now'].value) + '.')
+    steps.push('Checked for a listing already on sale: ' + midSentence(input['sale-now'].value) + '.')
   }
   if (input['next-sale'] && input['next-sale'].sent) {
     steps.push('Weighed buying now against waiting for the next big sale: ' + input['next-sale'].value + '.')
@@ -194,8 +199,9 @@ const aiSteps = computed(function () {
     steps.push('Also saw the rating: ' + input.rating.value + '.')
   }
   if (v.source === 'rules') {
-    steps.push('The AI did not answer, so fixed rules decided: 10% or more under the typical price is a buy; ' +
-      'otherwise a big sale within 14 days is worth the wait; otherwise the price is fair.')
+    steps.push('The AI did not answer, so fixed rules decided: 10% or more under the typical price is a buy, ' +
+      'and 10% or more over it is a wait. Otherwise, a big sale within 14 days is worth the wait. ' +
+      'Otherwise, the price is fair.')
   }
   return steps
 })
@@ -222,7 +228,7 @@ const saveInfo = computed(function () {
 onMounted(async function () {
   await loadProduct(route.params.productId, route.query.q)
   // Only ask for a verdict once a product with a price is actually on the page.
-  if (product.value && cheapest.value && cheapest.value.total > 0) {
+  if (product.value && baseRow.value && baseRow.value.total > 0) {
     worthItLoading.value = true
     // Tick the elapsed seconds every second while we wait on the AI.
     worthItElapsed.value = 0
@@ -261,7 +267,7 @@ const breadcrumbs = computed(function () {
 </script>
 
 <template>
-  <FdLoadingSpeed v-if="loading" message="Loading every store for this product"
+  <FdLoadingSpeed v-if="loading" message="Loading the listings for this product"
     slow-note="Still working. The first load can take up to 10 seconds." />
 
   <div v-else-if="errorText" class="alert alert-danger">
@@ -300,11 +306,11 @@ const breadcrumbs = computed(function () {
           <span v-else-if="product.reviews">from {{ Number(product.reviews).toLocaleString('en-SG') }} reviews</span>
         </p>
 
-        <!-- The cheapest total now. A crossed-out "was" price and a Save tag when the store shows one. -->
-        <div v-if="cheapest" class="fd-product-price">
-          <s v-if="saving" class="d-block text-secondary">{{ sgd(cheapest.oldPrice) }}</s>
+        <!-- Your pick's price now. A crossed-out "was" price and a Save tag when the store shows one. -->
+        <div v-if="baseRow" class="fd-product-price">
+          <s v-if="saving" class="d-block text-secondary">{{ sgd(baseRow.oldPrice) }}</s>
           <div class="d-flex flex-wrap align-items-center gap-2">
-            <span class="fd-price-now">{{ sgd(cheapest.total) }}</span>
+            <span class="fd-price-now">{{ sgd(baseRow.total) }}</span>
             <span v-if="saving" class="fd-save-tag">Save {{ sgd(saving.amount) }} | {{ saving.percent }}% off</span>
           </div>
         </div>
@@ -316,11 +322,11 @@ const breadcrumbs = computed(function () {
         <ul class="fd-product-facts" role="list">
           <li>
             <FdIcon name="scale" />
-            <span>{{ allStores.length }} {{ allStores.length === 1 ? 'store' : 'stores' }} compared</span>
+            <span>{{ allStores.length }} {{ allStores.length === 1 ? 'listing' : 'listings' }} compared</span>
           </li>
-          <li v-if="cheapest">
+          <li v-if="baseRow">
             <FdIcon name="cart" />
-            <span>Shipping: {{ cheapest.shipping || 'not shown' }}</span>
+            <span>Shipping: {{ baseRow.shipping || 'not shown' }}</span>
           </li>
           <li>
             <FdIcon name="sparkles" />
@@ -328,10 +334,10 @@ const breadcrumbs = computed(function () {
           </li>
         </ul>
 
-        <!-- Save to wishlist, Sleep on it, then Go to store (the cheapest store's page) in one row. -->
-        <SaveSleepButtons :name="product.title" :listing="cheapest ? { store: cheapest.store, price: cheapest.price } : null"
+        <!-- Save to wishlist, Sleep on it, then Go to store (your pick's page) in one row. -->
+        <SaveSleepButtons :name="product.title" :listing="baseRow ? { store: baseRow.store, price: baseRow.price } : null"
           :product="saveInfo">
-          <a v-if="cheapest && cheapest.link" class="btn btn-outline-dark" :href="cheapest.link"
+          <a v-if="baseRow && baseRow.link" class="btn btn-outline-dark" :href="baseRow.link"
             target="_blank" rel="noopener">Go to store</a>
         </SaveSleepButtons>
         </div>
@@ -340,9 +346,9 @@ const breadcrumbs = computed(function () {
 
     <!-- AI "Worth It" verdict: buy now or wait for a big sale. First under the hero, because it is
          the main answer on this page. -->
-    <section v-if="cheapest && (worthItLoading || worthItVerdict)" id="fd-worth-it-panel" class="mb-5"
+    <section v-if="baseRow && (worthItLoading || worthItVerdict)" id="fd-worth-it-panel" class="mb-5"
       aria-labelledby="fd-worth-it-title">
-      <!-- The title and AI tag sit above the card, like All stores, so it reads as its own section. -->
+      <!-- The title and AI tag sit above the card, like All listings, so it reads as its own section. -->
       <div class="d-flex align-items-center gap-2 mb-2">
         <h2 id="fd-worth-it-title" class="fd-section-title mb-0">Worth it?</h2>
         <span class="fd-ai-tag">AI</span>
@@ -365,7 +371,7 @@ const breadcrumbs = computed(function () {
         <!-- The verdict as one paragraph in body text; only the disclaimer under it is small. -->
         <!-- The reason and Based on in one paragraph; a bigger gap sets the disclaimer apart. -->
         <p class="mb-3">{{ verdictText }}</p>
-        <p class="small text-secondary mb-3">{{ worthItVerdict.source === 'rules' ? 'Guidance' : 'AI guidance' }} for {{ product.title }} at {{ sgd(cheapest.total) }}.
+        <p class="small text-secondary mb-3">{{ worthItVerdict.source === 'rules' ? 'Guidance' : 'AI guidance' }} for {{ product.title }} at {{ sgd(baseRow.total) }}.
           Not financial advice.</p>
         <button v-if="worthItVerdict.inputs" class="btn btn-outline-dark align-self-start" type="button"
           @click="openAiRead">See how the AI decided</button>
@@ -373,48 +379,42 @@ const breadcrumbs = computed(function () {
       </div>
     </section>
 
-    <h2 id="fd-all-stores" class="fd-section-title">All stores</h2>
+    <h2 id="fd-all-stores" class="fd-section-title">All listings</h2>
     <p v-if="baseRow" class="small text-secondary">
+      The {{ allStores.length === 1 ? 'listing' : allStores.length + ' listings' }} from your search<template
+        v-if="searchName"> for "{{ searchName }}"</template>, the same as on Compare.
       Prices marked + or − are against {{ baseRow.store }},
-      {{ route.query.store ? 'the store you picked on Compare' : 'the cheapest store for this product' }}.
+      {{ pickedRow ? 'your pick' : 'the cheapest listing' }}.
+      A listing can be a different model or size, so check its name.
     </p>
-    <!-- Built like the Wishlist table: a blue header pill, then one card per store. Roles keep it a
-         table for screen readers. -->
-    <div class="fd-store-table fd-store-panel" role="table" aria-label="All stores">
+    <!-- Built like the Wishlist table: a blue header pill, then one card per listing. Roles keep it a
+         table for screen readers. Google Shopping gives no shipping amount, so there is no Total column. -->
+    <div class="fd-store-table fd-store-panel" role="table" aria-label="All listings">
       <div class="fd-store-head" role="row">
         <span role="columnheader">Store</span>
         <span role="columnheader">Price</span>
         <span role="columnheader">Shipping</span>
-        <span role="columnheader">Total</span>
         <span role="columnheader"><span class="visually-hidden">Link</span></span>
       </div>
-      <!-- Three stores at a time; the rest scroll inside, with the brand scrollbar like the Wishlist. -->
-      <FdScrollArea label="All stores" class="fd-store-scroll" :style="{ maxHeight: storesHeight }">
+      <!-- Three listings at a time; the rest scroll inside, with the brand scrollbar like the Wishlist. -->
+      <FdScrollArea label="All listings" class="fd-store-scroll" :style="{ maxHeight: storesHeight }">
       <div ref="storeRows" class="fd-store-rows" role="rowgroup">
         <div v-for="(row, i) in allStores" :key="i + row.store" class="fd-store-row" role="row">
           <div class="fd-store-cell fd-store-cell-name" role="cell">
             <strong class="d-block">{{ row.store }}</strong>
             <span v-if="row.note" class="d-block small text-secondary">{{ row.note }}</span>
-            <!-- From the Compare search: name the listing, since it can be a different model. -->
-            <span v-if="row.fromSearch && row.name" class="d-block small text-secondary fd-store-listing">
+            <!-- Name the listing, since it can be a different model. -->
+            <span v-if="row.name" class="d-block small text-secondary fd-store-listing">
               Listed as: {{ row.name }}</span>
             <span v-if="row.moreOffers" class="d-block small text-secondary">
               +{{ row.moreOffers }} more {{ row.moreOffers === 1 ? 'offer' : 'offers' }} from {{ sgd(row.moreFrom) }}</span>
           </div>
           <div class="fd-store-cell" role="cell">
             <span class="fd-store-label" aria-hidden="true">Price</span>
-            {{ sgd(row.price) }}
-            <s v-if="row.oldPrice" class="small text-secondary ms-1">{{ sgd(row.oldPrice) }}</s>
-          </div>
-          <div class="fd-store-cell" role="cell">
-            <span class="fd-store-label" aria-hidden="true">Shipping</span>
-            {{ row.shipping || 'Not shown' }}
-          </div>
-          <div class="fd-store-cell" role="cell">
-            <span class="fd-store-label" aria-hidden="true">Total</span>
             <strong>{{ sgd(row.total) }}</strong>
-            <!-- Against the picked store: Your pick on its own row, else how much less or more. -->
-            <span v-if="baseRow && row === baseRow" class="fd-diff fd-diff-pick">Your pick</span>
+            <s v-if="row.oldPrice" class="small text-secondary ms-1">{{ sgd(row.oldPrice) }}</s>
+            <!-- Against your pick: Your pick on its own row, else how much less or more. -->
+            <span v-if="baseRow && row === baseRow" class="fd-diff fd-diff-pick">{{ pickedRow ? 'Your pick' : 'Cheapest' }}</span>
             <template v-else-if="baseRow">
               <span v-if="diffFromBase(row) < 0" class="fd-diff fd-diff-less"
                 :title="sgd(-diffFromBase(row)) + ' less than ' + baseRow.store">
@@ -425,6 +425,10 @@ const breadcrumbs = computed(function () {
               <span v-else class="fd-diff">Same price</span>
             </template>
           </div>
+          <div class="fd-store-cell" role="cell">
+            <span class="fd-store-label" aria-hidden="true">Shipping</span>
+            {{ row.shipping || 'Not shown' }}
+          </div>
           <div class="fd-store-cell fd-store-cell-link" role="cell">
             <a v-if="row.link" class="btn btn-sm btn-outline-dark" :href="row.link" target="_blank" rel="noopener">
               Go to store</a>
@@ -434,7 +438,7 @@ const breadcrumbs = computed(function () {
       </FdScrollArea>
     </div>
     <!-- The total under the card, worded and placed like the Friends and Wishlist totals. -->
-    <p class="fd-store-total">Total: {{ allStores.length }} {{ allStores.length === 1 ? 'store' : 'stores' }}</p>
+    <p class="fd-store-total">Total: {{ allStores.length }} {{ allStores.length === 1 ? 'listing' : 'listings' }}</p>
 
     <!-- What buyers say: one card per review, in a row that scrolls sideways. -->
     <section v-if="product.userReviews.length" id="fd-reviews" class="mb-5">
@@ -467,7 +471,7 @@ const breadcrumbs = computed(function () {
       aria-labelledby="fd-ai-read-title">
       <h2 id="fd-ai-read-title" class="fd-page-title">How the AI decided</h2>
       <p class="fd-entry-description">
-        Why it says "{{ worthItLabel }}", step by step, using today's prices for this product.
+        Why it says "{{ worthItLabel }}", step by step, using today's prices from your search.
       </p>
 
       <ol class="fd-ai-steps">
@@ -500,13 +504,13 @@ const breadcrumbs = computed(function () {
   }
 }
 
-/* All stores, built like the Wishlist table: a blue header pill and one card per store,
-   sharing the same five columns so everything lines up. */
+/* All listings, built like the Wishlist table: a blue header pill and one card per listing,
+   sharing the same four columns so everything lines up. */
 .fd-store-head,
 .fd-store-row {
   display: grid;
-  /* The store takes all the free room; Price, Shipping and Total are narrow, fixed columns on the right. */
-  grid-template-columns: minmax(0, 1fr) 7rem 7rem 7rem 8rem;
+  /* The store takes all the free room; Price and Shipping are narrow, fixed columns on the right. */
+  grid-template-columns: minmax(0, 1fr) 8rem 7rem 8rem;
   align-items: center;
   gap: 1rem;
   padding: var(--fd-row-pad);
@@ -525,7 +529,7 @@ const breadcrumbs = computed(function () {
   text-transform: uppercase;
 }
 
-/* The card around All stores: paper, vanilla line and corners, like the Wishlist and Friends
+/* The card around All listings: paper, vanilla line and corners, like the Wishlist and Friends
    cards, without their folder tabs. */
 .fd-store-panel {
   padding: var(--fd-card-pad);
@@ -574,7 +578,7 @@ const breadcrumbs = computed(function () {
   display: none;
 }
 
-/* + or - against the picked store, under each total: a small pill like the Wishlist's price drop
+/* + or - against your pick, under each price: a small pill like the Wishlist's price drop
    chip. Tea green for less, soft red for more, vanilla for the picked store; ink text on all. */
 .fd-diff {
   display: table;
@@ -608,7 +612,7 @@ const breadcrumbs = computed(function () {
   overflow: hidden;
 }
 
-/* Below 992px there is no room for five columns: the header pill is hidden and each card shows
+/* Below 992px there is no room for four columns: the header pill is hidden and each card shows
    its own small labels, like the Wishlist. */
 @media (max-width: 991.98px) {
   .fd-store-head {
@@ -616,7 +620,7 @@ const breadcrumbs = computed(function () {
   }
 
   .fd-store-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
     padding: 1rem;
   }

@@ -35,9 +35,10 @@ function isComparable(productName, listing) {
   )
 }
 
-// A product saved from its product page has a Google Shopping productId. Its live price is the
-// cheapest store on that same product (GET /api/product/:id, cached on the server for 24 hours),
-// so a long product title never needs to match a new search word for word.
+// A product saved from its product page has a Google Shopping productId. Its live price is that
+// same listing on its product page (GET /api/product/:id, the pick), so a long product title never
+// needs to match a new search word for word. The page lists every listing from the search, and the
+// cheapest one can be another model, so the cheapest is used only when the page has no pick.
 async function cheapestStoreOf(saved) {
   const product = await fetchProduct(saved.productId, saved.q || saved.name)
   const stores = (product.stores || []).filter(store => Number(store.price) > 0)
@@ -46,9 +47,11 @@ async function cheapestStoreOf(saved) {
     throw new Error('No store price found for this product')
   }
 
-  const cheapest = stores.reduce((lowest, store) =>
-    Number(store.price) < Number(lowest.price) ? store : lowest
-  )
+  const cheapest = product.pick && Number(product.pick.price) > 0
+    ? product.pick
+    : stores.reduce((lowest, store) =>
+      Number(store.price) < Number(lowest.price) ? store : lowest
+    )
 
   return {
     name: product.title,

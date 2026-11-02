@@ -12,17 +12,24 @@ test.describe('Product page', () => {
     await page.route('**/api/worth-it*', (route) => route.fulfill({ json: worthIt }));
   });
 
-  test('user can see the product name and the lowest price', async ({ page }) => {
+  test('user sees the same listings as Compare, with the clicked one as Your pick', async ({ page }) => {
     await page.goto('/product/' + productIphone.productId + '?q=iphone%2016');
 
     await expect(page.getByRole('heading', { level: 1, name: productIphone.title })).toBeVisible();
 
-    // The cheapest store comes first, so its total is the lowest price.
-    const cheapest = productIphone.stores[0];
-    await expect(page.getByRole('heading', { name: 'All stores' })).toBeVisible();
-    await expect(page.getByRole('row', { name: new RegExp(cheapest.store) })).toBeVisible();
-    // The team removed the Deal check, so the store table has no Deal check column.
+    // One row per Compare listing, plus the header row. The list says how many, as Compare does.
+    await expect(page.getByRole('heading', { name: 'All listings' })).toBeVisible();
+    const table = page.getByRole('table', { name: 'All listings' });
+    await expect(table.getByRole('row')).toHaveCount(productIphone.stores.length + 1);
+    await expect(page.getByText('Total: ' + productIphone.stores.length + ' listings')).toBeVisible();
+
+    // The listing clicked on Compare is Your pick.
+    const pick = table.getByRole('row', { name: new RegExp(productIphone.pick.store) });
+    await expect(pick.getByText('Your pick')).toBeVisible();
+
+    // The team removed the Deal check. Google Shopping gives no shipping amount, so there is no Total column.
     await expect(page.getByRole('columnheader', { name: 'Deal check' })).toHaveCount(0);
+    await expect(page.getByRole('columnheader', { name: 'Total' })).toHaveCount(0);
   });
 
   test('user sees the AI Worth it verdict without a click, with what it was based on', async ({ page }) => {
@@ -42,7 +49,7 @@ test.describe('Product page', () => {
     const dialog = page.getByRole('dialog', { name: 'How the AI decided' });
     await expect(dialog).toBeVisible();
     // The steps quote the numbers the AI used.
-    await expect(dialog.getByText('Found the cheapest total today: S$806.00 at Swiftronics USA.')).toBeVisible();
+    await expect(dialog.getByText('Took your pick: S$806.00 at Swiftronics USA, listed as "Apple iPhone 16".')).toBeVisible();
     // FastDeal has no price history, so the AI never reads one.
     await expect(dialog.getByText('Price history')).toHaveCount(0);
 
@@ -56,7 +63,7 @@ test.describe('Product page', () => {
       ...worthIt,
       decision: 'buy',
       headline: 'Good price now',
-      reason: 'The cheapest total S$806.00 is 12% under the typical S$916.00 across 5 stores.',
+      reason: 'Your pick S$806.00 is 51% under the typical S$1661.53 across 10 listings.',
       source: 'rules'
     };
     await page.route('**/api/worth-it*', (route) => route.fulfill({ json: rules }));

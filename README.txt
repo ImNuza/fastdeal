@@ -28,8 +28,8 @@ Logged out:
   product). Trending Today and Trending This Week show what people search.
 - Compare (/compare?q=...): every listing for the search, with filters (price, store, rating, free
   shipping, on sale) and sort.
-- Product page: every store for one product, cheapest total first, and the AI "Worth it?"
-  verdict. "See how the AI decided" opens a pop-up with the steps behind the verdict and the numbers it used.
+- Product page: the same listings as Compare, cheapest first, with the one you clicked as
+  "Your pick", and the AI "Worth it?" verdict on your pick. "See how the AI decided" opens a pop-up with the steps behind the verdict and the numbers it used.
   If both Gemini models are busy, the card shows an estimate from fixed rules and says so.
 - Trending (/trending): the most searched products.
 
@@ -100,7 +100,8 @@ VPN. Atlas must allow your IP address (Network Access in Atlas).
 6. External APIs
 ----------------
 - SerpApi Google Shopping: the search results on Compare.
-- SerpApi Google Immersive Product: every store for one product, with store logos and reviews.
+- SerpApi Google Immersive Product: the photo, rating, buyer reviews and description on the
+  product page. Its store list is not shown: the product page lists the Compare listings.
 - Google Gemini: cleans up the search words, identifies a product from a photo, and writes the
   "Worth it?" verdict.
 - Firebase Authentication: sign up and login (email and Google).
@@ -116,7 +117,7 @@ Each AI verdict is kept for the rest of the day.
 Two kinds of tests. Neither one calls SerpApi or Gemini: the tests use saved responses from
 tests/fixtures/.
 
-Unit tests (Vitest), 84 tests in 11 files, in the __tests__ folders:
+Unit tests (Vitest), 88 tests in 11 files, in the __tests__ folders:
   npm run test:unit
 They test the pure logic: the typical price, the store price rows, the budget planner, the AI verdict
 inputs, prompt and rule fallback, the SerpApi key fallback, keys, formats and search history.

@@ -183,6 +183,14 @@ Test 1 in `product.spec.js` also checks that the store table has no Deal check c
 typical price. The two price history tests in `worthItInputs.spec.js` became one test (no history row).
 Totals: 34 E2E tests in 11 files, 84 unit tests in 11 files.
 
+Batch 7 (2 Nov, Dewa and Zoe): the product page lists the same listings as Compare (Google Shopping), not
+Google Immersive's stores, and the clicked listing is "Your pick". `product.spec.js` test 1 checks one row per
+Compare listing, Your pick, and no Total column. The fixtures `product-iphone.json` and `worth-it.json` use the
+10 listings from `search-iphone.json`. `worthItInputs.spec.js` has 4 new tests: the pick row, the cheapest
+listing as the pick when the clicked one is gone, the "different model" line in the prompt, and the rule that
+a pick 10% or more over the typical price is a wait.
+Totals: 34 E2E tests in 11 files, 88 unit tests in 11 files.
+
 Batch 4, after Ronald's AI verdict merges: Compare filters and sort, the cheapest badge, the verdict (with a saved Gemini response). About 3 tests. Then check `product.spec.js` and `target-price-alert.spec.js`.
 
 Rules for this batch:
