@@ -19,8 +19,10 @@ const DROP_PERCENT = 10
 // ---------------------------------------------------------------
 // user.value.wishlist is the in-memory copy. Every change updates it at once, then is written
 // to MongoDB through /api/wishlist. Writes run one after another.
-// lastWrite is the queue's end: the last write, which never fails, so the next one always runs.
-let lastWrite = null
+// waiting holds the saves not sent yet, oldest first. sending is true while the loop in write()
+// is sending them. So Sleep on it never reaches the server before the save that creates the item.
+const waiting = []
+let sending = false
 
 // Restore the actual server data after a write fails.
 async function reloadWishlist() {
@@ -28,33 +30,26 @@ async function reloadWishlist() {
   if (user.value) user.value.wishlist = res.data
 }
 
-// Runs the request once the write before it has finished.
-async function runAfter(previous, request) {
-  await previous
-  return request()
-}
-
-// Waits for a write. A failed write is logged and the wishlist reloads, so the queue goes on.
-async function settle(operation) {
-  try {
-    await operation
-  } catch (err) {
-    console.error('[Wishlist] Could not save the change:', err)
-    // Not awaited, so the next queued save does not wait for this reload.
-    if (user.value) {
-      reloadWishlist()
+// request is a function that makes the axios call. Every save goes into the array, and one loop
+// sends them one by one. A failed save is logged and the wishlist reloads, so the next save still goes.
+async function write(request) {
+  waiting.push(request)
+  // A loop is already sending: it sends this save after the ones before it.
+  if (sending) return
+  sending = true
+  while (waiting.length > 0) {
+    const next = waiting.shift()
+    try {
+      await next()
+    } catch (err) {
+      console.error('[Wishlist] Could not save the change:', err)
+      // Not awaited, so the next save does not wait for this reload.
+      if (user.value) {
+        reloadWishlist()
+      }
     }
   }
-}
-
-function write(request) {
-  // Queue the database write, allowing later writes
-  // to proceed even if an earlier one failed.
-  const operation = runAfter(lastWrite, request)
-  lastWrite = settle(operation)
-
-  // Return the original operation so callers can detect failures.
-  return operation
+  sending = false
 }
 
 function keyPath(item) {
