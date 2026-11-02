@@ -49,6 +49,18 @@ const WORTH_IT_TONE = {
   unknown: 'secondary'
 }
 
+// "Wait for 11.11" when the verdict names the coming sale, else the fixed words.
+const worthItLabel = computed(function () {
+  const v = worthItVerdict.value
+  if (!v) {
+    return WORTH_IT_LABEL.unknown
+  }
+  if (v.decision === 'wait' && v.saleName) {
+    return 'Wait for ' + v.saleName
+  }
+  return WORTH_IT_LABEL[v.decision] || WORTH_IT_LABEL.unknown
+})
+
 
 // All stores: this product's own stores and the other stores from the Compare search, as one
 // list, cheapest total first. Only the product's own stores count for the cheapest and the verdict.
@@ -341,7 +353,7 @@ const breadcrumbs = computed(function () {
         <!-- The verdict tag in the card's top right corner; the reason flows beside it. -->
         <span v-if="worthItVerdict && !worthItLoading" class="badge fd-verdict-tag"
           :class="'text-bg-' + (WORTH_IT_TONE[worthItVerdict.decision] || 'secondary')">
-          {{ WORTH_IT_LABEL[worthItVerdict.decision] || WORTH_IT_LABEL.unknown }}</span>
+          {{ worthItLabel }}</span>
 
       <p v-if="worthItLoading" class="small text-secondary mb-0 d-flex align-items-center gap-2">
         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -455,7 +467,7 @@ const breadcrumbs = computed(function () {
       aria-labelledby="fd-ai-read-title">
       <h2 id="fd-ai-read-title" class="fd-page-title">How the AI decided</h2>
       <p class="fd-entry-description">
-        Why it says "{{ WORTH_IT_LABEL[worthItVerdict.decision] || WORTH_IT_LABEL.unknown }}", step by step, using today's prices for this product.
+        Why it says "{{ worthItLabel }}", step by step, using today's prices for this product.
       </p>
 
       <ol class="fd-ai-steps">

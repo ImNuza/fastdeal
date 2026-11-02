@@ -192,6 +192,32 @@ small {
   min-height: 44px;
 }
 
+/* Menu button: no thick pale glow on tap. While the menu is open its border turns yellow,
+   like the open page's link; keyboard focus gets the same yellow outline as the product cards. */
+.fd-nav .navbar-toggler {
+  border: var(--fd-border) solid rgb(244 237 227 / 35%);
+}
+
+.fd-nav .navbar-toggler:focus {
+  box-shadow: none;
+}
+
+.fd-nav .navbar-toggler[aria-expanded="true"] {
+  border-color: var(--fd-vanilla);
+}
+
+.fd-nav .navbar-toggler:focus-visible {
+  outline: 3px solid var(--fd-vanilla);
+  outline-offset: 3px;
+}
+
+/* Phone menu: the page you are on turns yellow, icon and words. */
+@media (max-width: 991.98px) {
+  .fd-nav .nav-link.active {
+    color: var(--fd-vanilla);
+  }
+}
+
 /* Unread count on the bell. In the phone menu it sits after the label. */
 .fd-nav-badge {
   font-family: var(--fd-font-body);
@@ -657,8 +683,4 @@ tr.cheapest td {
   color: #25508c;
   font-size: 6rem;
   line-height: 1;
-}
-
-.fd-week-link:hover .card-title {
-  text-decoration: underline;
 }

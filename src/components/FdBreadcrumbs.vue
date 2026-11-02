@@ -47,8 +47,9 @@ defineProps({
   text-decoration: none;
 }
 
+/* Hover turns it blue, like the tabs; no underline. */
 .fd-breadcrumbs a:hover {
-  text-decoration: underline;
+  color: var(--fd-blue);
 }
 
 /* Only the page you are on is blue and underlined. */

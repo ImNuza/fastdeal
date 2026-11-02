@@ -129,7 +129,8 @@ function toVerdict(text, model) {
 const DAY = 24 * 3600000
 // Part of the cache key. Change it when the inputs change, so no saved verdict shows old inputs.
 // v2: price history removed (31 Oct).
-const INPUTS_VERSION = 'v2'
+// v3: the verdict carries the next sale's name, for the "Wait for 11.11" tag (2 Nov).
+const INPUTS_VERSION = 'v3'
 
 // Public entry point. product: from getProduct.
 // sale: the next big sale ({ name, day, daysAway }) or null.
@@ -147,6 +148,8 @@ export async function worthIt(product, sale) {
     summary: summary,
     prompt: prompt,
     price: cheapest.total,
+    // "11.11", so the tag can say "Wait for 11.11". Empty when no big sale is coming.
+    saleName: sale ? sale.name.replace(/ sale$/, '') : '',
     product: { productId: product.productId, q: product.q || '', title: product.title, image: product.image || '' }
   }
 

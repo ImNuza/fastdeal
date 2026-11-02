@@ -115,7 +115,12 @@ const saleText = computed(function () {
 })
 
 const drops = computed(function () {
-  return (stats.value && stats.value.drops) || []
+  return ((stats.value && stats.value.drops) || []).slice(0, 3)
+})
+
+// How many products dropped beyond the 3 shown.
+const moreDrops = computed(function () {
+  return (stats.value && stats.value.moreDrops) || 0
 })
 
 // Shown in the third card while there are no believable price drops.
@@ -217,7 +222,9 @@ onBeforeUnmount(function () {
           <p class="fd-hero-text">
             The same item can cost a lot more at one store than another. FastDeal lines up every price, asks our AI if now is a good time to buy, and points you to the cheapest.
           </p>
-          <FdSearchBar />
+          <div class="fd-hero-lead">
+            <FdSearchBar />
+          </div>
         </div>
 
         <div v-if="comparing || nextSale" class="fd-cluster">
@@ -257,6 +264,7 @@ onBeforeUnmount(function () {
                 <span class="fd-drop-percent">-{{ row.percent }}%</span>
               </li>
             </ul>
+            <p v-if="moreDrops" class="fd-drops-more">+{{ moreDrops }} more {{ moreDrops === 1 ? 'item' : 'items' }}</p>
             <p class="fd-card-meta">Lower than when shoppers saved them.</p>
           </article>
           <article v-else-if="mostSaved.length" class="fd-card fd-card--saving">
@@ -660,11 +668,32 @@ onBeforeUnmount(function () {
   }
 }
 
+/* Stacked: the headline and description, then the cards, then the search bar. */
+@media (max-width: 1199.98px) {
+  .fd-hero-grid {
+    gap: 0;
+  }
+
+  .fd-hero-copy {
+    display: contents;
+  }
+
+  .fd-cluster {
+    order: 1;
+    margin: 1rem 0 2rem;
+  }
+
+  .fd-hero-lead {
+    order: 2;
+  }
+}
+
 .fd-display {
   margin-bottom: 1.25rem;
   color: var(--fd-blue);
   font-family: var(--fd-font-display);
-  font-size: clamp(3rem, 7vw, 5.25rem);
+  /* Phones: 4rem, so the headline still fills the narrow screen; grows with the window up to 5.25rem. */
+  font-size: clamp(4rem, 7vw, 5.25rem);
   font-weight: 400;
   line-height: 0.92;
   text-transform: uppercase;
@@ -741,8 +770,10 @@ onBeforeUnmount(function () {
     align-items: start;
   }
 
+  /* Centred down the height of the two cards beside it, like the wide layout. */
   .fd-card--history {
     grid-row: span 2;
+    align-self: center;
   }
 }
 
@@ -919,6 +950,12 @@ onBeforeUnmount(function () {
 .fd-drop-percent small {
   color: var(--fd-text-muted);
   font-family: var(--fd-font-body);
+  font-size: var(--fd-small);
+}
+
+.fd-drops-more {
+  margin: -0.25rem 0 0.75rem;
+  color: var(--fd-text-muted);
   font-size: var(--fd-small);
 }
 
