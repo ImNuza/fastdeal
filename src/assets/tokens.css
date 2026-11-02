@@ -25,6 +25,9 @@
   --fd-green: #b3c77a;
   --fd-green-soft: #d8e4b4;
   --fd-red: #edb0a2;
+  /* Result colours for text, dark enough to read on beige or paper: "$20 lower", "Sent!" */
+  --fd-green-text: #187447;
+  --fd-red-text: #a24432;
 
   /* On hold: Sleep on it cards */
   --fd-grey-soft: #ebe9e5;
@@ -75,6 +78,10 @@
 
   /* Layout: fallback only, App.vue overwrites this with the measured navbar height */
   --fd-nav-height: 71px;
+
+  /* The tallest a list in a folder tab card grows before it scrolls inside the card: fits the
+     screen, but never shorter than 20rem or taller than 40rem. */
+  --fd-list-max: clamp(20rem, calc(100svh - var(--fd-nav-height) - 16rem), 40rem);
 }
 
 @media (min-width: 768px) {

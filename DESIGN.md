@@ -28,6 +28,13 @@ How FastDeal looks and how to keep it consistent when you add or change a page. 
 | `src/components/FdBreadcrumbs.vue` | The trail above a page title, in table header type (small bold capitals; the page you are on is blue and underlined): "FastDeal / Sony WH-1000XM5" on Compare, "FastDeal / Sony WH-1000XM5 / Shopee" on a product (the last item is the store the shopper clicked on Compare, or the product title without one). Every item but the last is a link. |
 | `src/services/searchHistory.js` | A guest's last 5 searches, kept in the browser. Logged-in users get theirs from their account instead. |
 | `src/services/itemName.js` | Shows a search term as a product name: "samsung galaxy s25" becomes "Samsung Galaxy S25". Use it wherever a search term is shown. |
+| `src/components/FdTabs.vue` | Folder tabs and the card under them, as one piece. See [Lists in folder tabs](#lists-in-folder-tabs). |
+| `src/components/FdListSearch.vue` | The search pill above a list (filter friends, notifications, the wishlist, budgets, users). |
+| `src/components/FdScrollArea.vue` | A list that scrolls inside its card, with the brand scrollbar beside it. Add `fill` inside a tab card. |
+| `src/components/FdAvatar.vue` | The blue circle with beige initials (Friends, Admin, Account) or an icon (Notifications). `size="lg"` for the Account header. |
+| `src/components/FdGoogleButton.vue` | The Continue with Google button on Log in and Sign up. Its logo keeps Google's own colours, the only hex codes outside `tokens.css`. |
+| `src/components/FdEmptyState.vue` | An empty list: a blue icon and one short line, with an optional button under it. |
+| `src/components/FdTotalBar.vue` | The bar under a list that sticks to the bottom of the screen and holds the `FdPager` count. |
 | `src/components/FdFooter.vue` | The footer on every page. |
 | `src/App.vue` | Navbar, welcome prompt, page shell. |
 | `src/mock/budget.js` | The Plan a budget logic on Wishlist: finds the best mix of items for a budget. |
@@ -50,13 +57,15 @@ How FastDeal looks and how to keep it consistent when you add or change a page. 
 | Tea green (results) | `--fd-green` | `#b3c77a` | "Cheapest" badge and chip |
 | Green soft | `--fd-green-soft` | `#d8e4b4` | Cheapest table row |
 | Clay red (results) | `--fd-red` | `#edb0a2` | Bad results, such as "extra you'd pay" bars |
+| Green text | `--fd-green-text` | `#187447` | A good result written as text, such as "$20 lower" or "Sent!" |
+| Red text | `--fd-red-text` | `#a24432` | A bad result written as text, such as "$20 higher" |
 | Grey soft | `--fd-grey-soft` | `#ebe9e5` | Background of a Wishlist card on hold (Sleep on it) |
 | Grey line | `--fd-grey-line` | `#d4d1cb` | Border of a Wishlist card on hold |
 | Grey text | `--fd-grey-text` | `#5c5c5c` | The countdown on a Wishlist card on hold |
 | Ink | `--fd-ink` | `#343b1b` | Body text only |
 | Muted text | `--fd-text-muted` | `#585f3e` | Subtitles, captions, labels |
 
-The Worth It / Maybe / Not Worth It verdict box uses its own green, amber, and red border (`#2f6b47`, `#a8741a`, `#a3301f`). Keep those three for verdicts and errors only. The Home hero cards use none of the result colours: only blue, vanilla, and the soft vanilla fill, so they stay calm.
+Tea green and clay red are too light for text, so a result written as text uses green text or red text instead. The Home hero cards use none of the result colours: only blue, vanilla, and the soft vanilla fill, so they stay calm.
 
 ### Colour rules
 
@@ -79,6 +88,8 @@ Contrast is checked against WCAG AA (4.5:1 for body text):
 | Ink on tea green | 6.4:1 |
 | Ink on clay red | 6.3:1 |
 | Grey text on grey soft | 5.5:1 |
+| Green text on beige | 5.0:1 |
+| Red text on beige | 5.3:1 |
 
 ## Typography
 
@@ -146,6 +157,47 @@ Every page follows these two rules. Bootstrap's `.small`, `.badge`, inputs, and 
 | Icon only | add `fd-icon-btn` to a `btn-sm` | A 36px circle with just an icon, such as Remove or Decline. Always give it an `aria-label` |
 
 Use at most one main-action button in each area. A minor option (like "Create an account" under Log in) is a text link, not a button.
+
+### Lists in folder tabs
+
+Friends, Notifications, Wishlist, and Admin's Manage Users are built from the same five pieces. A new page with a tabbed list should use them too, not copy another page's CSS. Their styles are in the "Lists in folder tabs" section of `app.css`.
+
+```html
+<div class="fd-list-page">
+  <h1 class="fd-page-title">Friend List</h1>
+  <p class="fd-page-subtitle">One line that explains what this page is for.</p>
+
+  <FdTabs ref="tabsCard" v-model="activeTab" :tabs="tabs" label="Friends">
+    <div class="fd-list-tools">
+      <FdListSearch v-model="query" placeholder="Search your friends" label="Search your friends" />
+      <div class="fd-sort">
+        <label for="friend-sort">Sort by</label>
+        <select id="friend-sort" v-model="sortBy" class="form-select">...</select>
+      </div>
+    </div>
+
+    <FdScrollArea ref="scrollArea" fill label="Friends" :bar="rows.length > 0">
+      <FdEmptyState v-if="!rows.length" icon="friends">No friends yet.</FdEmptyState>
+      <div v-else>...one card per row...</div>
+    </FdScrollArea>
+  </FdTabs>
+
+  <FdTotalBar v-if="listTotal > 0" :stacked="listOnPhone">
+    <FdPager ... :top="tabsCard?.panel" />
+  </FdTotalBar>
+</div>
+```
+
+| Piece | What it does |
+|---|---|
+| `.fd-list-page` | Makes the page at least one screen tall, so a short list stretches the card down to the total bar. |
+| `FdTabs` | The tabs and the paper card under them. `tabs` is `[{ id, label, count, countLabel }]`: a `count` above 0 shows the blue count bubble, and `countLabel` is what screen readers hear ("3 unread"). `v-model` is the open tab's id. Arrow keys move between tabs. `id-prefix` names the tab ids (`fd-tab` gives `fd-tab-requests`) when a page needs its own. `tabsCard.panel` is the card, for `FdPager`'s `top`. On phones the tabs share the width evenly and long labels wrap. |
+| `.fd-list-tools` | The search and sort row. It ends where the cards end, so the scrollbar's column stays free. Each one gets a full row on phones. |
+| `FdListSearch` | The search pill. `busy` swaps the icon for loading dots while a search is on its way. |
+| `.fd-sort` | A muted "Sort by" (or "Show") label and a pill select as tall as the search. |
+| `FdScrollArea fill` | The list fills the rest of the card and grows up to `--fd-list-max` (fits the screen, 20rem to 40rem), then scrolls inside with the brand scrollbar. On phones there is no box: the list runs its full length. Call `scrollArea.toTop()` when the tab changes. |
+| `FdEmptyState` | `icon` is an `FdIcon` name; the line goes in the slot. Anything after it, like the New budget button, goes in the `action` slot. |
+| `FdTotalBar` | Sticks to the bottom of the screen and stops above the footer, so it must be the last thing in the page. `stacked` centres the phone page buttons with the count under them. |
 
 ### Logo
 

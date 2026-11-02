@@ -14,6 +14,12 @@ defineProps({
   bar: {
     type: Boolean,
     default: true
+  },
+  // For a list in a folder tab card: it fills the rest of the card and grows with a longer
+  // list up to --fd-list-max, then scrolls inside
+  fill: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -117,7 +123,7 @@ defineExpose({ toTop })
 </script>
 
 <template>
-  <div class="fd-scroll-area">
+  <div class="fd-scroll-area" :class="{ 'is-fill': fill }">
     <!-- The list, with an optional footer under it that stays put, such as New budget. The
          scrollbar beside them runs the full height of both. -->
     <div class="fd-scroll-area-main">
@@ -154,6 +160,11 @@ defineExpose({ toTop })
   flex: 1;
   gap: 0.5rem;
   min-height: 0;
+}
+
+.fd-scroll-area.is-fill {
+  flex: 1 1 auto;
+  max-height: var(--fd-list-max);
 }
 
 .fd-scroll-area-main {
