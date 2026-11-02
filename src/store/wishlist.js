@@ -19,24 +19,39 @@ const DROP_PERCENT = 10
 // ---------------------------------------------------------------
 // user.value.wishlist is the in-memory copy. Every change updates it at once, then is written
 // to MongoDB through /api/wishlist. Writes run one after another.
-let writes = Promise.resolve()
+// lastWrite is the queue's end: the last write, which never fails, so the next one always runs.
+let lastWrite = null
+
+// Restore the actual server data after a write fails.
+async function reloadWishlist() {
+  const res = await axios.get('/api/wishlist', { quiet: true })
+  if (user.value) user.value.wishlist = res.data
+}
+
+// Runs the request once the write before it has finished.
+async function runAfter(previous, request) {
+  await previous
+  return request()
+}
+
+// Waits for a write. A failed write is logged and the wishlist reloads, so the queue goes on.
+async function settle(operation) {
+  try {
+    await operation
+  } catch (err) {
+    console.error('[Wishlist] Could not save the change:', err)
+    // Not awaited, so the next queued save does not wait for this reload.
+    if (user.value) {
+      reloadWishlist()
+    }
+  }
+}
 
 function write(request) {
   // Queue the database write, allowing later writes
   // to proceed even if an earlier one failed.
-  const operation = writes.then(request)
-
-  writes = operation.catch(function (err) {
-    console.error('[Wishlist] Could not save the change:', err)
-
-    // Restore the actual server data if a write fails.
-    // Not awaited, so the next queued save does not wait for this reload.
-    if (user.value) {
-      axios.get('/api/wishlist', { quiet: true }).then(function (res) {
-        if (user.value) user.value.wishlist = res.data
-      })
-    }
-  })
+  const operation = runAfter(lastWrite, request)
+  lastWrite = settle(operation)
 
   // Return the original operation so callers can detect failures.
   return operation
@@ -220,17 +235,17 @@ export const useWishlistStore = defineStore('wishlist', () => {
     return Boolean(findSaved(name, productId))
   }
 
-  function setTarget(name, price) {
+  async function setTarget(name, price) {
     const item = findSaved(name)
 
     if (!item) {
-      return Promise.reject(new Error('Wishlist product not found'))
+      throw new Error('Wishlist product not found')
     }
 
     const newTarget = Number(price)
 
     if (!Number.isFinite(newTarget) || newTarget < 0) {
-      return Promise.reject(new Error('Invalid target price'))
+      throw new Error('Invalid target price')
     }
 
     item.targetPrice = newTarget
@@ -333,6 +348,18 @@ export const useWishlistStore = defineStore('wishlist', () => {
     return livePrices.value[item.name] ?? null
   }
 
+  // Asks the server to email the user when the target price is reached. A failed check is only logged.
+  async function checkTarget(productKey) {
+    try {
+      await axios.post('/api/wishlist/' + encodeURIComponent(productKey) + '/check-target')
+    } catch (error) {
+      console.warn(
+        '[Target email] Check failed:',
+        error.response?.data?.error || error.message
+      )
+    }
+  }
+
   async function loadLivePrice(name) {
     if (liveLoading.value[name]) return
 
@@ -359,16 +386,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
         listing.price <= Number(saved.targetPrice)
       ) {
         // Not awaited, so the next price does not wait for the email check.
-        axios.post(
-          '/api/wishlist/' +
-          encodeURIComponent(saved.productKey) +
-          '/check-target'
-        ).catch(error => {
-          console.warn(
-            '[Target email] Check failed:',
-            error.response?.data?.error || error.message
-          )
-        })
+        checkTarget(saved.productKey)
       }
     } catch (error) {
       delete livePrices.value[name]

@@ -102,7 +102,16 @@ function removeRecent(name) {
   recentSearches.value = recentSearches.value.filter(function (item) { return item !== name })
   removeFromHistory(name)
   activeIndex.value = -1
-  axios.delete('/api/me/recent-searches', { params: { query: name } }).catch(function () {})
+  // Not awaited: the list on screen changes at once.
+  forgetOnAccount(name)
+}
+
+async function forgetOnAccount(name) {
+  try {
+    await axios.delete('/api/me/recent-searches', { params: { query: name } })
+  } catch (error) {
+    // Nothing to do: a guest's list lives in the browser only.
+  }
 }
 
 function onQueryFocus() {

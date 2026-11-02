@@ -127,7 +127,12 @@ app.post('/api/users/login-email', async (req, res) => {
       }
     )
     if (!check.ok) {
-      const body = await check.json().catch(() => ({}))
+      let body = {}
+      try {
+        body = await check.json()
+      } catch (error) {
+        // Not JSON: no reason to read.
+      }
       const reason = body.error && body.error.message ? body.error.message : ''
       if (reason.startsWith('TOO_MANY_ATTEMPTS')) {
         return res.status(429).json({ error: 'Too many tries. Wait a few minutes, then try again.' })

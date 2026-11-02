@@ -92,9 +92,12 @@ async function callGemini(model, prompt) {
 
     if (!res.ok) {
       // Read the Google error payload to detect RESOURCE_EXHAUSTED on a 429.
-      const errBody = await res.json().catch(function () {
-        return null
-      })
+      let errBody = null
+      try {
+        errBody = await res.json()
+      } catch (error) {
+        // Not JSON: no error status to read.
+      }
       const errorStatus = errBody && errBody.error && errBody.error.status
       return { ok: false, status: res.status, errorStatus: errorStatus || '', text: '' }
     }
