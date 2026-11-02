@@ -42,7 +42,8 @@ function applyDbUser(dbUser, fbUser) {
     budgetDrafts: dbUser.budgetDrafts || [],
     wishlist: []
   }
-  void loadWishlist(fbUser.email)
+  // Not awaited: the user is logged in at once and the wishlist fills in when it arrives.
+  loadWishlist(fbUser.email)
 }
 
 export function findSaved(name, productId) {

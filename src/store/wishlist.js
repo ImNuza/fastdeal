@@ -30,8 +30,9 @@ function write(request) {
     console.error('[Wishlist] Could not save the change:', err)
 
     // Restore the actual server data if a write fails.
+    // Not awaited, so the next queued save does not wait for this reload.
     if (user.value) {
-      void axios.get('/api/wishlist', { quiet: true }).then(function (res) {
+      axios.get('/api/wishlist', { quiet: true }).then(function (res) {
         if (user.value) user.value.wishlist = res.data
       })
     }
@@ -309,7 +310,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
   watch(
     [user, firebaseUser],
     () => {
-      void checkExpiredSleepTimers()
+      checkExpiredSleepTimers()
     },
     { immediate: true, deep: true }
   )
@@ -317,7 +318,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
   // Also check while the user has FastDeal open.
   if (typeof window !== 'undefined') {
     window.setInterval(() => {
-      void checkExpiredSleepTimers()
+      checkExpiredSleepTimers()
     }, 30000)
   }
 
@@ -357,7 +358,8 @@ export const useWishlistStore = defineStore('wishlist', () => {
         Number(saved.targetPrice) > 0 &&
         listing.price <= Number(saved.targetPrice)
       ) {
-        void axios.post(
+        // Not awaited, so the next price does not wait for the email check.
+        axios.post(
           '/api/wishlist/' +
           encodeURIComponent(saved.productKey) +
           '/check-target'
