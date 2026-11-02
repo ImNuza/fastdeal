@@ -3,9 +3,12 @@
 export async function fetchProduct(productId, q) {
   const url = '/api/product/' + encodeURIComponent(productId) + '?q=' + encodeURIComponent(q || '')
   const res = await fetch(url)
-  const data = await res.json().catch(function () {
-    return {}
-  })
+  let data = {}
+  try {
+    data = await res.json()
+  } catch (error) {
+    // Not JSON: keep the empty object, so the error message below is used.
+  }
   if (!res.ok) {
     const error = new Error(data.error || 'Could not load this product.')
     error.status = res.status
@@ -34,9 +37,12 @@ export async function fetchWorthIt(productId, q) {
   const url = '/api/worth-it?productId=' + encodeURIComponent(productId || '') +
     '&q=' + encodeURIComponent(q || '')
   const res = await fetch(url)
-  const verdict = await res.json().catch(function () {
-    return null
-  })
+  let verdict = null
+  try {
+    verdict = await res.json()
+  } catch (error) {
+    // Not JSON: the standard message below is used.
+  }
   if (verdict && (verdict.decision === 'buy' || verdict.decision === 'wait') && verdict.source !== 'rules') {
     savedVerdicts[key] = verdict
   }

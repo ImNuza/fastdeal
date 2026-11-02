@@ -18,7 +18,7 @@ axios.interceptors.request.use(async function (config) {
 // so the view can show its own message without losing what the person typed.
 // Background checks (the 5 second notification refresh and similar) pass { quiet: true },
 // because a missed check is fine and the next one tries again.
-axios.interceptors.response.use(undefined, function (error) {
+axios.interceptors.response.use(undefined, async function (error) {
   const config = error.config || {}
   const isLoad = (config.method || 'get') === 'get'
   if (isLoad && !config.quiet && !axios.isCancel(error)) {
@@ -28,5 +28,6 @@ axios.interceptors.response.use(undefined, function (error) {
       useErrorStore().showError(error.response.status)
     }
   }
-  return Promise.reject(error)
+  // Throwing passes the error on to the code that made the request.
+  throw error
 })

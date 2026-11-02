@@ -36,12 +36,14 @@ export const useTrendingStore = defineStore('trending', () => {
   }
 
   // Loads once; the search bar calls this on every page.
-  function ensureTrending() {
-    if (loaded.value) return Promise.resolve()
+  // Two calls at once share one request. fetchTrending never throws.
+  async function ensureTrending() {
+    if (loaded.value) return
     if (!pending) {
-      pending = fetchTrending().finally(function () { pending = null })
+      pending = fetchTrending()
     }
-    return pending
+    await pending
+    pending = null
   }
 
   return { today, todayFrom, week, loaded, error, topToday, weekExtras, fetchTrending, ensureTrending }

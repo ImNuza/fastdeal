@@ -151,7 +151,10 @@ onMounted(() => {
 onBeforeUnmount(() => navObserver?.disconnect())
 
 // Wait for the first route to resolve, otherwise every page looks like '/' on load.
-onMounted(() => router.isReady().then(maybeShowEntryDialog))
+onMounted(async () => {
+  await router.isReady()
+  maybeShowEntryDialog()
+})
 watch([() => route.path, user], maybeShowEntryDialog)
 </script>
 

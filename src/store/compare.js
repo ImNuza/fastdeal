@@ -49,13 +49,19 @@ async function loadLive(q) {
     // Record this search in the logged-in user's own history (newest first).
     // Fire-and-forget: axios attaches the Firebase token (src/services/http.js);
     // a logged-out user gets 401, which we ignore so search is never affected.
-    axios.post('/api/me/recent-searches', {
-      query: data.query || q,
-      productKey: data.productKey
-    }).catch(function () {})
+    saveRecentSearch(data.query || q, data.productKey)
     return { name: itemName(data.searchTerm || q), listings: rowsOut, productKey: data.productKey || q }
   } catch (err) {
     return null
+  }
+}
+
+// Not awaited by loadLive, so a slow or failed save never holds up the search.
+async function saveRecentSearch(query, productKey) {
+  try {
+    await axios.post('/api/me/recent-searches', { query: query, productKey: productKey })
+  } catch (err) {
+    // A logged-out user gets 401. That is fine.
   }
 }
 
