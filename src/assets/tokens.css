@@ -75,6 +75,10 @@
 
   /* Layout: fallback only, App.vue overwrites this with the measured navbar height */
   --fd-nav-height: 71px;
+
+  /* The tallest a list in a folder tab card grows before it scrolls inside the card: fits the
+     screen, but never shorter than 20rem or taller than 40rem. */
+  --fd-list-max: clamp(20rem, calc(100svh - var(--fd-nav-height) - 16rem), 40rem);
 }
 
 @media (min-width: 768px) {

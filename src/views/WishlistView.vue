@@ -11,7 +11,10 @@ import axios from 'axios'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../store/auth.js'
 import { useWishlistStore } from '../store/wishlist.js'
-import { useTabReachesCorner } from '../services/folderTabs.js'
+import FdTabs from '../components/FdTabs.vue'
+import FdListSearch from '../components/FdListSearch.vue'
+import FdEmptyState from '../components/FdEmptyState.vue'
+import FdTotalBar from '../components/FdTotalBar.vue'
 import FdPager from '../components/FdPager.vue'
 import { useListPages } from '../services/listPages.js'
 
@@ -133,10 +136,8 @@ const TABS = [
 ]
 const activeTab = ref('all')
 
-// Squares the card's top right corner while the open tab reaches it.
-const tabsEl = ref(null)
-const panelEl = ref(null)
-const tabAtCorner = useTabReachesCorner(tabsEl, panelEl, activeTab)
+// The tab card (for the pager to scroll back to) and the scrolling list inside it
+const tabsCard = ref(null)
 const scrollArea = ref(null)
 
 const tabFilters = {
@@ -144,15 +145,6 @@ const tabFilters = {
   drops: function (item) { return !asleep(item) && cheaper(item) },
   sleeping: function (item) { return asleep(item) },
   budget: function () { return true }
-}
-
-// Arrow keys move between tabs, as tab lists do.
-function onTabKey(event, index) {
-  const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-  if (!step) return
-  const next = TABS[(index + step + TABS.length) % TABS.length]
-  activeTab.value = next.id
-  document.getElementById('fd-wtab-' + next.id)?.focus()
 }
 
 watch(activeTab, function (tab) {
@@ -511,7 +503,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
 </script>
 
 <template>
-  <div v-if="user" class="fd-wish-page">
+  <div v-if="user" class="fd-list-page">
     <h1 class="fd-page-title">Wishlist</h1>
     <p class="fd-page-subtitle">What you saved, next to the best price right now. If another store is cheaper, it shows as a
       price drop.<br />
@@ -520,41 +512,26 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
     <!-- Always shown, even with nothing saved: like Notifications, the card stays open with an
          empty message inside, and Plan a budget is still there. -->
     <template v-if="user">
-      <div ref="tabsEl" class="fd-wish-tabs" role="tablist" aria-label="Wishlist">
-        <button v-for="(tab, i) in TABS" :id="'fd-wtab-' + tab.id" :key="tab.id" class="fd-wish-tab"
-          :class="{ 'is-active': activeTab === tab.id }" type="button" role="tab"
-          :aria-selected="activeTab === tab.id" aria-controls="fd-wish-panel"
-          :tabindex="activeTab === tab.id ? 0 : -1" @click="activeTab = tab.id" @keydown="onTabKey($event, i)">
-          <span class="fd-wish-tab-label">{{ tab.label }}</span>
-        </button>
-      </div>
-
-      <!-- The open tab and this card are one piece, like a folder tab. Search, the column header,
-           and the product cards all sit inside it; the cards scroll inside the card. -->
-      <div ref="panelEl" id="fd-wish-panel" class="fd-wish-panel" :class="{ 'is-first-open': activeTab === 'all', 'is-corner-open': tabAtCorner }"
-        role="tabpanel" :aria-labelledby="'fd-wtab-' + activeTab">
+      <!-- The open tab and the card under it are one piece, like a folder tab. Search, the column
+           header, and the product cards all sit inside it; the cards scroll inside the card. -->
+      <FdTabs ref="tabsCard" v-model="activeTab" :tabs="TABS" label="Wishlist" id-prefix="fd-wtab">
       <!-- Plan a budget: tick, rank, set a budget, and save it as a draft for later -->
-      <FdScrollArea v-if="activeTab === 'budget'" ref="scrollArea" label="Plan a budget" :bar="drafts.length > 0">
+      <FdScrollArea v-if="activeTab === 'budget'" ref="scrollArea" fill label="Plan a budget" :bar="drafts.length > 0">
         <!-- Your budgets: every saved draft, newest first, and a button to start a new one -->
         <div>
           <!-- No budgets: the empty message with New budget centred under it -->
-          <div v-if="!drafts.length" class="fd-empty-state">
-            <FdIcon name="wallet" class="fd-empty-icon" />
-            <p class="fd-empty-text">No saved budgets yet.</p>
-            <button class="btn btn-dark" type="button" @click="openBudget(null, $event)">New budget</button>
-          </div>
+          <FdEmptyState v-if="!drafts.length" icon="wallet">
+            No saved budgets yet.
+            <template #action>
+              <button class="btn btn-dark" type="button" @click="openBudget(null, $event)">New budget</button>
+            </template>
+          </FdEmptyState>
 
           <template v-else>
             <!-- Search and sort like the product tabs. New budget sits at the bottom right of the card. -->
-            <div class="fd-wish-tools fd-drafts-tools">
-              <div class="fd-wish-search">
-                <input v-model="budgetQuery" class="fd-wish-search-input" type="text" placeholder="Search your budgets"
-                  aria-label="Search your budgets" autocomplete="off" />
-                <span class="fd-wish-search-icon" aria-hidden="true">
-                  <FdIcon name="search" />
-                </span>
-              </div>
-              <div class="fd-wish-sort">
+            <div class="fd-list-tools fd-wish-tools fd-drafts-tools">
+              <FdListSearch v-model="budgetQuery" placeholder="Search your budgets" label="Search your budgets" />
+              <div class="fd-sort">
                 <label for="budget-sort">Sort by</label>
                 <select id="budget-sort" v-model="budgetSort" class="form-select">
                   <option v-for="opt in budgetSortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -562,10 +539,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
               </div>
             </div>
 
-            <div v-if="!shownDrafts.length" class="fd-empty-state">
-              <FdIcon name="search" class="fd-empty-icon" />
-              <p class="fd-empty-text">No budgets match "{{ budgetQuery.trim() }}".</p>
-            </div>
+            <FdEmptyState v-if="!shownDrafts.length" icon="search">No budgets match "{{ budgetQuery.trim() }}".</FdEmptyState>
             <ul v-else class="fd-drafts list-unstyled mb-0">
             <li v-for="d in pageRows" :key="d._id" class="fd-draft">
               <button class="fd-draft-open" type="button" @click="openBudget(d, $event)">
@@ -600,16 +574,9 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
       </FdScrollArea>
 
       <template v-else>
-      <div v-if="tabItems.length" class="fd-wish-tools">
-        <!-- Built like the Home search bar: one pill with the search icon inside, minus the photo search. -->
-        <div class="fd-wish-search">
-          <input v-model="query" class="fd-wish-search-input" type="text" placeholder="Search your wishlist"
-            aria-label="Search your wishlist" autocomplete="off" />
-          <span class="fd-wish-search-icon" aria-hidden="true">
-            <FdIcon name="search" />
-          </span>
-        </div>
-        <div class="fd-wish-sort">
+      <div v-if="tabItems.length" class="fd-list-tools fd-wish-tools">
+        <FdListSearch v-model="query" placeholder="Search your wishlist" label="Search your wishlist" />
+        <div class="fd-sort">
           <label for="wish-sort">Sort by</label>
           <select id="wish-sort" v-model="sortBy" class="form-select">
             <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -630,12 +597,9 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
           </div>
         </div>
 
-        <FdScrollArea ref="scrollArea" label="Saved products" :bar="tabItems.length > 0">
+        <FdScrollArea ref="scrollArea" fill label="Saved products" :bar="tabItems.length > 0">
         <!-- Nothing in this tab: the same icon-and-line empty state as Notifications -->
-        <div v-if="!shownItems.length" class="fd-empty-state">
-          <FdIcon :name="emptyIcon" class="fd-empty-icon" />
-          <p class="fd-empty-text">{{ emptyText }}</p>
-        </div>
+        <FdEmptyState v-if="!shownItems.length" :icon="emptyIcon">{{ emptyText }}</FdEmptyState>
         <div v-else class="fd-wish-rows" role="rowgroup">
           <div v-for="item in pageRows" :key="item.name" class="fd-wish-row" :class="{ 'is-asleep': asleep(item) }"
             role="row">
@@ -756,14 +720,14 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
         </FdScrollArea>
       </div>
       </template>
-      </div>
+      </FdTabs>
     </template>
 
 
     <!-- Last in the page so it can stick to the bottom of the screen and stop above the footer. -->
-    <div v-if="listTotal > 0" class="fd-budget-bar" :class="{ 'has-pager': listOnPhone && listTotal > 0 }">
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" :noun="activeTab === 'budget' ? 'budgets' : 'products'" label="Wishlist" :top="panelEl" />
-    </div>
+    <FdTotalBar v-if="listTotal > 0" :stacked="listOnPhone">
+      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" :noun="activeTab === 'budget' ? 'budgets' : 'products'" label="Wishlist" :top="tabsCard?.panel" />
+    </FdTotalBar>
   </div>
 
   <!-- Plan a budget pop-up for one budget: its name, the budget, and the ranked items. Opened from
@@ -1152,101 +1116,10 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
 }
 
 /* ===================================
-   PAGE, TABS, AND CARD (like Friends and Notifications)
+   PAGE, TABS, AND CARD
+   The tabs, search, sort, empty message, and total bar are the shared ones (FdTabs,
+   FdListSearch, FdEmptyState, FdTotalBar), styled in app.css like Friends and Notifications.
 =================================== */
-
-.fd-wish-tabs {
-  display: flex;
-}
-
-.fd-wish-tab {
-  position: relative;
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  min-height: 3.5rem;
-  /* Shrinks with the window, so all four tabs still fit across the card on small tablets. */
-  padding: 0 clamp(0.75rem, 2vw, 1.75rem);
-  border: var(--fd-border) solid transparent;
-  border-bottom: 0;
-  border-radius: var(--fd-radius) var(--fd-radius) 0 0;
-  background: transparent;
-  color: var(--fd-text-muted);
-  font-size: var(--fd-table-header);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.fd-wish-tab:hover {
-  color: var(--fd-blue);
-}
-
-/* The open tab: paper, outlined like the card, over the card's top edge so the two join. */
-.fd-wish-tab.is-active {
-  z-index: 1;
-  border-color: var(--fd-vanilla-line);
-  background: var(--fd-paper);
-  color: var(--fd-text);
-}
-
-.fd-wish-tab-label {
-  position: relative;
-  display: inline-block;
-}
-
-.fd-wish-tab.is-active .fd-wish-tab-label::after {
-  content: '';
-  position: absolute;
-  top: calc(100% + 0.3rem);
-  left: 0;
-  right: 0;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--fd-blue);
-}
-
-.fd-wish-tab:focus-visible {
-  outline: 3px solid var(--fd-blue);
-  outline-offset: -3px;
-}
-
-/* The white card under the tabs: search, header, and the scrolling cards */
-/* The page fills the screen below the navbar, like Friends and Notifications */
-.fd-wish-page {
-  display: flex;
-  flex-direction: column;
-  /* At least the screen below the navbar: a short list fills the screen down to the total bar.
-     A longer list makes the card taller (up to the list's maximum) and the page scrolls, with
-     the sticky total bar cutting across the card until the end. */
-  min-height: calc(100svh - var(--fd-nav-height) - 2.5rem);
-}
-
-/* The white card: search on top, the scrolling cards under it */
-.fd-wish-panel {
-  position: relative;
-  /* Fills the screen down to the total bar: the search on top, the scrolling list under it */
-  display: flex;
-  flex: 1 0 auto;
-  flex-direction: column;
-  margin-bottom: 1.5rem;
-  margin-top: calc(var(--fd-border) * -1);
-  padding: var(--fd-card-pad);
-  border: var(--fd-border) solid var(--fd-vanilla-line);
-  border-radius: var(--fd-radius);
-  background: var(--fd-paper);
-}
-
-.fd-wish-panel.is-first-open {
-  border-top-left-radius: 0;
-}
-
-/* Same on the right, while the open tab reaches the card's top right corner. */
-.fd-wish-panel.is-corner-open {
-  border-top-right-radius: 0;
-}
 
 /* The column header, then the scrolling cards filling the rest of the card */
 .fd-wish-table {
@@ -1255,128 +1128,9 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
   flex-direction: column;
 }
 
-/* The scrolling list fills the rest of the card, and grows with a longer list up to the same
-   maximum as before (fits the screen, 20rem to 40rem); past that it scrolls inside */
-.fd-wish-panel .fd-scroll-area {
-  flex: 1 1 auto;
-  max-height: clamp(20rem, calc(100svh - var(--fd-nav-height) - 16rem), 40rem);
-}
-
-@media (max-width: 576px) {
-  .fd-wish-tab {
-    flex: 1 1 auto;
-    justify-content: center;
-    padding: 0 0.5rem;
-  }
-
-  .fd-wish-panel {
-    padding: 1rem;
-  }
-}
-
-/* Empty tab, like Notifications: an icon and a line in the middle of the open card */
-.fd-empty-state {
-  padding: 3rem 1rem;
-  color: var(--fd-text-muted);
-  text-align: center;
-}
-
-.fd-empty-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  margin: 0 auto 0.75rem;
-  color: var(--fd-blue);
-}
-
-.fd-empty-text {
-  font-size: var(--fd-small);
-}
-
-/* ===================================
-   WISHLIST SEARCH AND SORT
-=================================== */
-
-/* Search and sort, ending where the cards end so the scrollbar's column stays free */
-.fd-wish-tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin: 0 1.75rem 1rem 0;
-}
-
-/* Phones: the list has no scrollbar (see FdScrollArea), so no room is kept for one. */
-@media (max-width: 767.98px) {
-  .fd-wish-tools {
-    margin-right: 0;
-  }
-}
-
-.fd-wish-search {
-  display: flex;
-  flex: 1 1 16rem;
-  align-items: center;
-  gap: 0.25rem;
-  min-height: var(--fd-search);
-  /* 2px less than Home top and bottom: this bar has a border, so the total stays 44px.
-     On the right, the same 16px as a card's padding, so the search icon lines up with the
-     icon buttons (like the trash) at the end of the cards below. */
-  padding: 0.125rem 1rem 0.125rem 1.5rem;
-  border: var(--fd-border) solid var(--fd-vanilla-line);
-  border-radius: 999px;
-  background: var(--fd-paper);
-}
-
-.fd-wish-search:focus-within {
-  border-color: var(--fd-blue);
-  box-shadow: 0 0 0 0.25rem rgb(39 80 138 / 35%);
-}
-
-.fd-wish-search-input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fd-text);
-  font-size: var(--fd-body);
-  outline: none;
-}
-
-.fd-wish-search-input::placeholder {
-  color: var(--fd-text-muted);
-}
-
-/* Same size as the Home search bar's icon area: the bar is 48px tall like Home's. */
-.fd-wish-search-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  color: var(--fd-blue);
-}
-
-.fd-wish-sort {
-  display: flex;
-  flex: 0 1 22rem;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.fd-wish-sort label {
-  flex-shrink: 0;
-  color: var(--fd-text-muted);
-  font-size: var(--fd-small);
-  font-weight: 700;
-}
-
-.fd-wish-tools .form-select {
-  flex: 1 1 auto;
-  /* Same height as the search bar beside it. */
-  min-height: var(--fd-search);
-  padding: 0.375rem 3.25rem 0.375rem 1.5rem;
-  border-radius: 999px;
-  background-position: right 1.25rem center;
-  font-size: var(--fd-body);
+/* Sort by is a little wider here, for its longer options. */
+.fd-wish-tools .fd-sort {
+  flex-basis: 22rem;
 }
 
 /* ===================================
@@ -1733,26 +1487,6 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
    BUDGET BAR AND MODAL
 =================================== */
 
-/* Sticks to the bottom of the screen, like the Friends bar: on a short screen it sits over the
-   card, cutting it off at its line */
-.fd-budget-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem 1rem;
-  /* Same height as before, when it held the Plan a budget button */
-  min-height: calc(var(--fd-control) + 1.5rem + var(--fd-border));
-  /* Pushed to the bottom of the screen under the card */
-  margin-top: auto;
-  padding: 0.75rem 0;
-  border-top: var(--fd-border) solid var(--fd-vanilla-line);
-  background: var(--fd-beige);
-}
-
 /* New budget: bottom right of the card, in the list's column, so it ends where the Sort by
    menu ends and the scrollbar runs past it to the bottom. */
 .fd-budget-add {
@@ -2025,14 +1759,6 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
 
 .fd-hold-end strong {
   color: var(--fd-blue);
-}
-
-/* Phones: the page buttons centred, with their "Showing" line under them. */
-.fd-budget-bar.has-pager {
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 1rem 0 1.25rem;
 }
 
 </style>

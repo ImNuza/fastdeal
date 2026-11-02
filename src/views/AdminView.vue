@@ -1,12 +1,15 @@
 <script setup>
-import { ref, computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useAdminStore } from '../store/admin.js'
 import { useAuthStore } from '../store/auth.js'
 import { storeToRefs } from 'pinia'
 import FdIcon from '../components/FdIcon.vue'
 import FdConfirmDialog from '../components/FdConfirmDialog.vue'
 import { sgd } from '../services/format.js'
-import { useTabReachesCorner } from '../services/folderTabs.js'
+import FdTabs from '../components/FdTabs.vue'
+import FdListSearch from '../components/FdListSearch.vue'
+import FdScrollArea from '../components/FdScrollArea.vue'
+import FdTotalBar from '../components/FdTotalBar.vue'
 import FdPager from '../components/FdPager.vue'
 import { useListPages } from '../services/listPages.js'
 
@@ -26,19 +29,9 @@ const ROLE_TABS = [
 ]
 const roleFilter = ref('all')
 
-// Squares the card's top right corner while the open tab reaches it.
-const tabsEl = ref(null)
-const panelEl = ref(null)
-const tabAtCorner = useTabReachesCorner(tabsEl, panelEl, roleFilter)
-
-// Arrow keys move between tabs, as tab lists do.
-function onTabKey(event, index) {
-  const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-  if (!step) return
-  const next = ROLE_TABS[(index + step + ROLE_TABS.length) % ROLE_TABS.length]
-  roleFilter.value = next.id
-  document.getElementById('fd-role-tab-' + next.id)?.focus()
-}
+// The tab card (for the pager to scroll back to) and the scrolling list inside it
+const tabsCard = ref(null)
+const scrollArea = ref(null)
 
 // Day hovered or tapped on each chart; null means today (the last day)
 const searchPick = ref(null)
@@ -225,114 +218,9 @@ const filteredUsers = computed(function () {
   })
 })
 
-// Scrollbar inside the users card, the same as the Friends card: arrows that jump to the top or
-// bottom and a brand-blue handle to drag, since browsers on a Mac hide their own until you scroll.
-const listEl = ref(null)
-const trackEl = ref(null)
-const canScroll = ref(false)
-const thumbSize = ref(20)
-const thumbTop = ref(0)
-
-function updateBar() {
-  const el = listEl.value
-  if (!el) {
-    canScroll.value = false
-    return
-  }
-  const room = el.scrollHeight - el.clientHeight
-  canScroll.value = room > 1
-  // A small handle: its share of the track, kept between 12% and 40%; 20% with nothing to scroll.
-  thumbSize.value = canScroll.value
-    ? Math.min(Math.max((el.clientHeight / el.scrollHeight) * 100, 12), 40)
-    : 20
-  thumbTop.value = canScroll.value
-    ? (el.scrollTop / room) * (100 - thumbSize.value)
-    : Math.min(thumbTop.value, 100 - thumbSize.value)
-}
-
-function moveIdleThumb(top) {
-  thumbTop.value = Math.min(Math.max(top, 0), 100 - thumbSize.value)
-}
-
-// The arrows jump straight to the very top (-1) or the very bottom (1).
-function scrollStep(direction) {
-  if (!canScroll.value) {
-    moveIdleThumb(direction < 0 ? 0 : 100)
-    return
-  }
-  const el = listEl.value
-  el.scrollTo({ top: direction < 0 ? 0 : el.scrollHeight, behavior: 'smooth' })
-}
-
-// A press on the empty track jumps one page toward the press.
-function onTrackPress(event) {
-  const el = listEl.value
-  const thumb = trackEl.value.querySelector('.fd-scrollbar-thumb').getBoundingClientRect()
-  const direction = event.clientY < thumb.top ? -1 : 1
-  if (!canScroll.value) {
-    moveIdleThumb(thumbTop.value + direction * thumbSize.value)
-    return
-  }
-  el.scrollBy({ top: direction * el.clientHeight * 0.9, behavior: 'smooth' })
-}
-
-// Dragging the handle: moving it the full free length of the track scrolls everything.
-let dragStartY = 0
-let dragStartScroll = 0
-let dragStartTop = 0
-
-function onThumbDown(event) {
-  event.preventDefault()
-  dragStartY = event.clientY
-  dragStartScroll = listEl.value.scrollTop
-  dragStartTop = thumbTop.value
-  event.currentTarget.setPointerCapture(event.pointerId)
-}
-
-function onThumbMove(event) {
-  if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
-  const el = listEl.value
-  if (!canScroll.value) {
-    moveIdleThumb(dragStartTop + ((event.clientY - dragStartY) / trackEl.value.clientHeight) * 100)
-    return
-  }
-  const free = trackEl.value.clientHeight * (1 - thumbSize.value / 100)
-  if (free > 0) {
-    el.scrollTop = dragStartScroll + ((event.clientY - dragStartY) * (el.scrollHeight - el.clientHeight)) / free
-  }
-}
-
-// Re-measure when the list changes size: a new tab, a search, a new sort.
-let barObserver = null
-
-watch(listEl, function (el) {
-  barObserver?.disconnect()
-  if (el) {
-    barObserver = new ResizeObserver(updateBar)
-    barObserver.observe(el)
-    if (el.firstElementChild) barObserver.observe(el.firstElementChild)
-    nextTick(updateBar)
-  }
-})
-
+// A new tab starts at the top of its list.
 watch(roleFilter, function () {
-  if (listEl.value) listEl.value.scrollTop = 0
-  nextTick(function () {
-    if (listEl.value?.firstElementChild) barObserver?.observe(listEl.value.firstElementChild)
-    updateBar()
-  })
-})
-
-// A search can swap the list for the "no users" message, so watch whichever is showing.
-watch(filteredUsers, function () {
-  nextTick(function () {
-    if (listEl.value?.firstElementChild) barObserver?.observe(listEl.value.firstElementChild)
-    updateBar()
-  })
-})
-
-onBeforeUnmount(function () {
-  barObserver?.disconnect()
+  scrollArea.value?.toTop()
 })
 
 function formatDate(d) {
@@ -556,27 +444,11 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
     <section class="fd-manage">
     <h2 class="fd-section-title">Manage Users</h2>
 
-    <div ref="tabsEl" class="fd-role-tabs" role="tablist" aria-label="Users by role">
-      <button v-for="(tab, i) in ROLE_TABS" :id="'fd-role-tab-' + tab.id" :key="tab.id" class="fd-role-tab"
-        :class="{ 'is-active': roleFilter === tab.id }" type="button" role="tab"
-        :aria-selected="roleFilter === tab.id" aria-controls="fd-role-panel"
-        :tabindex="roleFilter === tab.id ? 0 : -1" @click="roleFilter = tab.id" @keydown="onTabKey($event, i)">
-        <span class="fd-role-tab-label">{{ tab.label }}</span>
-      </button>
-    </div>
-
-    <div ref="panelEl" id="fd-role-panel" class="fd-role-panel" :class="{ 'is-first-open': roleFilter === 'all', 'is-corner-open': tabAtCorner }"
-      role="tabpanel" :aria-labelledby="'fd-role-tab-' + roleFilter">
+    <FdTabs ref="tabsCard" v-model="roleFilter" :tabs="ROLE_TABS" label="Users by role" id-prefix="fd-role-tab">
       <!-- Search and sort only once the open tab has someone to search, like the Wishlist. -->
-      <div v-if="roleUsers.length" class="fd-admin-tools">
-        <div class="fd-admin-search">
-          <input v-model="search" class="fd-admin-search-input" type="text" placeholder="Search name or email"
-            aria-label="Search users by username or email" autocomplete="off" />
-          <span class="fd-admin-search-icon" aria-hidden="true">
-            <FdIcon name="search" />
-          </span>
-        </div>
-        <div class="fd-admin-sort">
+      <div v-if="roleUsers.length" class="fd-list-tools">
+        <FdListSearch v-model="search" placeholder="Search name or email" label="Search users by username or email" />
+        <div class="fd-sort">
           <label for="admin-sort">Sort by</label>
           <select id="admin-sort" v-model="userSort" class="form-select">
             <option v-for="opt in USER_SORTS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -586,55 +458,39 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
 
       <div v-if="roleSuccess" class="alert alert-success" role="status">{{ roleSuccess }}</div>
 
-      <div class="fd-user-body">
-      <div ref="listEl" class="fd-user-scroll" tabindex="0" aria-label="Users list" @scroll="updateBar">
-      <div v-if="filteredUsers.length" class="fd-user-rows">
-        <div v-for="u in pageRows" :key="u.firebaseUid" class="fd-user-card">
-          <div class="fd-avatar" aria-hidden="true">{{ initials(u) }}</div>
-          <div class="fd-user-info">
-            <div class="fd-user-name">
-              {{ u.username || '(no username)' }}
-              <span v-if="u.role === 'admin'" class="fd-role-tag">Admin</span>
+      <FdScrollArea ref="scrollArea" class="fd-user-scroll" label="Users list" :bar="roleUsers.length > 0">
+        <div v-if="filteredUsers.length" class="fd-user-rows">
+          <div v-for="u in pageRows" :key="u.firebaseUid" class="fd-user-card">
+            <div class="fd-avatar" aria-hidden="true">{{ initials(u) }}</div>
+            <div class="fd-user-info">
+              <div class="fd-user-name">
+                {{ u.username || '(no username)' }}
+                <span v-if="u.role === 'admin'" class="fd-role-tag">Admin</span>
+              </div>
+              <div class="fd-user-email">{{ u.email }}</div>
             </div>
-            <div class="fd-user-email">{{ u.email }}</div>
-          </div>
-          <div class="fd-user-meta">
-            <span><strong>{{ u.wishlistCount }}</strong> saved</span>
-            <span>Joined {{ formatDate(u.createdAt) }}</span>
-          </div>
-          <div class="fd-user-action">
-            <span v-if="u.firebaseUid === auth.user?.uid" class="small text-secondary">You</span>
-            <button v-else-if="u.role !== 'admin'" class="btn btn-sm btn-dark" type="button"
-              @click="askRoleChange(u, 'admin')">Promote</button>
-            <button v-else class="btn btn-sm btn-outline-dark" type="button"
-              @click="askRoleChange(u, 'user')">Demote</button>
+            <div class="fd-user-meta">
+              <span><strong>{{ u.wishlistCount }}</strong> saved</span>
+              <span>Joined {{ formatDate(u.createdAt) }}</span>
+            </div>
+            <div class="fd-user-action">
+              <span v-if="u.firebaseUid === auth.user?.uid" class="small text-secondary">You</span>
+              <button v-else-if="u.role !== 'admin'" class="btn btn-sm btn-dark" type="button"
+                @click="askRoleChange(u, 'admin')">Promote</button>
+              <button v-else class="btn btn-sm btn-outline-dark" type="button"
+                @click="askRoleChange(u, 'user')">Demote</button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <p v-else-if="roleUsers.length" class="alert alert-secondary mb-0">No users match your search.</p>
-      <p v-else class="alert alert-secondary mb-0">No {{ roleFilter === 'admin' ? 'admins' : 'users' }} here yet.</p>
-      </div>
+        <p v-else-if="roleUsers.length" class="alert alert-secondary mb-0">No users match your search.</p>
+        <p v-else class="alert alert-secondary mb-0">No {{ roleFilter === 'admin' ? 'admins' : 'users' }} here yet.</p>
+      </FdScrollArea>
+    </FdTabs>
 
-        <!-- Hidden from screen readers: the list itself scrolls with the keyboard. -->
-        <div v-if="roleUsers.length" class="fd-scrollbar" aria-hidden="true">
-          <button class="fd-scrollbar-arrow" type="button" tabindex="-1" @click="scrollStep(-1)">
-            <FdIcon name="chevron-up" />
-          </button>
-          <div ref="trackEl" class="fd-scrollbar-track" @pointerdown.self="onTrackPress">
-            <div class="fd-scrollbar-thumb" :style="{ top: thumbTop + '%', height: thumbSize + '%' }"
-              @pointerdown="onThumbDown" @pointermove="onThumbMove"></div>
-          </div>
-          <button class="fd-scrollbar-arrow" type="button" tabindex="-1" @click="scrollStep(1)">
-            <FdIcon name="chevron-down" />
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="listTotal > 0" class="fd-admin-bar" :class="{ 'has-pager': listOnPhone && listTotal > 0 }">
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" :noun="roleFilter === 'admin' ? 'admins' : 'users'" label="Users" :top="panelEl" />
-    </div>
+    <FdTotalBar v-if="listTotal > 0" :stacked="listOnPhone">
+      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" :noun="roleFilter === 'admin' ? 'admins' : 'users'" label="Users" :top="tabsCard?.panel" />
+    </FdTotalBar>
     </section>
   </div>
 
@@ -1204,283 +1060,19 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
    MANAGE USERS (same as Friends)
 =================================== */
 
-.fd-role-tabs {
-  display: flex;
+/* Folder tabs, search, sort, and the total bar are the shared ones (FdTabs and friends, styles in
+   app.css). Unlike the other tab lists, this one has a set height: short lists leave white space
+   under them, longer ones scroll inside, and the page scrolls around the card. */
+.fd-tabs-panel .fd-user-scroll {
+  flex: 0 0 auto;
+  height: var(--fd-list-max);
 }
 
-.fd-role-tab {
-  position: relative;
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  min-height: 3.5rem;
-  padding: 0 1.75rem;
-  border: var(--fd-border) solid transparent;
-  border-bottom: 0;
-  border-radius: var(--fd-radius) var(--fd-radius) 0 0;
-  background: transparent;
-  color: var(--fd-text-muted);
-  font-size: var(--fd-table-header);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.fd-role-tab:hover {
-  color: var(--fd-blue);
-}
-
-.fd-role-tab.is-active {
-  z-index: 1;
-  border-color: var(--fd-vanilla-line);
-  background: var(--fd-paper);
-  color: var(--fd-text);
-}
-
-.fd-role-tab-label {
-  position: relative;
-  display: inline-block;
-}
-
-.fd-role-tab.is-active .fd-role-tab-label::after {
-  content: '';
-  position: absolute;
-  top: calc(100% + 0.3rem);
-  left: 0;
-  right: 0;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--fd-blue);
-}
-
-.fd-role-tab:focus-visible {
-  outline: 3px solid var(--fd-blue);
-  outline-offset: -3px;
-}
-
-/* The total under the list, like the Friends and Wishlist bars. Sticky inside .fd-manage, so
-   it stays at the bottom of the screen from when Manage Users scrolls in, and settles under
-   the list at the end. */
-.fd-admin-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  /* Same height as the Wishlist's bar, which holds a full-size button, like the Friends bar. */
-  min-height: calc(var(--fd-control) + 1.5rem + var(--fd-border));
-  margin-top: 1.5rem;
-  padding: 0.75rem 0;
-  border-top: var(--fd-border) solid var(--fd-vanilla-line);
-  background: var(--fd-beige);
-}
-
-
-.fd-role-panel {
-  position: relative;
-  margin-top: calc(var(--fd-border) * -1);
-  padding: var(--fd-card-pad);
-  border: var(--fd-border) solid var(--fd-vanilla-line);
-  border-radius: var(--fd-radius);
-  background: var(--fd-paper);
-}
-
-.fd-role-panel.is-first-open {
-  border-top-left-radius: 0;
-}
-
-/* Same on the right, while the open tab reaches the card's top right corner. */
-.fd-role-panel.is-corner-open {
-  border-top-right-radius: 0;
-}
-
-/* Search and Sort by in one row, like the Wishlist's */
-.fd-admin-tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.fd-admin-sort {
-  display: flex;
-  flex: 0 1 20rem;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.fd-admin-sort label {
-  flex-shrink: 0;
-  color: var(--fd-text-muted);
-  font-size: var(--fd-small);
-  font-weight: 700;
-}
-
-.fd-admin-sort .form-select {
-  flex: 1 1 auto;
-  min-height: var(--fd-search);
-  padding: 0.375rem 3.25rem 0.375rem 1.5rem;
-  border-radius: 999px;
-  background-position: right 1.25rem center;
-  font-size: var(--fd-body);
-}
-
-.fd-admin-search {
-  display: flex;
-  flex: 1 1 16rem;
-  align-items: center;
-  gap: 0.25rem;
-  min-height: var(--fd-search);
-  padding: 0.125rem 1rem 0.125rem 1.5rem;
-  border: var(--fd-border) solid var(--fd-vanilla-line);
-  border-radius: 999px;
-  background: var(--fd-paper);
-}
-
-.fd-admin-search:focus-within {
-  border-color: var(--fd-blue);
-  box-shadow: 0 0 0 0.25rem rgb(39 80 138 / 35%);
-}
-
-.fd-admin-search-input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fd-text);
-  font-size: var(--fd-body);
-  outline: none;
-}
-
-.fd-admin-search-input::placeholder {
-  color: var(--fd-text-muted);
-}
-
-.fd-admin-search-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  color: var(--fd-blue);
-}
-
-/* The list scrolls inside the card with the Friends scrollbar beside it */
-.fd-user-body {
-  display: flex;
-  gap: 0.5rem;
-  /* A set height, like the Wishlist, Friends, and Notifications lists: it fits the
-     screen, but never shorter than 20rem or taller than 40rem. Short lists leave white space
-     under them; longer ones scroll inside. The page scrolls around the card. */
-  height: clamp(20rem, calc(100svh - var(--fd-nav-height) - 16rem), 40rem);
-}
-
-.fd-user-scroll {
-  flex: 1;
-  min-width: 0;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.fd-user-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.fd-user-scroll:focus-visible {
-  outline: 3px solid var(--fd-blue);
-  outline-offset: 3px;
-}
-
-/* The search and sort end where the cards end, leaving the scrollbar's column free */
-.fd-role-panel > .fd-admin-tools {
-  margin-right: 1.75rem;
-}
-
-/* Phones: no box inside the card, like the Wishlist. The list runs its full length, the page
-   scrolls instead, and the search no longer leaves room for a scrollbar. */
+/* Phones: no box inside the card. The list runs its full length and the page scrolls instead. */
 @media (max-width: 767.98px) {
-  .fd-user-body {
+  .fd-tabs-panel .fd-user-scroll {
     height: auto;
   }
-
-  .fd-user-scroll {
-    overflow-y: visible;
-  }
-
-  .fd-user-body .fd-scrollbar {
-    display: none;
-  }
-
-  .fd-role-panel > .fd-admin-tools {
-    margin-right: 0;
-  }
-}
-
-.fd-scrollbar {
-  display: flex;
-  flex-shrink: 0;
-  flex-direction: column;
-  align-items: center;
-  width: 1.25rem;
-  user-select: none;
-}
-
-.fd-scrollbar-arrow {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--fd-text-muted);
-  cursor: pointer;
-}
-
-.fd-scrollbar-arrow:hover {
-  background: var(--fd-beige);
-  color: var(--fd-blue);
-}
-
-.fd-scrollbar-arrow .fd-icon {
-  width: 0.875rem;
-  height: 0.875rem;
-}
-
-.fd-scrollbar-track {
-  position: relative;
-  flex: 1;
-  width: 0.375rem;
-  margin: 0.25rem 0;
-  border-radius: 999px;
-  background: var(--fd-beige);
-  cursor: pointer;
-}
-
-/* The handle is brand blue and a little wider than its track, so it is easy to see and grab. */
-.fd-scrollbar-thumb {
-  position: absolute;
-  left: 50%;
-  width: 0.625rem;
-  border-radius: 999px;
-  background: var(--fd-blue);
-  transform: translateX(-50%);
-  cursor: grab;
-  touch-action: none;
-}
-
-.fd-scrollbar-thumb:hover,
-.fd-scrollbar-thumb:active {
-  background: var(--fd-blue-dark);
-}
-
-.fd-scrollbar-thumb:active {
-  cursor: grabbing;
 }
 
 .fd-user-rows {
@@ -1574,26 +1166,4 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
     padding-left: calc(44px + 0.875rem);
   }
 }
-
-@media (max-width: 576px) {
-  .fd-role-tab {
-    flex: 1 1 auto;
-    justify-content: center;
-    padding: 0 0.5rem;
-  }
-
-  .fd-role-panel {
-    padding: 1rem;
-  }
-}
-
-
-/* Phones: the page buttons centred, with their "Showing" line under them. */
-.fd-admin-bar.has-pager {
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 1rem 0 1.25rem;
-}
-
 </style>
