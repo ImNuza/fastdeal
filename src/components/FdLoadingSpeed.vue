@@ -121,9 +121,19 @@ onBeforeUnmount(function () {
   font-weight: 400;
   line-height: 1.05;
   letter-spacing: 0.005em;
-  text-align: left;
+  /* Centred, and balanced if it ever wraps, so the lines come out even */
+  text-align: center;
+  text-wrap: balance;
   text-transform: uppercase;
   transform: skewX(-6deg);
+}
+
+/* Phones: a long message breaks into two even lines beside the speed lines,
+   "Comparing prices / across stores". Wider screens keep it on one line. */
+@media (max-width: 767.98px) {
+  .is-page .fd-load-message {
+    max-width: 10em;
+  }
 }
 
 .fd-load-time {

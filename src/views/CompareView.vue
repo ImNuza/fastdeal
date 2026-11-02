@@ -13,6 +13,7 @@ import { fetchSearchedWith } from '../services/productApi.js'
 import { useCompareStore } from '../store/compare.js'
 import axios from 'axios'
 import FdPager from '../components/FdPager.vue'
+import FdIcon from '../components/FdIcon.vue'
 import { useListPages } from '../services/listPages.js'
 
 const route = useRoute()
@@ -34,6 +35,20 @@ const freeOnly = ref(false)
 const saleOnly = ref(false)
 const sortBy = ref('price')
 const note = ref('')
+
+// Phones: the filters fold into a button, closed at first so the listings come first.
+const filtersOpen = ref(false)
+// How many filters are on, for the button: "Filters (2 on)". Sort is not a filter.
+const filtersOn = computed(function () {
+  return [
+    minPrice.value !== '',
+    maxPrice.value !== '',
+    storeName.value !== 'All',
+    minRating.value > 0,
+    freeOnly.value,
+    saleOnly.value
+  ].filter(Boolean).length
+})
 
 //searched with feature
 const searchedWith = ref([])
@@ -180,8 +195,20 @@ const listingsEl = ref(null)
 
     <p v-if="note" class="small mb-3" role="status">{{ note }}</p>
 
-    <div class="card fd-card-pad mb-3">
-      <div class="row g-2">
+    <!-- Phones: the button is the card's header and the filters open under it, in the same box. -->
+    <div class="card fd-card-pad mb-3 fd-filters" :class="{ 'is-open': filtersOpen }">
+      <button
+        class="d-md-none fd-filter-toggle"
+        type="button"
+        aria-controls="fd-filters-body"
+        :aria-expanded="filtersOpen"
+        @click="filtersOpen = !filtersOpen"
+      >
+        <span>Filters and sort<template v-if="filtersOn"> ({{ filtersOn }} on)</template></span>
+        <FdIcon :name="filtersOpen ? 'chevron-up' : 'chevron-down'" />
+      </button>
+
+      <div id="fd-filters-body" class="row g-2 fd-filters-body">
         <div class="col-6 col-md-2">
           <label class="form-label small" for="min">Min price</label>
           <input id="min" v-model.number="minPrice" class="form-control form-control-sm" type="number" min="0" placeholder="Any" />
@@ -306,6 +333,52 @@ const listingsEl = ref(null)
 </template>
 
 <style scoped>
+/* Phones: the card's header row opens and closes the filters under it. */
+.fd-filter-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: var(--fd-control);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fd-blue);
+  /* Same type as the pager's Prev and Next */
+  font-family: var(--fd-font-body);
+  font-size: var(--fd-button);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.fd-filter-toggle:focus-visible {
+  border-radius: 0.5rem;
+  outline: 0.25rem solid rgb(39 80 138 / 35%);
+  outline-offset: 0.25rem;
+}
+
+@media (max-width: 767.98px) {
+  /* Closed, the card is only as tall as its header row, like a select box. */
+  .fd-filters {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .fd-filters:not(.is-open) .fd-filters-body {
+    display: none;
+  }
+
+  /* A line between the header and the filters, like a section inside the card. */
+  .fd-filters.is-open .fd-filters-body {
+    padding-top: 0.75rem;
+    padding-bottom: var(--fd-card-pad);
+    border-top: var(--fd-border) solid var(--fd-vanilla-line);
+  }
+}
+
 /* Sticks to the bottom of the screen while scrolling through the listings and settles under
    the last card, like the Wishlist's total bar. */
 .fd-listings-bar {

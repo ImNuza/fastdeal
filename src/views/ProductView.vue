@@ -398,6 +398,8 @@ const storeTable = ref(null)
     </p>
     <!-- Built like the Wishlist table: a blue header pill, then one card per listing. Roles keep it a
          table for screen readers. Google Shopping gives no shipping amount, so there is no Total column. -->
+    <!-- Holds the listings and their bar, so the bar sticks only while the listings scroll past. -->
+    <div class="fd-store-block">
     <div ref="storeTable" class="fd-store-table fd-store-panel" role="table" aria-label="All listings">
       <div class="fd-store-head" role="row">
         <span role="columnheader">Store</span>
@@ -449,6 +451,7 @@ const storeTable = ref(null)
     <!-- The total under the card, worded and placed like the Friends and Wishlist totals. -->
     <div v-if="listTotal > 0" class="fd-store-foot" :class="{ 'has-pager': listOnPhone && listTotal > 0 }">
       <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" noun="listings" label="Listings" :top="storeTable" />
+    </div>
     </div>
 
     <!-- What buyers say: one card per review, in a row that scrolls sideways. -->
@@ -560,12 +563,19 @@ const storeTable = ref(null)
    card, so the next section starts closer under it: the card's bottom to the next title is about
    the same as the 48px between the other sections. */
 /* The pager on the left (phones only), the total on the right */
+/* Sticks to the bottom of the screen while scrolling through the listings and settles under
+   the last card, like the Compare page's bar. */
 .fd-store-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: 0.5rem 1rem;
   margin: 0 0 1.25rem;
-  padding: 0.5rem 0 0;
+  padding: 0.5rem 0;
+  border-top: var(--fd-border) solid var(--fd-vanilla-line);
+  background: var(--fd-beige);
 }
 
 
@@ -652,6 +662,14 @@ const storeTable = ref(null)
 
   .fd-store-cell-link {
     text-align: left;
+  }
+
+  /* The pill sits beside the price instead of under it. */
+  .fd-diff {
+    display: inline-block;
+    margin-top: 0;
+    margin-left: 0.5rem;
+    vertical-align: middle;
   }
 
   .fd-store-label {
