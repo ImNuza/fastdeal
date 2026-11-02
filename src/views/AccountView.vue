@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/auth.js'
 import { signOutUser } from '../services/auth.js'
 import { updateUser } from '../services/userApi.js'
 import FdIcon from '../components/FdIcon.vue'
+import FdAvatar from '../components/FdAvatar.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -82,7 +83,7 @@ async function saveTelegram() {
       <h2 class="fd-section-title">Account details</h2>
       <div class="card fd-account-card">
         <div class="fd-account-head">
-          <span class="fd-account-avatar" aria-hidden="true">{{ initials }}</span>
+          <FdAvatar size="lg">{{ initials }}</FdAvatar>
           <div class="fd-account-who">
             <p class="fd-section-subtitle mb-0">
               {{ user.username || user.email }}
@@ -158,20 +159,6 @@ async function saveTelegram() {
   border-bottom: 1px solid var(--fd-vanilla-line);
 }
 
-/* Same blue initials circle as the Friends and Admin pages */
-.fd-account-avatar {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: 50%;
-  background: var(--fd-blue);
-  color: var(--fd-beige);
-  font-size: var(--fd-body);
-  font-weight: 700;
-}
 
 .fd-account-who {
   min-width: 0;

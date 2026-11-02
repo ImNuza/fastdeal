@@ -4,6 +4,7 @@ import { useAdminStore } from '../store/admin.js'
 import { useAuthStore } from '../store/auth.js'
 import { storeToRefs } from 'pinia'
 import FdIcon from '../components/FdIcon.vue'
+import FdAvatar from '../components/FdAvatar.vue'
 import FdConfirmDialog from '../components/FdConfirmDialog.vue'
 import { sgd } from '../services/format.js'
 import FdTabs from '../components/FdTabs.vue'
@@ -461,7 +462,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
       <FdScrollArea ref="scrollArea" class="fd-user-scroll" label="Users list" :bar="roleUsers.length > 0">
         <div v-if="filteredUsers.length" class="fd-user-rows">
           <div v-for="u in pageRows" :key="u.firebaseUid" class="fd-user-card">
-            <div class="fd-avatar" aria-hidden="true">{{ initials(u) }}</div>
+            <FdAvatar>{{ initials(u) }}</FdAvatar>
             <div class="fd-user-info">
               <div class="fd-user-name">
                 {{ u.username || '(no username)' }}
@@ -1091,20 +1092,6 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
   background: var(--fd-paper);
 }
 
-.fd-avatar {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--fd-blue);
-  color: var(--fd-beige);
-  font-family: var(--fd-font-body);
-  font-size: var(--fd-body);
-  font-weight: 700;
-}
 
 .fd-user-info {
   flex: 1;

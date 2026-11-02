@@ -432,17 +432,17 @@ const listingsEl = ref(null)
   flex-direction: column;
   height: 100%;
   padding: var(--fd-card-pad);
-  border: var(--fd-border, 1px) solid var(--fd-vanilla-line, #e4ddcf);
+  border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: 1rem;
-  background: var(--fd-paper, #fff);
-  color: var(--fd-text, #1a1a1a);
+  background: var(--fd-paper);
+  color: var(--fd-text);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 /* The cheapest listing is highlighted, mirroring the old table row. */
 .fd-listing-card.cheapest {
-  border-color: var(--fd-green, #2f6b47);
-  box-shadow: 0 0 0 2px var(--fd-green, #2f6b47);
+  border-color: var(--fd-green);
+  box-shadow: 0 0 0 2px var(--fd-green);
 }
 
 /* Hovering (or tabbing to) a card highlights it with a blue outline. It never grows. */
@@ -483,8 +483,8 @@ const listingsEl = ref(null)
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--fd-text-muted, #6b6b6b);
-  font-family: var(--fd-font-display, inherit);
+  color: var(--fd-text-muted);
+  font-family: var(--fd-font-display);
   font-size: var(--fd-page-title);
 }
 
@@ -519,22 +519,22 @@ const listingsEl = ref(null)
 
 .fd-listing-price {
   margin: 0 0 0.125rem;
-  color: var(--fd-blue, #1f4fd8);
-  font-family: var(--fd-font-display, inherit);
+  color: var(--fd-blue);
+  font-family: var(--fd-font-display);
   font-size: var(--fd-section-title);
   line-height: 1.1;
 }
 
 .fd-listing-store {
   margin: 0 0 0.125rem;
-  color: var(--fd-text, #1a1a1a);
-  font-size: var(--fd-small, 0.875rem);
+  color: var(--fd-text);
+  font-size: var(--fd-small);
 }
 
 .fd-listing-meta {
   margin: 0;
-  color: var(--fd-text-muted, #6b6b6b);
-  font-size: var(--fd-small, 0.875rem);
+  color: var(--fd-text-muted);
+  font-size: var(--fd-small);
 }
 
 .fd-listing-save {

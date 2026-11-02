@@ -14,6 +14,7 @@ import {
   declineOrRemove
 } from '../services/friendsApi.js'
 import FdIcon from '../components/FdIcon.vue'
+import FdAvatar from '../components/FdAvatar.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
 import FdConfirmDialog from '../components/FdConfirmDialog.vue'
 import FdTabs from '../components/FdTabs.vue'
@@ -315,7 +316,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
 
             <div v-else class="friend-rows">
               <div v-for="f in pageRows" :key="f.pairKey" class="friend-card">
-                <div class="friend-avatar">{{ initials(f) }}</div>
+                <FdAvatar>{{ initials(f) }}</FdAvatar>
                 <div class="friend-info">
                   <div class="friend-username">{{ f.username || '(no username)' }}</div>
                   <div class="friend-email">{{ f.email }}</div>
@@ -341,7 +342,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
           <template v-if="!searchQuery.trim()">
             <div v-if="sent.length" class="friend-rows">
               <div v-for="req in pageRows" :key="req.pairKey" class="friend-card">
-                <div class="friend-avatar">{{ initials(req) }}</div>
+                <FdAvatar>{{ initials(req) }}</FdAvatar>
                 <div class="friend-info">
                   <div class="friend-username">{{ req.username }}</div>
                   <div class="friend-email">has not answered yet</div>
@@ -364,7 +365,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
           <!-- Once something is typed: the matching people. -->
           <div v-else-if="searchResults.length" class="friend-rows">
             <div v-for="r in pageRows" :key="r.pairKey" class="friend-card">
-              <div class="friend-avatar">{{ initials(r) }}</div>
+              <FdAvatar>{{ initials(r) }}</FdAvatar>
               <div class="friend-info">
                 <div class="friend-username">{{ r.username }}</div>
               </div>
@@ -403,7 +404,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
         <section v-else>
           <div v-if="requests.length" class="friend-rows">
             <div v-for="req in pageRows" :key="req.pairKey" class="friend-card">
-              <div class="friend-avatar">{{ initials(req) }}</div>
+              <FdAvatar>{{ initials(req) }}</FdAvatar>
               <div class="friend-info">
                 <div class="friend-username">{{ req.username || req.email }}</div>
                 <div class="friend-email">wants to be friends</div>
@@ -493,21 +494,6 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
   background: var(--fd-paper);
 }
 
-.friend-avatar {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--fd-blue);
-  color: var(--fd-beige);
-  /* Initials in DM Sans: the smallest Anton size is too big for a 44px circle. */
-  font-family: var(--fd-font-body);
-  font-size: var(--fd-body);
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
 .friend-info {
   flex: 1;

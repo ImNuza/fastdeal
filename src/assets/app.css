@@ -843,6 +843,36 @@ tr.cheapest td {
   font-size: var(--fd-small);
 }
 
+/* Avatar (FdAvatar): a blue circle with beige initials or an icon. Initials are DM Sans: the
+   smallest Anton size is too big for a 44px circle. */
+.fd-avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--fd-blue);
+  color: var(--fd-beige);
+  font-family: var(--fd-font-body);
+  font-size: var(--fd-body);
+  font-weight: 700;
+}
+
+.fd-avatar-md {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.fd-avatar-lg {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.fd-avatar .fd-icon {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
 /* Total bar (FdTotalBar): sticks to the bottom of the screen while scrolling and stops above
    the footer. Last thing in its page, so the sticking ends where the page does. */
 .fd-total-bar {
@@ -917,7 +947,7 @@ tr.cheapest td {
   height: 150px;
   object-fit: contain;
   border-radius: 0.75rem;
-  background: var(--fd-beige, #f3ede1);
+  background: var(--fd-beige);
   margin-bottom: 0.75rem;
 }
 

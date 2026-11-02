@@ -1083,7 +1083,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
   flex-direction: column;
   align-items: center;
   gap: 0.2rem;
-  background: #f4f0e8;
+  background: var(--fd-beige);
   padding: 1rem;
   border-radius: 1rem;
 }
@@ -1095,11 +1095,11 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
 }
 
 .fd-verdict-change.is-lower {
-  color: #187447;
+  color: var(--fd-green-text);
 }
 
 .fd-verdict-change.is-higher {
-  color: #a24432;
+  color: var(--fd-red-text);
 }
 
 .fd-verdict-title {
@@ -1386,8 +1386,8 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
   left: 50%;
   margin-top: 0.15rem;
   transform: translateX(-50%);
-  color: #187447;
-  font-size: 0.75rem;
+  color: var(--fd-green-text);
+  font-size: var(--fd-small);
   font-weight: 700;
   white-space: nowrap;
 }

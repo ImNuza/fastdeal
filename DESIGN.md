@@ -31,6 +31,8 @@ How FastDeal looks and how to keep it consistent when you add or change a page. 
 | `src/components/FdTabs.vue` | Folder tabs and the card under them, as one piece. See [Lists in folder tabs](#lists-in-folder-tabs). |
 | `src/components/FdListSearch.vue` | The search pill above a list (filter friends, notifications, the wishlist, budgets, users). |
 | `src/components/FdScrollArea.vue` | A list that scrolls inside its card, with the brand scrollbar beside it. Add `fill` inside a tab card. |
+| `src/components/FdAvatar.vue` | The blue circle with beige initials (Friends, Admin, Account) or an icon (Notifications). `size="lg"` for the Account header. |
+| `src/components/FdGoogleButton.vue` | The Continue with Google button on Log in and Sign up. Its logo keeps Google's own colours, the only hex codes outside `tokens.css`. |
 | `src/components/FdEmptyState.vue` | An empty list: a blue icon and one short line, with an optional button under it. |
 | `src/components/FdTotalBar.vue` | The bar under a list that sticks to the bottom of the screen and holds the `FdPager` count. |
 | `src/components/FdFooter.vue` | The footer on every page. |
@@ -55,13 +57,15 @@ How FastDeal looks and how to keep it consistent when you add or change a page. 
 | Tea green (results) | `--fd-green` | `#b3c77a` | "Cheapest" badge and chip |
 | Green soft | `--fd-green-soft` | `#d8e4b4` | Cheapest table row |
 | Clay red (results) | `--fd-red` | `#edb0a2` | Bad results, such as "extra you'd pay" bars |
+| Green text | `--fd-green-text` | `#187447` | A good result written as text, such as "$20 lower" or "Sent!" |
+| Red text | `--fd-red-text` | `#a24432` | A bad result written as text, such as "$20 higher" |
 | Grey soft | `--fd-grey-soft` | `#ebe9e5` | Background of a Wishlist card on hold (Sleep on it) |
 | Grey line | `--fd-grey-line` | `#d4d1cb` | Border of a Wishlist card on hold |
 | Grey text | `--fd-grey-text` | `#5c5c5c` | The countdown on a Wishlist card on hold |
 | Ink | `--fd-ink` | `#343b1b` | Body text only |
 | Muted text | `--fd-text-muted` | `#585f3e` | Subtitles, captions, labels |
 
-The Worth It / Maybe / Not Worth It verdict box uses its own green, amber, and red border (`#2f6b47`, `#a8741a`, `#a3301f`). Keep those three for verdicts and errors only. The Home hero cards use none of the result colours: only blue, vanilla, and the soft vanilla fill, so they stay calm.
+Tea green and clay red are too light for text, so a result written as text uses green text or red text instead. The Home hero cards use none of the result colours: only blue, vanilla, and the soft vanilla fill, so they stay calm.
 
 ### Colour rules
 
@@ -84,6 +88,8 @@ Contrast is checked against WCAG AA (4.5:1 for body text):
 | Ink on tea green | 6.4:1 |
 | Ink on clay red | 6.3:1 |
 | Grey text on grey soft | 5.5:1 |
+| Green text on beige | 5.0:1 |
+| Red text on beige | 5.3:1 |
 
 ## Typography
 

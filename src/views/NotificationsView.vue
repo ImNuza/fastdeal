@@ -6,6 +6,7 @@ const { user } = storeToRefs(useAuthStore())
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import axios from 'axios'
 import FdIcon from '../components/FdIcon.vue'
+import FdAvatar from '../components/FdAvatar.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
 import FdTelegramPrompt from '../components/FdTelegramPrompt.vue'
 import FdTabs from '../components/FdTabs.vue'
@@ -279,7 +280,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
         <ul v-else class="notif-rows">
           <li v-for="n in pageRows" :key="n._id" class="notif-row-item">
             <div v-if="isBuyTogether(n) || isGroupInvite(n)" class="notif-row">
-              <span class="notif-icon" aria-hidden="true"><FdIcon :name="iconFor(n)" /></span>
+              <FdAvatar class="notif-icon" :icon="iconFor(n)" />
               <div class="notif-main">
                 <div class="notif-head">
                   <p class="notif-title"><span v-if="!n.read" class="unread-dot" aria-label="Unread"></span>{{ n.title }}</p>
@@ -295,7 +296,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
             </div>
 
             <router-link v-else :to="n.link || '/'" class="notif-row notif-row-link" @click="openNotification(n)">
-              <span class="notif-icon" aria-hidden="true"><FdIcon :name="iconFor(n)" /></span>
+              <FdAvatar class="notif-icon" :icon="iconFor(n)" />
               <div class="notif-main">
                 <div class="notif-head">
                   <p class="notif-title"><span v-if="!n.read" class="unread-dot" aria-label="Unread"></span>{{ n.title }}</p>
@@ -435,22 +436,10 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
   border-radius: var(--fd-radius);
 }
 
-/* The round icon: a brand-blue circle with a beige icon, like the Friends page avatars. */
+/* The round icon (FdAvatar): a little bigger than the 44px initials circles. */
 .notif-icon {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
   width: 3rem;
   height: 3rem;
-  border-radius: 50%;
-  background: var(--fd-blue);
-  color: var(--fd-beige);
-}
-
-.notif-icon .fd-icon {
-  width: 1.375rem;
-  height: 1.375rem;
 }
 
 .notif-main {
