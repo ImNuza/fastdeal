@@ -66,9 +66,11 @@ const slots = computed(function () {
 const ONE = { people: 'person' }
 
 const showing = computed(function () {
+  const noun = props.total === 1 ? (ONE[props.noun] || props.noun.replace(/s$/, '')) : props.noun
+  // Without buttons the whole list is out at once, scrolling in its card: "Showing 45 products".
+  if (!props.buttons) return 'Showing ' + props.total + ' ' + noun
   const from = (page.value - 1) * PAGE_SIZE + 1
   const to = Math.min(page.value * PAGE_SIZE, props.total)
-  const noun = props.total === 1 ? (ONE[props.noun] || props.noun.replace(/s$/, '')) : props.noun
   // "Showing 1 to 10 of 45 products"; a page with one row reads "Showing 11 of 11 products".
   const range = from === to ? from : from + ' to ' + to
   return 'Showing ' + range + ' of ' + props.total + ' ' + noun
