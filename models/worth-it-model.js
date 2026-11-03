@@ -7,8 +7,9 @@
 // exact prompt go back together, so the "How this verdict was made" page can show what the AI read.
 //
 // Conventions match models/shoppingapimodel.js:
-//   - GEMINI_API_KEY is read at module scope (server.js does `import 'dotenv/config'`
-//     BEFORE importing this model, so process.env is already populated).
+//   - Gemini keys (GEMINI_API_KEY + GEMINI_API_KEY_2 backup) are read by
+//     services/geminiKeys.js, which rotates to the backup key on any failure.
+//     server.js does `import 'dotenv/config'` BEFORE importing this model.
 //   - Raw REST fetch to generativelanguage.googleapis.com, body { contents:[{parts:[{text}]}] }.
 //   - Any failure returns a graceful FALLBACK verdict; worthIt() never throws upward,
 //     so the product page always renders.
@@ -22,8 +23,7 @@
 import WorthItCache from './worth-it-cache-model.js'
 import { verdictInputs, verdictPrompt, ruleVerdict } from '../services/worthItInputs.js'
 import { sgDay } from '../services/priceHistory.js'
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+import { geminiFetch, hasGeminiKey } from '../services/geminiKeys.js'
 
 // Primary model, then the backup when the primary is busy or down.
 // 3.5-flash-lite answered in about 1s every time in a check on 31 Oct. 3.1 took up to 7s and was
@@ -33,10 +33,6 @@ const WORTH_IT_FALLBACK_MODEL = 'gemini-3.1-flash-lite'
 const RULES_MINUTES = 10
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
-
-function geminiUrl(model) {
-  return `${GEMINI_BASE}/${model}:generateContent`
-}
 
 // The neutral verdict shown whenever Gemini is unavailable or returns nothing usable.
 // decision is one of: 'buy' | 'wait' | 'unknown'. The page renders reason + a tone colour.
@@ -69,7 +65,7 @@ function parseGeminiJson(text) {
 //   (the Google error .status string, e.g. "RESOURCE_EXHAUSTED") on failure.
 async function callGemini(model, prompt) {
   try {
-    const res = await fetch(`${geminiUrl(model)}?key=${GEMINI_API_KEY}`, {
+    const res = await geminiFetch(GEMINI_BASE, model, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -168,7 +164,7 @@ export async function worthIt(product, sale) {
     console.error('[Worth it] cache read failed:', error.message)
   }
 
-  if (!GEMINI_API_KEY) {
+  if (!hasGeminiKey()) {
     return Object.assign(ruleVerdict(product, sale) || fallbackVerdict('AI verdict is not configured.'), extra)
   }
 
