@@ -147,8 +147,8 @@ Batch 3, now unblocked (Zoe's wishlist is merged): 5 E2E tests in `wishlist.spec
 | # | Login | Test |
 |---|---|---|
 | 13 | `@user` | On a product page (product fixture), "Save" adds the product. It shows on `/wishlist`. "Remove <name>", then "Remove" in the pop-up, takes it off again. |
-| 14 | `@admin` | "Search your wishlist" narrows the list. "Sort by" changes the order. The tabs "Price drops" and "Sleeping on it" filter the list. Read only. |
-| 15 | `@user` | Save a product, then "Sleep on <name>" with a hold time. It shows under "Sleeping on it". Cleanup: remove the product. |
+| 14 | `@admin` | "Search your wishlist" narrows the list. "Sort by" changes the order. The tabs "Price drops" and "Sleep on it" filter the list. Read only. |
+| 15 | `@user` | Save a product, then "Sleep on <name>" with a hold time. It shows under "Sleep on it". Cleanup: remove the product. |
 | 16 | `@admin` | "Plan a budget" tab, "New budget": enter "Your budget". The plan keeps the total under the budget. Close without saving. If a save is tested, delete the draft with "Delete <name>" at the end. |
 | 17 | `@admin` | The "friends saved ... Buy together" button opens the "Buy together" dialog with the team accounts that saved the same Sony headphones (ronald.s, jayden). Close without sending. |
 
@@ -195,6 +195,10 @@ Batch 8 (3 Nov, after the Week 12 consult): 7 demo searches with seeded 30-day h
 Unit: `priceHistory.spec.js` +8 (`seededPrices`, `summarizeHistory`, `lastDays`), `serpapiKeys.spec.js` +1 (PR #55).
 E2E tests for the history UI come with Zoe's UI, with `history` mocked from a fixture.
 Totals: 34 E2E tests in 11 files, 97 unit tests in 11 files.
+
+Batch 9 (3 Nov): new `services/__tests__/geminiKeys.spec.js` (5 tests, `fetch` mocked): the Gemini key fallback now
+reads `GEMINI_API_KEY_2` up to `_10`.
+Totals: 34 E2E tests in 11 files, 102 unit tests in 12 files.
 
 Batch 4, after Ronald's AI verdict merges: Compare filters and sort, the cheapest badge, the verdict (with a saved Gemini response). About 3 tests. Then check `product.spec.js` and `target-price-alert.spec.js`.
 

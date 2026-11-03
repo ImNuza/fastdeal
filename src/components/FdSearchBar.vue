@@ -14,11 +14,16 @@ const props = defineProps({
   compact: {
     type: Boolean,
     default: false
+  },
+  // Sets the ids' prefix, for a second compact bar on the same page (the phone navbar's).
+  idPrefix: {
+    type: String,
+    default: ''
   }
 })
 
 // Ids stay unique if both bars are ever on screen at once.
-const prefix = props.compact ? 'fd-nav-search' : 'fd-search'
+const prefix = props.idPrefix || (props.compact ? 'fd-nav-search' : 'fd-search')
 
 const route = useRoute()
 const router = useRouter()

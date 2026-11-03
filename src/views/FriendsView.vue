@@ -269,8 +269,8 @@ function initials(f) {
   return name.slice(0, 2).toUpperCase()
 }
 
-// Phones: 10 rows a page, with the page buttons in the bar. Wider: the count only.
-const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal, isPhone: listOnPhone } = useListPages(
+// 8 rows a page on every screen, with the page buttons in the bar under the list.
+const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal } = useListPages(
   function () {
     if (activeTab.value === 'friends') return shownFriends.value
     if (activeTab.value === 'add') return searchQuery.value.trim() ? searchResults.value : sent.value
@@ -432,8 +432,8 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
     </FdTabs>
 
     <!-- Sticks to the bottom of the screen while scrolling, like the Wishlist's total bar. -->
-    <FdTotalBar v-if="listTotal > 0" :stacked="listOnPhone">
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" :noun="activeTab === 'friends' ? 'friends' : activeTab === 'requests' ? 'requests' : searchQuery.trim() ? 'people' : 'pending requests'" label="Friends" :top="tabsCard?.panel" />
+    <FdTotalBar v-if="listTotal > 0" stacked>
+      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :noun="activeTab === 'friends' ? 'friends' : activeTab === 'requests' ? 'requests' : searchQuery.trim() ? 'people' : 'pending requests'" label="Friends" :top="tabsCard?.panel" />
     </FdTotalBar>
   </div>
 

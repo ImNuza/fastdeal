@@ -16,6 +16,7 @@ import FdPager from '../components/FdPager.vue'
 import FdIcon from '../components/FdIcon.vue'
 import FdPriceChart from '../components/FdPriceChart.vue'
 import { useListPages } from '../services/listPages.js'
+import FdBelt from '../components/FdBelt.vue'
 
 const route = useRoute()
 const { user } = storeToRefs(useAuthStore())
@@ -32,8 +33,6 @@ const minPrice = ref('')
 const maxPrice = ref('')
 const storeName = ref('All')
 const minRating = ref(0)
-const freeOnly = ref(false)
-const saleOnly = ref(false)
 const sortBy = ref('price')
 const note = ref('')
 
@@ -45,14 +44,14 @@ const filtersOn = computed(function () {
     minPrice.value !== '',
     maxPrice.value !== '',
     storeName.value !== 'All',
-    minRating.value > 0,
-    freeOnly.value,
-    saleOnly.value
+    minRating.value > 0
   ].filter(Boolean).length
 })
 
 //searched with feature
 const searchedWith = ref([])
+// Wide screens: one row of 4 to start, and Load More adds a row of 4 at a time.
+const ALSO_ROW = 4
 
 //price chart
 const searchHistory = computed(function () {
@@ -73,7 +72,7 @@ const chartHistory = computed(function () {
   }
   return null
 })
-const showAll = ref(false)
+const alsoShown = ref(ALSO_ROW)
 
 // Image URLs that failed to load, so those cards show the placeholder instead.
 const brokenImages = ref({})
@@ -129,12 +128,6 @@ const rows = computed(function () {
       continue
     }
     if (Number(minRating.value) && row.rating < Number(minRating.value)) {
-      continue
-    }
-    if (freeOnly.value && !row.freeShipping) {
-      continue
-    }
-    if (saleOnly.value && !row.onSale) {
       continue
     }
     next.push(row)
@@ -193,10 +186,10 @@ onMounted(async function () {
   searchedWith.value = await fetchSearchedWith(q,sessionId())
 })
 
-// Phones: 10 rows a page, with the page buttons in the bar. Wider: the count only.
-const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal, isPhone: listOnPhone } = useListPages(
+// 8 listings a page (two rows of four on wide screens), with the page buttons in the bar under them.
+const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal } = useListPages(
   rows,
-  [minPrice, maxPrice, storeName, minRating, freeOnly, saleOnly, sortBy]
+  [minPrice, maxPrice, storeName, minRating, sortBy]
 )
 const listingsEl = ref(null)
 </script>
@@ -238,22 +231,22 @@ const listingsEl = ref(null)
       </button>
 
       <div id="fd-filters-body" class="row g-2 fd-filters-body">
-        <div class="col-6 col-md-2">
+        <div class="col-6 col-md">
           <label class="form-label small" for="min">Min price</label>
           <input id="min" v-model.number="minPrice" class="form-control form-control-sm" type="number" min="0" placeholder="Any" />
         </div>
-        <div class="col-6 col-md-2">
+        <div class="col-6 col-md">
           <label class="form-label small" for="max">Max price</label>
           <input id="max" v-model.number="maxPrice" class="form-control form-control-sm" type="number" min="0" placeholder="Any" />
         </div>
-        <div class="col-6 col-md-2">
+        <div class="col-6 col-md">
           <label class="form-label small" for="store">Store</label>
           <select id="store" v-model="storeName" class="form-select form-select-sm">
             <option>All</option>
             <option v-for="name in stores" :key="name">{{ name }}</option>
           </select>
         </div>
-        <div class="col-6 col-md-2">
+        <div class="col-6 col-md">
           <label class="form-label small" for="rating">Min rating</label>
           <select id="rating" v-model.number="minRating" class="form-select form-select-sm">
             <option :value="0">Any</option>
@@ -261,23 +254,13 @@ const listingsEl = ref(null)
             <option :value="4.5">4.5+</option>
           </select>
         </div>
-        <div class="col-6 col-md-2">
+        <div class="col-12 col-md">
           <label class="form-label small" for="sort">Sort</label>
           <select id="sort" v-model="sortBy" class="form-select form-select-sm">
             <option value="price">Lowest price</option>
             <option value="rating">Highest rating</option>
             <option value="reviews">Most reviews</option>
           </select>
-        </div>
-        <div class="col-6 col-md-2 d-flex flex-column justify-content-end">
-          <div class="form-check">
-            <input id="ship" v-model="freeOnly" class="form-check-input" type="checkbox" />
-            <label class="form-check-label small" for="ship">Free shipping</label>
-          </div>
-          <div class="form-check">
-            <input id="sale" v-model="saleOnly" class="form-check-input" type="checkbox" />
-            <label class="form-check-label small" for="sale">On sale</label>
-          </div>
         </div>
       </div>
     </div>
@@ -336,15 +319,28 @@ const listingsEl = ref(null)
       </ul>
 
       <!-- Sticks to the bottom of the screen while the listings scroll past, like the Wishlist's total bar. -->
-      <div class="fd-listings-bar" :class="{ 'has-pager': listOnPhone && listTotal > 0 }">
-        <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" noun="listings" label="Listings" :top="listingsEl" />
+      <div class="fd-listings-bar" :class="{ 'has-pager': listTotal > 0 }">
+        <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" noun="listings" label="Listings" :top="listingsEl" />
       </div>
     </div>
 
     <section v-if="searchedWith.length" class="mb-4 mt-4">
-      <h2 class="fd-section-title">Customers who viewed this also viewed:</h2>
+      <h2 class="fd-section-title fd-also-title">Customers who viewed this also viewed</h2>
+      <!-- Below 992px: the first 10 on a belt that rolls past nonstop, the same as Home's Trending Today. -->
+      <FdBelt class="d-lg-none" :items="searchedWith.slice(0, 10)" label="Customers who viewed this also viewed">
+        <template #default="{ item, tabindex }">
+          <router-link :to="{ path: '/compare', query: { q: item.query } }" class="fd-item-link" :tabindex="tabindex">
+            <div class="card h-100 fd-item">
+              <img :src="item.image" alt="" class="fd-item-img">
+              <h5 class="fd-item-title">{{ itemName(item.query) }}</h5>
+            </div>
+          </router-link>
+        </template>
+      </FdBelt>
+      <!-- 992px and up: one row of 4, with Load More adding a row of 4 at a time. -->
+      <div class="d-none d-lg-block">
       <div class="row g-3">
-        <div class="col-6 col-md-4 col-lg-3" v-for="item in (showAll ? searchedWith : searchedWith.slice(0, 8))" :key="item._id">
+        <div class="col-6 col-md-4 col-lg-3" v-for="item in searchedWith.slice(0, alsoShown)" :key="item._id">
           <router-link :to="{ path: '/compare', query: { q: item.query } }" class="fd-item-link">
             <div class="card h-100 fd-item">
               <img :src="item.image" class="fd-item-img">
@@ -354,14 +350,20 @@ const listingsEl = ref(null)
         </div>
       </div>
       <div class="text-center">
-        <button v-if="!showAll && searchedWith.length > 8" class="btn btn-outline-dark mt-3" @click="showAll = true">Load More</button>
-        <p v-if="showAll" class="small text-secondary mt-3 mb-0">No more items to show</p>
+        <button v-if="alsoShown < searchedWith.length" class="btn btn-outline-dark mt-3" @click="alsoShown += ALSO_ROW">Load More</button>
+        <p v-else-if="alsoShown > ALSO_ROW" class="small text-secondary mt-3 mb-0">No more items to show</p>
+      </div>
       </div>
     </section>
   </div>
 </template>
 
 <style scoped>
+/* A section title, with a little more room above the cards than its usual 0.5rem. */
+.fd-also-title {
+  margin-bottom: 1rem;
+}
+
 /* Phones: the card's header row opens and closes the filters under it. */
 .fd-filter-toggle {
   display: flex;

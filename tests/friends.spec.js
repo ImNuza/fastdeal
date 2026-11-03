@@ -57,7 +57,13 @@ test.describe('Friends', () => {
     await adminContext.addInitScript(() => sessionStorage.setItem('fastdeal-entry-choice', 'guest'));
     const adminPage = await adminContext.newPage();
 
-    const addButton = page.getByRole('button', { name: 'Add friend', exact: true });
+    // Searching "demo" also finds fastdealdemo (the presentation account), so take the Add friend button
+    // in the row whose username is exactly "demo": the deepest block that holds both.
+    const demoRow = page.locator('div')
+      .filter({ has: page.getByText('demo', { exact: true }) })
+      .filter({ has: page.getByRole('button') })
+      .last();
+    const addButton = demoRow.getByRole('button', { name: 'Add friend', exact: true });
     const cancelButton = page.getByRole('button', { name: 'Cancel the request to demo', exact: true });
 
     async function findDemo() {

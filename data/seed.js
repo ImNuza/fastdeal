@@ -14,6 +14,8 @@
 //     Friends who saved a demo product also send a Buy Together invite or alert to demo.
 // demo@smu.edu.sg is an admin. demo.user@smu.edu.sg is a normal user with nothing saved and no friends,
 // so the E2E tests can save, remove and send friend requests from a clean start.
+// fastdealdemo1@gmail.com (username fastdealdemo) is the presentation account, set up for the video
+// scenario: see seedPresenter below.
 // Needs MONGODB_URI and DEMO_FIREBASE_UID in .env. Optional: DEMO_USER_FIREBASE_UID.
 import dotenv from 'dotenv'
 import { readFileSync } from 'fs'
@@ -71,6 +73,27 @@ const TEAM_FRIENDS = [
 // Team account whose friend request waits under Requests
 const REQUEST_FROM = 'dewa@nuza.dev'
 
+// The presentation account (a normal user) and the friend who saved the same headphones.
+// The account must exist first: sign up once in the app with this email.
+const PRESENTER_EMAIL = 'fastdealdemo1@gmail.com'
+const PRESENTER_FRIEND = 'zoedharmadi.2024@smu.edu.sg'
+// All its friends: the whole team. Only Zoe saved the scenario's Sony listing, so Buy Together names only her.
+const PRESENTER_FRIENDS = [...TEAM_FRIENDS, REQUEST_FROM]
+// The Sony listing the presenter opens: the cheapest one in the demo search "Sony WH-1000XM5 wireless
+// headphones". The friend saved it, so Buy Together shows when the presenter's Sleep on it ends.
+const SCENARIO_PRODUCT = '17755277695162489284'
+const SCENARIO_QUERY = 'Sony WH-1000XM5 wireless headphones'
+// Already on the presenter's wishlist, from the demo searches, for Plan a budget and the target price:
+// the cheapest Owala, a Kindle, the cheapest Nespresso, the cheapest iPhone 16 Pro and the cheapest
+// Dyson V15. Zoe saved none of these. Marvel, Jayden and Bernard saved the same iPhone.
+const PRESENTER_ITEMS = [
+  { productId: '4133118681708311535', q: 'Owala bottle' },
+  { productId: '519652814591809605', q: 'Kindle Paperwhite' },
+  { productId: '4782649891617645591', q: 'Nespresso Capsules 50 Pack' },
+  { productId: '519162940787093305', q: 'Apple iPhone 16 Pro' },
+  { productId: '5560066562276436901', q: 'Dyson V15 Detect' }
+]
+
 // What demo does with each product, by its place in demo-products.json:
 // 2 Sleep on it still counting down, 3 Sleep on it ended (purchase verdict waiting), 4 a target price.
 // The target is on the newest product: it is the first row on the wishlist, and the target price
@@ -78,6 +101,104 @@ const REQUEST_FROM = 'dewa@nuza.dev'
 const SLEEPING_INDEX = 2
 const SLEEP_ENDED_INDEX = 3
 const TARGET_INDEX = 4
+
+// One demo search listing with its product page title: the name the product page saves it under
+function demoListing(productId) {
+  for (const search of demo.searches) {
+    const listing = search.listings.find(function (row) { return row.productId === productId })
+    if (listing) {
+      const page = demo.pages.find(function (row) { return row.productId === productId })
+      return { listing: listing, name: page ? page.title : listing.name, image: (page && page.image) || listing.image || '' }
+    }
+  }
+  return null
+}
+
+// The presentation account, ready for the scenario: logged-in shopper "fastdealdemo" with 5 saved
+// products, no Sony yet, the team as friends, and nothing else. It has no Telegram username, so
+// Send Invites first shows "Set your Telegram ID" and the presenter adds it in Account.
+// Zoe has the scenario's Sony headphones saved. Returns a line for the log.
+async function seedPresenter() {
+  const presenter = await User.findOne({ email: PRESENTER_EMAIL }).lean()
+  if (!presenter) {
+    return PRESENTER_EMAIL + ' does not exist yet, so the presentation account was skipped.'
+  }
+  const uid = presenter.firebaseUid
+  const friend = await User.findOne({ email: PRESENTER_FRIEND }).lean()
+
+  // Start clean: no saved products, holds, friends, notifications, budgets, recent searches or Telegram
+  await WishlistItem.deleteMany({ firebaseUid: uid })
+  await SleepHold.deleteMany({ firebaseUid: uid })
+  await Friendship.deleteMany({ $or: [{ requesterUid: uid }, { addresseeUid: uid }] })
+  await Notification.deleteMany({ $or: [{ firebaseUid: uid }, { fromUid: uid }] })
+  await User.updateOne({ firebaseUid: uid }, {
+    $set: {
+      username: 'fastdealdemo',
+      role: 'user',
+      emailAlertsOn: true,
+      telegramUsername: null,
+      budgetDrafts: [],
+      recentSearches: []
+    }
+  })
+
+  const now = Date.now()
+  const items = []
+  PRESENTER_ITEMS.forEach(function (item, i) {
+    const found = demoListing(item.productId)
+    if (!found) return
+    items.push({
+      firebaseUid: uid,
+      productName: found.name,
+      productKey: toProductKey(found.name),
+      productId: item.productId,
+      q: item.q,
+      image: found.image,
+      savedPrice: found.listing.price,
+      savedStore: found.listing.store,
+      priority: i + 1,
+      savedAt: new Date(now - (PRESENTER_ITEMS.length - i) * DAY)
+    })
+  })
+  await WishlistItem.insertMany(items)
+
+  const sony = demoListing(SCENARIO_PRODUCT)
+  if (!friend || !sony) {
+    return 'Presentation account set up with ' + items.length + ' saved products, but ' + PRESENTER_FRIEND +
+      ' or the Sony listing is missing, so there is no friend.'
+  }
+  const team = await User.find({ email: { $in: PRESENTER_FRIENDS } }).select('firebaseUid').lean()
+  await Friendship.insertMany(team.map(function (member, i) {
+    return {
+      requesterUid: uid,
+      addresseeUid: member.firebaseUid,
+      pairKey: toPairKey(uid, member.firebaseUid),
+      status: 'accepted',
+      createdAt: new Date(now - (3 + i) * DAY),
+      respondedAt: new Date(now - (3 + i) * DAY + 2 * HOUR)
+    }
+  }))
+  // Zoe's own save of the Sony headphones. Only added if she does not have it, so her other data stays.
+  const friendCount = await WishlistItem.countDocuments({ firebaseUid: friend.firebaseUid })
+  await WishlistItem.updateOne(
+    { firebaseUid: friend.firebaseUid, productKey: toProductKey(sony.name) },
+    {
+      $setOnInsert: {
+        productName: sony.name,
+        productId: SCENARIO_PRODUCT,
+        q: SCENARIO_QUERY,
+        image: sony.image,
+        savedPrice: sony.listing.price,
+        savedStore: sony.listing.store,
+        priority: friendCount + 1,
+        savedAt: new Date(now - 2 * DAY)
+      }
+    },
+    { upsert: true }
+  )
+  return 'Presentation account fastdealdemo: ' + items.length + ' saved products, ' + team.length + ' friends, ' +
+    friend.username + ' has "' + sony.name + '" saved, no Telegram username.'
+}
 
 async function seed() {
   const uid = process.env.DEMO_FIREBASE_UID
@@ -301,6 +422,7 @@ async function seed() {
         buyTogetherCount + ' about Buy Together)' +
         (demoUserUid ? '. demo.user is clean.' : '. DEMO_USER_FIREBASE_UID is not set, so demo.user was skipped.')
     )
+    console.log(await seedPresenter())
   } catch (error) {
     console.error('Seed failed:', error.message)
     process.exitCode = 1

@@ -2,10 +2,9 @@
 import { computed } from 'vue'
 import { PAGE_SIZE } from '../services/listPages.js'
 
-// The line under a list, "Showing 11 to 20 of 45 products", at the bottom right like the old
-// count. With buttons on (phones, where there is no scrollbar; see services/listPages.js) it
-// gains Prev, the page numbers, and Next above it, even for one page, and both centre. After a move, the top of the list
-// scrolls back into view.
+// Page buttons under a list: Prev, the page numbers, and Next, centred, even for one page. The
+// "Showing 9 to 16 of 45 products" line is not shown; screen readers hear it when the page
+// changes. After a move, the top of the list scrolls back into view.
 const props = defineProps({
   pageCount: {
     type: Number,
@@ -15,11 +14,6 @@ const props = defineProps({
   total: {
     type: Number,
     required: true
-  },
-  // Prev, the page numbers, and Next: on for phones, off where the list scrolls in its card
-  buttons: {
-    type: Boolean,
-    default: false
   },
   // What the list holds, plural, for the line under the buttons: "products", "friends".
   // One row drops the s ("1 product"), or uses ONE below for words that change.
@@ -67,11 +61,9 @@ const ONE = { people: 'person' }
 
 const showing = computed(function () {
   const noun = props.total === 1 ? (ONE[props.noun] || props.noun.replace(/s$/, '')) : props.noun
-  // Without buttons the whole list is out at once, scrolling in its card: "Showing 45 products".
-  if (!props.buttons) return 'Showing ' + props.total + ' ' + noun
   const from = (page.value - 1) * PAGE_SIZE + 1
   const to = Math.min(page.value * PAGE_SIZE, props.total)
-  // "Showing 1 to 10 of 45 products"; a page with one row reads "Showing 11 of 11 products".
+  // "Showing 1 to 8 of 45 products"; a page with one row reads "Showing 9 of 9 products".
   const range = from === to ? from : from + ' to ' + to
   return 'Showing ' + range + ' of ' + props.total + ' ' + noun
 })
@@ -95,8 +87,8 @@ function go(n) {
 </script>
 
 <template>
-  <nav v-if="total > 0" class="fd-pager" :class="{ 'is-paged': buttons }" :aria-label="label + ' pages'">
-    <div v-if="buttons" class="fd-pager-row">
+  <nav v-if="total > 0" class="fd-pager is-paged" :aria-label="label + ' pages'">
+    <div class="fd-pager-row">
       <button class="fd-pager-step" type="button" aria-label="Previous page" :disabled="page <= 1" @click="go(page - 1)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
           stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
@@ -118,7 +110,7 @@ function go(n) {
       </button>
     </div>
 
-    <p class="fd-pager-showing" aria-live="polite">{{ showing }}</p>
+    <p class="fd-pager-showing visually-hidden" aria-live="polite">{{ showing }}</p>
   </nav>
 </template>
 
@@ -188,10 +180,12 @@ function go(n) {
   color: var(--fd-beige);
 }
 
+/* Nowhere to go: faded right back, so it clearly cannot be pressed. */
 .fd-pager-step:disabled {
   border-color: var(--fd-vanilla-line);
   color: var(--fd-text-muted);
-  cursor: default;
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .fd-pager-num {

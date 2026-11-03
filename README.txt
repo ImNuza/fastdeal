@@ -12,11 +12,21 @@ up to a minute to load. After that it is fast.
 
 1. Logins
 ---------
-Two demo accounts. Both use the password demo1234.
+Presentation account (use this one to try the app):
+- Email:     fastdealdemo1@gmail.com
+- Password:  123456789!abc
+- Username:  fastdealdemo. Normal user. Has 5 saved products and the 6 team members as friends.
+  Zoe saved the Sony WH-1000XM5 headphones. Search "Sony WH-1000XM5 wireless headphones", save the cheapest
+  listing, and start Sleep on it: when it ends, a "Buy together?" alert names Zoe.
+  The account has no Telegram username, so Send Invites first asks you to set one in Account.
+
+Two more demo accounts. Both use the password demo1234.
 
 - demo@smu.edu.sg       Admin. Has a wishlist, friends, a friend request, notifications and the
                         Admin dashboard.
 - demo.user@smu.edu.sg  Normal user. Starts empty. The automated tests use it.
+
+npm run seed resets all three accounts.
 
 You can also create your own account on the Sign up page, or log in with Google.
 
@@ -89,6 +99,8 @@ VPN. Atlas must allow your IP address (Network Access in Atlas).
 - SERPAPI_API_KEY_2 to _10  Optional backup keys. When one key runs out of searches, the server
                          uses the next one. A key that is not set is skipped.
 - GEMINI_API_KEY         Google Gemini key (search clean-up, photo search, Worth it verdict).
+- GEMINI_API_KEY_2 to _10  Optional backup keys. When a Gemini call fails with one key, the server
+                         tries the next one. A key that is not set is skipped.
 - VITE_FIREBASE_*        Firebase Authentication settings for the browser. Not secret.
 - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
                          Email for target price alerts. Optional: without them, no email is sent.
@@ -138,11 +150,11 @@ history. Type one of these in the search bar (case and extra spaces do not matte
 Two kinds of tests. Neither one calls SerpApi or Gemini: the tests use saved responses from
 tests/fixtures/.
 
-Unit tests (Vitest), 97 tests in 11 files, in the __tests__ folders:
+Unit tests (Vitest), 102 tests in 12 files, in the __tests__ folders:
   npm run test:unit
 They test the pure logic: the typical price, the store price rows, the budget planner, the AI verdict
-inputs, prompt and rule fallback, the seeded price history and its 30-day window, the SerpApi key
-fallback, keys, formats and search history.
+inputs, prompt and rule fallback, the seeded price history and its 30-day window, the SerpApi and Gemini
+key fallbacks, keys, formats and search history.
 
 End-to-end tests (Playwright), 34 tests in 11 files, in tests/:
 1. Once, install the browser:

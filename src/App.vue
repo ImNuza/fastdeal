@@ -184,9 +184,27 @@ function closeMenuOnLeave() {
   if (canHover() && menuOpen.value) menu().hide()
 }
 
+// Phone search: a search icon beside the hamburger opens a search row under the navbar, focused
+// and ready to type. Opening one of the search and the menu closes the other, and the search closes
+// again on Escape or once a search goes to a new page.
+const searchOpen = ref(false)
+
+function toggleSearch() {
+  searchOpen.value = !searchOpen.value
+  if (searchOpen.value) {
+    if (menuOpen.value) menu().hide()
+    nextTick(() => document.getElementById('fd-phone-search-bar-q')?.focus())
+  }
+}
+
+watch(() => route.fullPath, () => { searchOpen.value = false })
+
 // Bootstrap ignores show and hide mid-animation, so its own events say whether the menu is open.
 onMounted(() => {
-  navMenu.value.addEventListener('show.bs.collapse', () => { menuOpen.value = true })
+  navMenu.value.addEventListener('show.bs.collapse', () => {
+    menuOpen.value = true
+    searchOpen.value = false
+  })
   navMenu.value.addEventListener('hide.bs.collapse', () => { menuOpen.value = false })
 })
 
@@ -239,6 +257,18 @@ watch([() => route.path, user], maybeShowEntryDialog)
   <nav ref="navBar" @mouseleave="closeMenuOnLeave" class="navbar navbar-expand-lg navbar-dark fd-nav sticky-top">
     <div class="container">
       <router-link class="navbar-brand" to="/" aria-label="FastDeal home"><FdLogo /></router-link>
+      <!-- Phones: search is an icon beside the hamburger. Not on Home, which has its own in the hero. -->
+      <button
+        v-if="!route.meta.heroSearch"
+        class="navbar-toggler fd-search-toggler"
+        type="button"
+        aria-controls="fd-phone-search"
+        :aria-label="searchOpen ? 'Close search' : 'Search'"
+        :aria-expanded="searchOpen"
+        @click="toggleSearch"
+      >
+        <FdIcon :name="searchOpen ? 'x' : 'search'" />
+      </button>
       <button
         class="navbar-toggler"
         type="button"
@@ -250,9 +280,12 @@ watch([() => route.path, user], maybeShowEntryDialog)
       >
         <span class="navbar-toggler-icon"></span>
       </button>
+      <div v-if="searchOpen && !route.meta.heroSearch" id="fd-phone-search" class="fd-phone-search d-lg-none" @keydown.esc="searchOpen = false">
+        <FdSearchBar compact id-prefix="fd-phone-search-bar" />
+      </div>
       <div ref="navMenu" class="collapse navbar-collapse" id="fdNav">
-        <!-- Top of the phone menu, beside the logo on desktop. Not on Home, which has its own in the hero. -->
-        <FdSearchBar v-if="!route.meta.heroSearch" compact class="fd-nav-search" />
+        <!-- Desktop: beside the logo. Not on Home, which has its own in the hero. -->
+        <FdSearchBar v-if="!route.meta.heroSearch" compact class="fd-nav-search d-none d-lg-block" />
         <ul class="navbar-nav ms-auto align-items-lg-center fd-nav-right">
           <li class="nav-item">
             <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/wishlist') }" active-class="" exact-active-class="" to="/wishlist">

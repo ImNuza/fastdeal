@@ -14,9 +14,9 @@ test.describe('Home page trending', () => {
     await expect(page.getByLabel('Trending today').getByRole('link').first()).toBeVisible();
 
     await expect(page.getByRole('heading', { name: 'Trending This Week' })).toBeVisible();
-    // Each week card is a link with the product name as a level 5 heading.
-    const weekCards = page.getByRole('link').filter({ has: page.getByRole('heading', { level: 5 }) });
-    await expect(weekCards.first()).toBeVisible();
+    // The week carousel shows one card at a time as a link. The cards beside it are hidden from screen readers.
+    const week = page.getByRole('region', { name: 'Trending this week' });
+    await expect(week.getByRole('link').first()).toBeVisible();
   });
 
   test('user sees the product initials when a trending product has no photo', async ({ page }) => {
@@ -26,7 +26,8 @@ test.describe('Home page trending', () => {
     }));
     await page.goto('/');
 
-    const card = page.getByRole('link').filter({ has: page.getByRole('heading', { level: 5, name: 'Sony WH-1000XM5' }) });
+    const week = page.getByRole('region', { name: 'Trending this week' });
+    const card = week.getByRole('link', { name: /Sony WH-1000XM5/ });
     await expect(card).toBeVisible();
     await expect(card.getByText('SW', { exact: true })).toBeVisible();
     await expect(card.getByRole('img')).toHaveCount(0);

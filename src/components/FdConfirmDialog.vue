@@ -1,6 +1,6 @@
 <script setup>
 // One confirm pop-up for every "are you sure" step: removing a friend, a wishlist item or a
-// saved budget. Same look as the Admin role pop-up and the welcome prompt (dialog styles in app.css).
+// saved budget, and logging out. Same look as the Admin role pop-up and the welcome prompt (dialog styles in app.css).
 // The parent shows it with v-if and handles confirm (do the action) and cancel (close it).
 import { ref, onMounted } from 'vue'
 

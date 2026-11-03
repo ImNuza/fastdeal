@@ -36,7 +36,10 @@ Run `npm run build` and `npm run test:e2e` before a change goes to `main`.
 
 ## Tests
 - Never call SerpApi or Gemini from a test. Return a saved response from `tests/fixtures/` with `page.route`.
-- Demo logins: `demo@smu.edu.sg` (admin, has the demo data) and `demo.user@smu.edu.sg` (normal user). Same password, read from `E2E_DEMO_PASSWORD` in `.env`. A test tagged `@admin` or `@user` in its title runs as that account. An untagged test runs logged out.
+- Demo logins: `demo@smu.edu.sg` (admin, has the demo data) and `demo.user@smu.edu.sg` (normal user). The presentation account
+  `fastdealdemo1@gmail.com` (username `fastdealdemo`, normal user, password in README.txt) is for the video and the prof.
+  The seed gives it 5 saved products, the team as friends (only Zoe has the scenario's Sony saved) and no Telegram username.
+  No test uses it. Same password, read from `E2E_DEMO_PASSWORD` in `.env`. A test tagged `@admin` or `@user` in its title runs as that account. An untagged test runs logged out.
 - Selectors: `getByRole`, then `getByLabel`, then `data-testid="feature-element"`. Never CSS classes.
 - Tests must not create users. Run `npm run seed` before a full run. The seed keeps `demo@smu.edu.sg` as admin.
 - The seed uses real data, with one exception: products from `data/demo-products.json` (saved by team members), the team
@@ -50,7 +53,8 @@ Run `npm run build` and `npm run test:e2e` before a change goes to `main`.
 - Keys live in `.env` (not tracked). Never print, paste or log a key value.
 - `SERPAPI_API_KEY`, then `SERPAPI_API_KEY_2` up to `SERPAPI_API_KEY_10`: free plan keys from different members.
   `services/serpapiKeys.js` moves to the next key when one runs out. A key that is not set is skipped. Graders use the app until Week 18.
-- `GEMINI_API_KEY`: used by `models/shoppingapimodel.js` and `models/worth-it-model.js` (cached a day in `worthItCache`).
+- `GEMINI_API_KEY`, then `GEMINI_API_KEY_2` up to `GEMINI_API_KEY_10`: used by `models/shoppingapimodel.js` and
+  `models/worth-it-model.js` (cached a day in `worthItCache`). `services/geminiKeys.js` moves to the next key on any failure.
 - Render has its own copy of the keys. A new key must also be added in the Render dashboard.
 
 ## Gotchas

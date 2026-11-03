@@ -12,14 +12,14 @@ export const useTrendingStore = defineStore('trending', () => {
   const error = ref('')
   let pending = null
 
-  // Home page: the top 5 for today, and up to 8 more from the week that are not already in those 5.
+  // Home page: the top 5 for today, and up to 10 more from the week that are not already in those 5.
   const topToday = computed(function () {
     return today.value.slice(0, 5)
   })
 
   const weekExtras = computed(function () {
     const shown = topToday.value.map(function (item) { return item._id })
-    return week.value.filter(function (item) { return !shown.includes(item._id) }).slice(0, 8)
+    return week.value.filter(function (item) { return !shown.includes(item._id) }).slice(0, 10)
   })
 
   async function fetchTrending() {

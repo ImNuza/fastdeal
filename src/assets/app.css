@@ -123,14 +123,46 @@ small {
   line-height: 1;
 }
 
-/* Navbar search: the first thing in the phone menu, beside the logo on desktop. */
-.fd-nav-search {
-  margin: 1.25rem 0 0.5rem;
+/* Phone search: a plain search icon beside the hamburger, no border, which opens a search row
+   across the full width under the navbar. Desktop has the bar beside the logo instead. */
+/* Doubled class so it wins over the hamburger's border rule below. */
+.fd-nav .navbar-toggler.fd-search-toggler {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-left: auto;
+  margin-right: 0.25rem;
+  padding: 0;
+  border: 0;
+  color: var(--fd-beige);
 }
 
-/* Room between the search and the first menu link. */
+.fd-nav .navbar-toggler.fd-search-toggler[aria-expanded="true"] {
+  color: var(--fd-vanilla);
+}
+
+/* Only while the hamburger shows: desktop has the full bar instead. */
+@media (min-width: 992px) {
+  .fd-nav .navbar-toggler.fd-search-toggler {
+    display: none;
+  }
+}
+
+.fd-search-toggler .fd-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.fd-phone-search {
+  flex-basis: 100%;
+  padding: 1rem 0 0.25rem;
+}
+
+/* Room between the top of the phone menu and its first link. */
 @media (max-width: 991.98px) {
-  .fd-nav-search + .navbar-nav {
+  .fd-nav .navbar-nav {
     padding-top: 1rem;
   }
 }
@@ -221,8 +253,10 @@ small {
     min-width: 44px;
   }
 
+  /* The padding keeps a gap before the first icon, even when the search bar stretches across. */
   .fd-nav-right {
     gap: 0.8125rem;
+    padding-left: 1.5rem;
   }
 
   .fd-nav .fd-icon-link.active {
@@ -941,13 +975,15 @@ tr.cheapest td {
   line-height: 1.3;
 }
 
+/* White behind the photo, matching the photo's own white background, like every product photo. */
 .fd-item-img {
   display: block;
   width: 100%;
   height: 150px;
+  padding: 0.75rem;
   object-fit: contain;
   border-radius: 0.75rem;
-  background: var(--fd-beige);
+  background: var(--fd-white);
   margin-bottom: 0.75rem;
 }
 
