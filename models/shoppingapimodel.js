@@ -10,18 +10,17 @@
 // falls back to the raw query so search always runs.
 
 import { serpGet, hasSerpKey } from '../services/serpapiKeys.js'
+import { geminiFetch, hasGeminiKey } from '../services/geminiKeys.js'
 import { toProductKey } from './product-key.js'
 import SearchCache from './search-cache-model.js'
 import SearchLog from './search-log-model.js'
 import { recordPrices, storePrices } from '../services/priceHistory.js'
 
-// The Gemini key is read at module scope; server.js does `import 'dotenv/config'` BEFORE it
-// imports this model. SerpApi keys are read by services/serpapiKeys.js.
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY
-
+// Gemini keys (primary + backup) are read by services/geminiKeys.js, which rotates on any
+// failure. server.js does `import 'dotenv/config'` BEFORE it imports this model.
+// SerpApi keys are read by services/serpapiKeys.js.
 const GEMINI_MODEL = 'gemini-3.5-flash-lite'
-const GEMINI_URL =
-  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 // How long a saved search is reused before SerpApi is called again.
 const CACHE_HOURS = 6
@@ -44,7 +43,7 @@ function parseGeminiJson(text) {
 // conservative minimum retail price (USD). Any problem -> fall back to the raw query.
 async function preprocess(rawQuery) {
   const fallback = { searchTerm: rawQuery, minPrice: null }
-  if (!GEMINI_API_KEY) return fallback
+  if (!hasGeminiKey()) return fallback
 
   const prompt =
     `Given the product search '${rawQuery}':\n` +
@@ -54,7 +53,7 @@ async function preprocess(rawQuery) {
     `Return JSON only: {"query": str, "min_price": int}`
 
   try {
-    const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+    const res = await geminiFetch(GEMINI_BASE, GEMINI_MODEL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -179,7 +178,6 @@ export async function search(q, sessionId) {
   const listings = results
     .map(toRow)
     .filter((r) => r.price > 0)
-    .slice(0, 10)
 
   const fetchedAt = new Date()
 
@@ -214,7 +212,7 @@ export async function search(q, sessionId) {
 
 
 export async function identifyImage(base64,mimeType) {
-  const res=await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`,{
+  const res=await geminiFetch(GEMINI_BASE, GEMINI_MODEL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

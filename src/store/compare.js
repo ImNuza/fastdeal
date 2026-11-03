@@ -26,8 +26,8 @@ function toRow(item, index) {
 }
 
 // Run the search on the server. It reuses a saved copy from the last 6 hours,
-// so a reload costs no SerpApi credit. Returns { name, listings, productKey } built from the
-// first 10 usable results, or null if nothing usable came back.
+// so a reload costs no SerpApi credit. Returns { name, listings, productKey } built from all
+// usable results, or null if nothing usable came back.
 async function loadLive(q) {
   try {
     const res = await fetch('/api/search?q=' + encodeURIComponent(q) + '&sid=' + encodeURIComponent(sessionId()))
@@ -37,7 +37,7 @@ async function loadLive(q) {
     const data = await res.json()
     const listings = Array.isArray(data.listings) ? data.listings : []
     const rowsOut = []
-    for (let i = 0; i < listings.length && rowsOut.length < 10; i++) {
+    for (let i = 0; i < listings.length; i++) {
       const row = toRow(listings[i], i)
       if (row.price > 0) {
         rowsOut.push(row)
