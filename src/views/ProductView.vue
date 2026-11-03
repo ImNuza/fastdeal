@@ -44,12 +44,6 @@ const WORTH_IT_LABEL = {
   unknown: 'No verdict yet'
 }
 
-const WORTH_IT_TONE = {
-  buy: 'success',
-  wait: 'warning',
-  unknown: 'secondary'
-}
-
 // "Wait for 11.11" when the verdict names the coming sale, else the fixed words.
 const worthItLabel = computed(function () {
   const v = worthItVerdict.value
@@ -107,20 +101,42 @@ const saving = computed(function () {
 
 
 
-// The verdict as one paragraph: the reason, what it was based on, and the fallback note when
-// the AI did not answer. Joined with spaces so the sentences never run together.
-const verdictText = computed(function () {
+// The card's colour: green for buy, vanilla for wait, plain while loading or with no verdict.
+const verdictTone = computed(function () {
   const v = worthItVerdict.value
-  if (!v) {
+  if (!v || worthItLoading.value) {
     return ''
   }
-  return [
-    v.reason,
-    v.summary ? 'Based on: ' + v.summary : '',
-    v.source === 'rules'
-      ? 'The AI did not answer, so this is an estimate from the same numbers with fixed rules. Reload later for the AI verdict.'
-      : ''
-  ].filter(Boolean).join(' ')
+  return v.decision === 'buy' ? 'buy' : v.decision === 'wait' ? 'wait' : ''
+})
+
+// The small line beside See how the AI decided
+const verdictNote = computed(function () {
+  const v = worthItVerdict.value
+  if (v && v.source === 'rules') {
+    return 'The AI did not answer, so fixed rules estimated this. Not financial advice.'
+  }
+  return 'AI guidance, not financial advice.'
+})
+
+// One line reading the store prices chart: where your pick stands against the cheapest, and the spread.
+const priceRead = computed(function () {
+  const rows = allStores.value
+  const pick = baseRow.value
+  const low = cheapest.value
+  if (!rows.length || !pick || !low) {
+    return ''
+  }
+  let high = rows[0].total
+  for (const row of rows) {
+    if (row.total > high) high = row.total
+  }
+  const range = ' Prices run from ' + sgd(low.total) + ' to ' + sgd(high) + ' across ' + rows.length + ' listings.'
+  const more = Math.round((pick.total - low.total) * 100) / 100
+  if (more <= 0) {
+    return 'Your pick at ' + pick.store + ' is the cheapest.' + range
+  }
+  return 'Your pick costs ' + sgd(more) + ' more than the cheapest, ' + low.store + ' at ' + sgd(low.total) + '.' + range
 })
 
 // "See how the AI decided" pop-up: the steps behind the verdict, each with the numbers it used,
@@ -322,48 +338,65 @@ const listTotal = computed(function () { return allStores.value.length })
     </div>
 
     <!-- AI "Worth It" verdict: buy now or wait for a big sale. First under the hero, because it is
-         the main answer on this page. -->
-    <section v-if="baseRow && (worthItLoading || worthItVerdict)" id="fd-worth-it-panel" class="mb-5"
-      aria-labelledby="fd-worth-it-title">
+         the main answer on this page. The verdict comes first, big, then the numbers it used, then
+         the store prices with a line reading them. -->
+    <section v-if="baseRow" id="fd-worth-it-panel" aria-labelledby="fd-worth-it-title">
       <!-- The title and AI tag sit above the card, like All listings, so it reads as its own section. -->
       <div class="d-flex align-items-center gap-2 mb-2">
         <h2 id="fd-worth-it-title" class="fd-section-title mb-0">Worth it?</h2>
         <span class="fd-ai-tag">AI</span>
       </div>
 
-      <div class="card fd-worth-it"
-        :class="worthItVerdict ? 'border-' + (WORTH_IT_TONE[worthItVerdict.decision] || 'secondary') : ''">
-        <!-- The verdict tag in the card's top right corner; the reason flows beside it. -->
-        <span v-if="worthItVerdict && !worthItLoading" class="badge fd-verdict-tag"
-          :class="'text-bg-' + (WORTH_IT_TONE[worthItVerdict.decision] || 'secondary')">
-          {{ worthItLabel }}</span>
+      <div class="card fd-worth-it" :class="verdictTone ? 'is-' + verdictTone : ''">
+        <p v-if="worthItLoading" class="small text-secondary mb-0 d-flex align-items-center gap-2">
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          <span>Asking our AI whether to buy now or wait…</span>
+          <span class="badge text-bg-secondary" aria-live="polite">{{ worthItElapsed }}s elapsed</span>
+        </p>
 
-      <p v-if="worthItLoading" class="small text-secondary mb-0 d-flex align-items-center gap-2">
-        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-        <span>Asking our AI whether to buy now or wait…</span>
-        <span class="badge text-bg-secondary" aria-live="polite">{{ worthItElapsed }}s elapsed</span>
-      </p>
+        <!-- The verdict at a glance: an icon, the decision in big type, one line of why. -->
+        <div v-else-if="worthItVerdict" class="fd-verdict">
+          <span class="fd-verdict-icon" aria-hidden="true">
+            <FdIcon :name="worthItVerdict.decision === 'wait' ? 'clock' : 'check'" />
+          </span>
+          <div>
+            <p class="fd-verdict-label">{{ worthItLabel }}</p>
+            <p class="fd-verdict-reason">{{ worthItVerdict.reason }}</p>
+          </div>
+        </div>
 
-      <template v-else-if="worthItVerdict">
-        <!-- The verdict as one paragraph in body text; only the disclaimer under it is small. -->
-        <!-- The reason and Based on in one paragraph; a bigger gap sets the disclaimer apart. -->
-        <p class="mb-3">{{ verdictText }}</p>
-        <p class="small text-secondary mb-3">{{ worthItVerdict.source === 'rules' ? 'Guidance' : 'AI guidance' }} for {{ product.title }} at {{ sgd(baseRow.total) }}.
-          Not financial advice.</p>
-        <button v-if="worthItVerdict.inputs" class="btn btn-outline-dark align-self-start" type="button"
-          @click="openAiRead">See how the AI decided</button>
-      </template>
+        <!-- The numbers the verdict weighs -->
+        <ul class="fd-verdict-stats" role="list">
+          <li>
+            <span>Your pick</span>
+            <strong>{{ sgd(baseRow.total) }}</strong>
+          </li>
+          <li v-if="cheapest">
+            <span>Cheapest</span>
+            <strong>{{ sgd(cheapest.total) }}</strong>
+          </li>
+          <li v-if="product.typicalPrice">
+            <span>Typical</span>
+            <strong>{{ sgd(product.typicalPrice) }}</strong>
+          </li>
+        </ul>
+
+        <!-- Store prices: one bar per listing, cheapest in green, with a line reading them. -->
+        <div v-if="allStores.length > 1" class="fd-verdict-prices">
+          <h3 class="fd-section-subtitle mb-1">How the prices look</h3>
+          <p class="fd-verdict-read">{{ priceRead }}</p>
+          <FdStorePriceChart :rows="allStores" />
+        </div>
+
+        <div v-if="worthItVerdict && !worthItLoading" class="fd-verdict-foot">
+          <button v-if="worthItVerdict.inputs" class="btn btn-outline-dark" type="button"
+            @click="openAiRead">See how the AI decided</button>
+          <p class="small text-secondary mb-0">{{ verdictNote }}</p>
+        </div>
       </div>
     </section>
 
-    <!-- Store prices: one bar per listing, cheapest in green. -->
-    <section v-if="allStores.length > 1" class="mb-5">
-      <h2 class="fd-section-title">Price by store</h2>
-      <p class="small text-secondary">What each store charges for this search. The cheapest is in green.</p>
-      <FdStorePriceChart :rows="allStores" />
-    </section>
-
-    <h2 id="fd-all-stores" class="fd-section-title">All listings</h2>
+    <h2 id="fd-all-stores" class="fd-section-title" :class="{ 'fd-section-gap': baseRow }">All listings</h2>
     <p v-if="baseRow" class="small text-secondary">
       The {{ allStores.length === 1 ? 'listing' : allStores.length + ' listings' }} from your search<template
         v-if="searchName"> for "{{ searchName }}"</template>, the same as on Compare.
@@ -429,7 +462,7 @@ const listTotal = computed(function () { return allStores.value.length })
     </div>
 
     <!-- What buyers say: one card per review, in a row that scrolls sideways. -->
-    <section v-if="product.userReviews.length" id="fd-reviews" class="mb-5">
+    <section v-if="product.userReviews.length" id="fd-reviews" class="fd-section-gap">
       <h2 class="fd-section-title">What buyers say</h2>
       <!-- Only the top 3 reviews show here; the rest are on the product's Google Shopping page. -->
       <p v-if="product.reviewsLink" class="small text-secondary mb-3">
@@ -472,30 +505,135 @@ const listTotal = computed(function () { return allStores.value.length })
 </template>
 
 <style scoped>
-/* The total belongs to the card, so the next section starts closer under it, about the same as
-   the 48px between the other sections. */
+/* The total ends the All listings section; the next section adds the standard gap above itself. */
 .fd-store-total {
-  margin-bottom: 1.25rem;
+  margin-bottom: 0;
 }
 
 /* Cards on this page use the app's card padding token (--fd-card-pad), like every other page. */
 .fd-worth-it {
-  /* Block, not Bootstrap's column flex, so the verdict tag can float in the top right corner. */
-  display: block;
+  gap: 1.5rem;
   padding: var(--fd-card-pad);
 }
 
-.fd-verdict-tag {
-  float: right;
-  margin: 0 0 0.5rem 1rem;
+/* Buy: a tea green edge; wait: vanilla. The icon circle takes the same colour. */
+.fd-worth-it.is-buy {
+  border-color: var(--fd-green);
 }
 
-/* The verdict text takes 3/4 of the card's width on wider screens, so lines stay short enough to
-   read; the tag keeps the top right corner. Phones use the full width. */
-@media (min-width: 768px) {
-  .fd-worth-it > p {
-    max-width: 75%;
+.fd-worth-it.is-wait {
+  border-color: var(--fd-vanilla);
+}
+
+.fd-verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.fd-verdict-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: var(--fd-vanilla-soft);
+  color: var(--fd-ink);
+}
+
+.is-buy .fd-verdict-icon {
+  background: var(--fd-green);
+}
+
+.is-wait .fd-verdict-icon {
+  background: var(--fd-vanilla);
+}
+
+.fd-verdict-icon .fd-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.fd-verdict-label {
+  margin: 0 0 0.25rem;
+  color: var(--fd-blue);
+  font-family: var(--fd-font-display);
+  font-size: var(--fd-page-title);
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+/* One line of why, kept short enough to read */
+.fd-verdict-reason {
+  max-width: 40rem;
+  margin: 0;
+}
+
+/* The number tiles in one row on every screen, numbers at the section title size */
+.fd-verdict-stats {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fd-verdict-stats li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border: var(--fd-border) solid var(--fd-vanilla-line);
+  border-radius: var(--fd-radius);
+  background: var(--fd-beige);
+}
+
+.fd-verdict-stats span {
+  color: var(--fd-text-muted);
+  font-size: var(--fd-small);
+  font-weight: 700;
+}
+
+.fd-verdict-stats strong {
+  color: var(--fd-blue);
+  font-family: var(--fd-font-display);
+  font-size: var(--fd-section-title);
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+@media (max-width: 575.98px) {
+  .fd-verdict-stats {
+    gap: 0.5rem;
   }
+
+  .fd-verdict-stats li {
+    padding: 0.625rem 0.5rem;
+  }
+}
+
+.fd-verdict-prices {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--fd-grey-line);
+}
+
+.fd-verdict-read {
+  margin: 0 0 1rem;
+  color: var(--fd-text-muted);
+}
+
+/* See how the AI decided on the left, the short disclaimer beside it */
+.fd-verdict-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--fd-grey-line);
 }
 
 /* All listings, built like the Wishlist table: a blue header pill and one card per listing,

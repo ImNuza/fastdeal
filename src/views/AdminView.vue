@@ -340,7 +340,7 @@ const listTotal = computed(function () { return filteredUsers.value.length })
       </div>
 
       <!-- Charts -->
-      <div class="row g-3 mb-5">
+      <div class="row g-3">
         <div class="col-12 col-lg-6">
           <div class="card h-100 fd-chart-card">
             <div class="fd-chart-head">
@@ -435,7 +435,7 @@ const listTotal = computed(function () { return filteredUsers.value.length })
 
     <!-- Manage users: folder tabs and cards, like the Friends page. Its own box, so the total
          bar sticks to the bottom of the screen only while this section is showing. -->
-    <section class="fd-manage">
+    <section class="fd-manage fd-section-gap">
     <h2 class="fd-section-title">Manage Users</h2>
 
     <FdTabs v-model="roleFilter" :tabs="ROLE_TABS" label="Users by role" id-prefix="fd-role-tab">

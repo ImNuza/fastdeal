@@ -229,7 +229,19 @@ function initials(name) {
   return name.split(/\s+/).slice(0, 2).map(function (word) { return word.charAt(0) }).join('').toUpperCase()
 }
 
+// The faint hint in an empty target box. An AI-set target shows there, like "Your name" on a form,
+// and stays the alert price until the shopper types their own. Otherwise the box is plain empty.
+function targetHint(item) {
+  if (item.targetSource === 'ai' && Number(item.targetPrice) > 0) {
+    return Number(item.targetPrice).toFixed(2)
+  }
+  return null
+}
+
 async function onTarget(item, event) {
+  // Clearing the box keeps the AI's target rather than setting the alert to S$0
+  if (event.target.value === '' && item.targetSource === 'ai') return
+
   const nextTarget = Number(event.target.value)
   const previousTarget = Number(item.targetPrice)
 
@@ -678,7 +690,8 @@ const listTotal = computed(function () { return listRows.value.length })
                   <div class="input-group fd-target-input">
                     <span class="input-group-text">S$</span>
                     <input :id="'target-' + item.name" class="form-control" type="number" min="0" step="0.01"
-                      :value="item.targetPrice" :aria-label="'Target price for ' + item.name"
+                      :value="item.targetSource === 'ai' ? '' : item.targetPrice"
+                      :placeholder="targetHint(item)" :aria-label="'Target price for ' + item.name"
                       @change="onTarget(item, $event)" />
                   </div>
                   <span v-if="reached(item)" class="fd-reached" role="img" aria-label="Target reached"
@@ -686,7 +699,8 @@ const listTotal = computed(function () { return listRows.value.length })
                     <FdIcon name="check" />
                   </span>
                 </div>
-                <!-- Set by the AI from the price history; goes away once the shopper changes the target. -->
+                <!-- Set by the AI from the price history, shown as the box's grey hint; goes away once
+                     the shopper types their own target. -->
                 <p v-if="item.targetSource === 'ai'" class="fd-target-ai" :title="item.targetReason || null">
                   <span class="fd-ai-tag">AI</span> suggested<span v-if="item.targetReason" class="visually-hidden">: {{ item.targetReason }}</span>
                 </p>
@@ -1327,6 +1341,12 @@ span.fd-wish-product {
 }
 
 /* Under an AI-set target: the small vanilla AI tag (as on the product page), then "suggested". */
+/* The AI's target as a faint hint in the box, lighter than typed text */
+.fd-target-input .form-control::placeholder {
+  color: var(--fd-text-muted);
+  opacity: 0.45;
+}
+
 .fd-target-ai {
   display: flex;
   align-items: center;

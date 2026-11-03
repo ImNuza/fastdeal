@@ -1092,3 +1092,9 @@ tr.cheapest td {
   font-size: var(--fd-small);
   text-align: right;
 }
+
+/* Every section after the first on a page starts this far below the one before it
+   (--fd-section-gap). The section before it ends with no bottom margin of its own. */
+.fd-section-gap {
+  margin-top: var(--fd-section-gap) !important;
+}

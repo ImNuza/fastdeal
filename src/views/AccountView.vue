@@ -151,7 +151,7 @@ async function saveTelegram() {
       </div>
     </section>
 
-    <section class="mt-5">
+    <section class="fd-section-gap">
       <h2 class="fd-section-title">Settings</h2>
       <div class="card fd-card-pad">
         <div class="form-check form-switch mb-0">

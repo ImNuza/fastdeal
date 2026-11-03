@@ -68,6 +68,10 @@
   --fd-panel-pad: 1.5rem;
   --fd-row-pad: 0.75rem 1.25rem;
 
+  /* The space between two sections of a page (a section title and what belongs to it), the same
+     on every page. Use the fd-section-gap class on every section after the first. */
+  --fd-section-gap: 3rem;
+
   /* The one soft shadow, for the search bar and its dropdown so they pop */
   --fd-shadow: 0 0.75rem 2rem rgb(0 0 0 / 0.15);
 
