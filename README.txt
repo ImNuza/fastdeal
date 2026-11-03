@@ -89,6 +89,8 @@ VPN. Atlas must allow your IP address (Network Access in Atlas).
 - SERPAPI_API_KEY_2 to _10  Optional backup keys. When one key runs out of searches, the server
                          uses the next one. A key that is not set is skipped.
 - GEMINI_API_KEY         Google Gemini key (search clean-up, photo search, Worth it verdict).
+- GEMINI_API_KEY_2 to _10  Optional backup keys. When a Gemini call fails with one key, the server
+                         tries the next one. A key that is not set is skipped.
 - VITE_FIREBASE_*        Firebase Authentication settings for the browser. Not secret.
 - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
                          Email for target price alerts. Optional: without them, no email is sent.
@@ -138,11 +140,11 @@ history. Type one of these in the search bar (case and extra spaces do not matte
 Two kinds of tests. Neither one calls SerpApi or Gemini: the tests use saved responses from
 tests/fixtures/.
 
-Unit tests (Vitest), 97 tests in 11 files, in the __tests__ folders:
+Unit tests (Vitest), 102 tests in 12 files, in the __tests__ folders:
   npm run test:unit
 They test the pure logic: the typical price, the store price rows, the budget planner, the AI verdict
-inputs, prompt and rule fallback, the seeded price history and its 30-day window, the SerpApi key
-fallback, keys, formats and search history.
+inputs, prompt and rule fallback, the seeded price history and its 30-day window, the SerpApi and Gemini
+key fallbacks, keys, formats and search history.
 
 End-to-end tests (Playwright), 34 tests in 11 files, in tests/:
 1. Once, install the browser:

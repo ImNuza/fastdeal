@@ -7,8 +7,8 @@
 // exact prompt go back together, so the "How this verdict was made" page can show what the AI read.
 //
 // Conventions match models/shoppingapimodel.js:
-//   - Gemini keys (GEMINI_API_KEY + GEMINI_API_KEY_2 backup) are read by
-//     services/geminiKeys.js, which rotates to the backup key on any failure.
+//   - Gemini keys (GEMINI_API_KEY, then backups GEMINI_API_KEY_2 to _10) are read by
+//     services/geminiKeys.js, which rotates to the next key on any failure.
 //     server.js does `import 'dotenv/config'` BEFORE importing this model.
 //   - Raw REST fetch to generativelanguage.googleapis.com, body { contents:[{parts:[{text}]}] }.
 //   - Any failure returns a graceful FALLBACK verdict; worthIt() never throws upward,
