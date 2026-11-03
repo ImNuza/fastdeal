@@ -185,7 +185,7 @@ test.describe('Wishlist', () => {
     await expect(pokemon).toBeHidden();
 
     // The seed puts the Owala bottle on hold.
-    await page.getByRole('tab', { name: 'Sleeping on it' }).click();
+    await page.getByRole('tab', { name: 'Sleep on it' }).click();
     await expect(page.getByText(OWALA.name, { exact: true })).toBeVisible();
     await expect(iphone).toBeHidden();
   });
@@ -205,7 +205,7 @@ test.describe('Wishlist', () => {
     await expect(pokemon).toBeVisible();
   });
 
-  test('user can put a saved product on hold and find it under Sleeping on it @user', async ({ page }) => {
+  test('user can put a saved product on hold and find it under Sleep on it @user', async ({ page }) => {
     test.setTimeout(180000);
 
     try {
@@ -228,7 +228,7 @@ test.describe('Wishlist', () => {
       await held;
       await expect(dialog).toBeHidden();
 
-      await page.getByRole('tab', { name: 'Sleeping on it' }).click();
+      await page.getByRole('tab', { name: 'Sleep on it' }).click();
       await expect(page.getByText(NAME, { exact: true })).toBeVisible();
       await expect(page.getByText(/Sleeping on it, .+ left/)).toBeVisible();
     } finally {

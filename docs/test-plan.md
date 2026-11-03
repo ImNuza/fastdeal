@@ -147,8 +147,8 @@ Batch 3, now unblocked (Zoe's wishlist is merged): 5 E2E tests in `wishlist.spec
 | # | Login | Test |
 |---|---|---|
 | 13 | `@user` | On a product page (product fixture), "Save" adds the product. It shows on `/wishlist`. "Remove <name>", then "Remove" in the pop-up, takes it off again. |
-| 14 | `@admin` | "Search your wishlist" narrows the list. "Sort by" changes the order. The tabs "Price drops" and "Sleeping on it" filter the list. Read only. |
-| 15 | `@user` | Save a product, then "Sleep on <name>" with a hold time. It shows under "Sleeping on it". Cleanup: remove the product. |
+| 14 | `@admin` | "Search your wishlist" narrows the list. "Sort by" changes the order. The tabs "Price drops" and "Sleep on it" filter the list. Read only. |
+| 15 | `@user` | Save a product, then "Sleep on <name>" with a hold time. It shows under "Sleep on it". Cleanup: remove the product. |
 | 16 | `@admin` | "Plan a budget" tab, "New budget": enter "Your budget". The plan keeps the total under the budget. Close without saving. If a save is tested, delete the draft with "Delete <name>" at the end. |
 | 17 | `@admin` | The "friends saved ... Buy together" button opens the "Buy together" dialog with the team accounts that saved the same Sony headphones (ronald.s, jayden). Close without sending. |
 

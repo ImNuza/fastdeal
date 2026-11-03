@@ -15,9 +15,10 @@ up to a minute to load. After that it is fast.
 Presentation account (use this one to try the app):
 - Email:     fastdealdemo1@gmail.com
 - Password:  123456789!abc
-- Username:  fastdealdemo. Normal user. Has 3 saved products and one friend (Zoe), who saved the
-  Sony WH-1000XM5 headphones. Search "Sony WH-1000XM5 wireless headphones", save the cheapest
+- Username:  fastdealdemo. Normal user. Has 5 saved products and the 6 team members as friends.
+  Zoe saved the Sony WH-1000XM5 headphones. Search "Sony WH-1000XM5 wireless headphones", save the cheapest
   listing, and start Sleep on it: when it ends, a "Buy together?" alert names Zoe.
+  The account has no Telegram username, so Send Invites first asks you to set one in Account.
 
 Two more demo accounts. Both use the password demo1234.
 
