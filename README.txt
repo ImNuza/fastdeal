@@ -12,11 +12,20 @@ up to a minute to load. After that it is fast.
 
 1. Logins
 ---------
-Two demo accounts. Both use the password demo1234.
+Presentation account (use this one to try the app):
+- Email:     fastdealdemo1@gmail.com
+- Password:  123456789!abc
+- Username:  fastdealdemo. Normal user. Has 3 saved products and one friend (Zoe), who saved the
+  Sony WH-1000XM5 headphones. Search "Sony WH-1000XM5 wireless headphones", save the cheapest
+  listing, and start Sleep on it: when it ends, a "Buy together?" alert names Zoe.
+
+Two more demo accounts. Both use the password demo1234.
 
 - demo@smu.edu.sg       Admin. Has a wishlist, friends, a friend request, notifications and the
                         Admin dashboard.
 - demo.user@smu.edu.sg  Normal user. Starts empty. The automated tests use it.
+
+npm run seed resets all three accounts.
 
 You can also create your own account on the Sign up page, or log in with Google.
 
