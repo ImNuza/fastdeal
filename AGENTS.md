@@ -36,7 +36,10 @@ Run `npm run build` and `npm run test:e2e` before a change goes to `main`.
 
 ## Tests
 - Never call SerpApi or Gemini from a test. Return a saved response from `tests/fixtures/` with `page.route`.
-- Demo logins: `demo@smu.edu.sg` (admin, has the demo data) and `demo.user@smu.edu.sg` (normal user). Same password, read from `E2E_DEMO_PASSWORD` in `.env`. A test tagged `@admin` or `@user` in its title runs as that account. An untagged test runs logged out.
+- Demo logins: `demo@smu.edu.sg` (admin, has the demo data) and `demo.user@smu.edu.sg` (normal user). The presentation account
+  `fastdealdemo1@gmail.com` (username `fastdealdemo`, normal user, password in README.txt) is for the video and the prof.
+  The seed gives it 3 saved products, Zoe as its only friend (Zoe has the scenario's Sony saved) and Marvel's Telegram.
+  No test uses it. Same password, read from `E2E_DEMO_PASSWORD` in `.env`. A test tagged `@admin` or `@user` in its title runs as that account. An untagged test runs logged out.
 - Selectors: `getByRole`, then `getByLabel`, then `data-testid="feature-element"`. Never CSS classes.
 - Tests must not create users. Run `npm run seed` before a full run. The seed keeps `demo@smu.edu.sg` as admin.
 - The seed uses real data, with one exception: products from `data/demo-products.json` (saved by team members), the team
