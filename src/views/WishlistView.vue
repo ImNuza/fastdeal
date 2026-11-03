@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { sgd, storeLink } from '../services/format.js'
 import FdIcon from '../components/FdIcon.vue'
 import FdLoadingDots from '../components/FdLoadingDots.vue'
@@ -16,7 +16,6 @@ import FdListSearch from '../components/FdListSearch.vue'
 import FdEmptyState from '../components/FdEmptyState.vue'
 
 const router = useRouter()
-const route = useRoute()
 
 // All wishlist data and logic live in the wishlist store. This view keeps only the page layout,
 // the search and sort, and the pop-up handling (focus, openers, the sleep time picker).
@@ -24,7 +23,6 @@ const { user } = storeToRefs(useAuthStore())
 const wishlistStore = useWishlistStore()
 const {
   now, liveLoading, liveErrors,
-  verdictItem, verdictLoading, verdictError, activeVerdict,
   budget, included, plan, planIndex, budgetError, plannable, heldCount, option, pickedItems, missedItems,
   drafts, editing, editingDraft, draftName, draftSaving, draftError, draftChanged,
   buyItem, selected, inviting, inviteSent, error: buyError
@@ -32,7 +30,6 @@ const {
 const {
   removeSaved, setTarget, ownTarget, sleepOn, fillSuggestions,
   best, loadLivePrice, saving, cheaper, savingPercent, reached, asleep,
-  hasFinishedSleep, openVerdict: loadVerdict, closeVerdict,
   clearPlan, findPlan, nextOption, rankOf, setRank, cheapestPlannable, startDraft, closeDraft, saveDraft, removeDraft,
   fetchFriendOverlap, friendsFor, allInvited, openBuyTogether, closeBuyTogether, sendInvites
 } = wishlistStore
@@ -368,45 +365,6 @@ function confirmSleep() {
   closeSleep()
 }
 
-// Purchase verdict pop-up: the price lookup and maths are in the store; the view only moves focus.
-const verdictDialog = ref(null)
-
-function openVerdict(item) {
-  nextTick(() => {
-    verdictDialog.value?.querySelector('button')?.focus()
-  })
-  return loadVerdict(item)
-}
-
-watch(
-  [() => route.query.verdict, () => user.value?.wishlist],
-  ([productName]) => {
-    if (typeof productName !== 'string' || !user.value) {
-      return
-    }
-
-    const item = user.value.wishlist.find(
-      saved => saved.name === productName
-    )
-
-    if (!item || !hasFinishedSleep(item)) {
-      return
-    }
-
-    // Open the same popup used by View purchase verdict.
-    openVerdict(item)
-
-    // Remove the query parameter so refreshing the page
-    // doesn't automatically reopen the same verdict.
-    const { verdict, ...remainingQuery } = route.query
-
-    router.replace({
-      path: route.path,
-      query: remainingQuery
-    })
-  },
-  { immediate: true }
-)
 
 // Plan a budget tab: the drafts and the numbers are in the store. Opening the tab drops items
 // that went on hold from the budget being edited.
@@ -624,11 +582,6 @@ const listTotal = computed(function () { return listRows.value.length })
                 </span>
                 <span class="fd-section-subtitle mb-0">{{ item.name }}</span>
               </component>
-              <!-- After Sleep on it ends: the verdict link sits under the product name -->
-              <button v-if="hasFinishedSleep(item)" class="fd-verdict-link" type="button"
-                @click="openVerdict(item)">
-                View purchase verdict
-              </button>
             </div>
             <!-- On hold: the prices, target, and buttons give way to one countdown across those columns. -->
             <div v-if="asleep(item)" class="fd-wish-cell fd-wish-countdown" role="cell" aria-colspan="4">
@@ -904,95 +857,6 @@ const listTotal = computed(function () { return listRows.value.length })
     </section>
   </div>
 
-  <!-- Purchase Verdict pop-up -->
-  <div v-if="verdictItem" class="fd-entry-backdrop" @click.self="closeVerdict" @keydown.esc="closeVerdict">
-    <section ref="verdictDialog" class="fd-entry-dialog" role="dialog" aria-modal="true"
-      aria-labelledby="fd-verdict-title">
-      <h2 id="fd-verdict-title" class="fd-page-title">
-        SLEEP ON IT — VERDICT
-      </h2>
-
-      <p class="fd-entry-description">
-        Your waiting period for
-        <strong>{{ verdictItem.name }}</strong>
-        has ended.
-      </p>
-
-      <p v-if="verdictLoading" class="alert alert-secondary">
-        <FdLoadingDots size="inline" message="Checking the latest price" />
-      </p>
-
-      <p v-else-if="verdictError" class="alert alert-danger" role="alert">
-        {{ verdictError }}
-        <button class="btn btn-outline-dark d-block mt-2" type="button" @click="openVerdict(verdictItem)">
-          Try again
-        </button>
-      </p>
-
-      <template v-else-if="activeVerdict">
-
-        <!-- Price comparison -->
-        <div class="fd-verdict-prices">
-
-          <div>
-            <span>Original saved price</span>
-            <strong>{{ sgd(activeVerdict.start) }}</strong>
-          </div>
-
-          <div>
-            <span>Cheapest matching price found</span>
-            <strong>{{ sgd(activeVerdict.latest) }}</strong>
-          </div>
-
-        </div>
-
-        <!-- Percentage price change -->
-        <div class="fd-verdict-change" :class="{
-          'is-lower': activeVerdict.percent < 0,
-          'is-higher': activeVerdict.percent > 0
-        }">
-
-          <strong>
-            {{ activeVerdict.percent > 0 ? '+' : '' }}
-            {{ activeVerdict.percent.toFixed(1) }}%
-          </strong>
-
-          <span v-if="activeVerdict.difference < 0">
-            Price decreased by
-            {{ sgd(-activeVerdict.difference) }}
-          </span>
-
-          <span v-else-if="activeVerdict.difference > 0">
-            Price increased by
-            {{ sgd(activeVerdict.difference) }}
-          </span>
-
-          <span v-else>
-            Price unchanged
-          </span>
-        </div>
-
-        <!-- Purchase verdict -->
-        <h3 class="fd-verdict-title">
-          {{ activeVerdict.title }}
-        </h3>
-
-        <p>{{ activeVerdict.message }}</p>
-
-      </template>
-
-      <p v-else class="alert alert-secondary">
-        Latest price unavailable.
-        We cannot calculate a verdict yet.
-      </p>
-      <button class="btn btn-dark fd-btn-lg w-100" type="button" @click="closeVerdict">
-        Got it
-      </button>
-
-    </section>
-  </div>
-
-
   <!-- Sleep on it pop-up. Uses the welcome prompt's dialog styles from app.css. -->
   <div v-if="sleepItem" class="fd-entry-backdrop" @click.self="closeSleep" @keydown.esc="closeSleep">
     <section ref="sleepDialog" class="fd-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="fd-sleep-title">
@@ -1064,75 +928,6 @@ const listTotal = computed(function () { return listRows.value.length })
 
 <style scoped>
 /* ===================================
-   SLEEP ON IT - PURCHASE VERDICT
-=================================== */
-
-.fd-verdict-prices {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  margin: 1.25rem 0;
-}
-
-.fd-verdict-prices>div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 1rem;
-  border: 1px solid var(--fd-vanilla-line);
-  border-radius: 1rem;
-}
-
-.fd-verdict-prices span {
-  color: var(--fd-text-muted);
-  font-size: var(--fd-small);
-}
-
-.fd-verdict-prices strong {
-  color: var(--fd-blue);
-  font-size: var(--fd-section-title);
-  font-family: var(--fd-font-display);
-  font-weight: 400;
-}
-
-.fd-verdict-change {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  background: var(--fd-beige);
-  padding: 1rem;
-  border-radius: 1rem;
-}
-
-.fd-verdict-change strong {
-  font-size: var(--fd-page-title);
-  font-family: var(--fd-font-display);
-  font-weight: 400;
-}
-
-.fd-verdict-change.is-lower {
-  color: var(--fd-green-text);
-}
-
-.fd-verdict-change.is-higher {
-  color: var(--fd-red-text);
-}
-
-.fd-verdict-title {
-  margin: 1.25rem 0 0.5rem;
-  color: var(--fd-blue);
-  font-size: var(--fd-body);
-  font-weight: 700;
-}
-
-@media (max-width: 460px) {
-  .fd-verdict-prices {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ===================================
    PAGE, TABS, AND CARD
    The tabs, search, sort, empty message, and total bar are the shared ones (FdTabs,
    FdListSearch, FdEmptyState), styled in app.css like Friends and Notifications.
@@ -1156,8 +951,10 @@ const listTotal = computed(function () { return listRows.value.length })
 
 .fd-wish-head,
 .fd-wish-row {
-  /* Last column fits three icon buttons (friends, moon, trash): 3 x 2.25rem + 2 x 0.5rem gaps */
-  --fd-wish-columns: minmax(0, 22rem) 9.5rem 9.5rem 12.5rem 7.75rem;
+  /* Last column fits three icon buttons (friends, moon, trash): 3 x 2.25rem + 2 x 0.5rem gaps.
+     The product column never drops below 14rem, so long names do not run into the prices;
+     the price and target columns give up space first on narrower screens. */
+  --fd-wish-columns: minmax(14rem, 1fr) minmax(6.5rem, 9.5rem) minmax(6.5rem, 9.5rem) minmax(10rem, 12.5rem) 7.75rem;
 }
 
 .fd-wish-head,
@@ -1224,6 +1021,7 @@ const listTotal = computed(function () { return listRows.value.length })
   align-items: center;
   gap: 1rem;
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
 /* On hold: not a link, so no pointer. */
@@ -1236,25 +1034,6 @@ span.fd-wish-product {
   flex-direction: column;
   gap: 0.3rem;
   min-width: 0;
-}
-
-.fd-wish-cell-product .fd-verdict-link {
-  display: block;
-  width: fit-content;
-  margin: 0.5rem 0 0 7rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fd-blue);
-  font-size: var(--fd-small);
-  font-weight: 700;
-  text-align: left;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.fd-wish-cell-product .fd-verdict-link:hover {
-  opacity: 0.8;
 }
 
 .fd-wish-image {
@@ -1402,7 +1181,7 @@ span.fd-wish-product {
   min-width: 0;
 }
 
-/* Stack the buttons above the verdict link */
+/* Stack the buttons */
 .fd-wish-action-group {
   display: flex;
   flex-direction: column;
@@ -1434,26 +1213,6 @@ span.fd-wish-product {
   font-size: var(--fd-small);
   font-weight: 700;
   white-space: nowrap;
-}
-
-/* Right-align the verdict text */
-.fd-verdict-link {
-  display: block;
-  width: max-content;
-  padding: 0;
-  margin: 0;
-  border: none;
-  background: transparent;
-  color: var(--fd-blue);
-  font-size: var(--fd-small);
-  font-weight: 700;
-  text-align: right;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.fd-verdict-link:hover {
-  opacity: 0.8;
 }
 
 
@@ -1538,10 +1297,6 @@ span.fd-wish-product {
     width: 4.5rem;
     height: 4.5rem;
     font-size: var(--fd-section-title);
-  }
-
-  .fd-wish-cell-product .fd-verdict-link {
-    margin-left: 5.5rem;
   }
 }
 

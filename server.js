@@ -830,8 +830,8 @@ app.post('/api/notifications/sleep-ended', requireUser, async (req, res) => {
       {
         $setOnInsert: {
           title: 'Sleep On It completed!',
-          body: `Your waiting period for ${productName} has ended. View your purchase verdict.`,
-          link: '/wishlist?verdict=' + encodeURIComponent(productName),
+          body: `Your waiting period for ${productName} has ended.`,
+          link: '/wishlist',
           read: false
         }
       },
