@@ -1104,3 +1104,69 @@ tr.cheapest td {
 .fd-section-gap {
   margin-top: var(--fd-section-gap) !important;
 }
+
+/* ===================================
+   SHARED SMALL PIECES
+=================================== */
+
+/* The small vanilla AI tag: beside the product page's Worth it? title and under an AI suggested
+   target on the Wishlist */
+.fd-ai-tag {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--fd-vanilla);
+  color: var(--fd-ink);
+  font-family: var(--fd-font-body);
+  font-size: var(--fd-small);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* Date range pill buttons (7 days, 30 days): the Admin board and the Compare price history */
+.fd-range {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.fd-range-btn {
+  min-height: var(--fd-control);
+  padding: 0 1.25rem;
+  border: var(--fd-border) solid var(--fd-vanilla-line);
+  border-radius: 999px;
+  background: var(--fd-paper);
+  color: var(--fd-text);
+  font-size: var(--fd-button);
+  font-weight: 700;
+}
+
+.fd-range-btn.is-active {
+  border-color: var(--fd-blue);
+  background: var(--fd-blue);
+  color: var(--fd-beige);
+}
+
+/* Change pill ("+5%", "-2.1%"): ink text on tea green for good news, soft red for bad, vanilla
+   when flat or new. Each page says which way is good: more shoppers on the Admin board, a lower
+   price on the Compare price history. */
+.fd-delta {
+  flex-shrink: 0;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  color: var(--fd-ink);
+  font-family: var(--fd-font-body);
+  font-size: var(--fd-small);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.fd-delta.is-good {
+  background: var(--fd-green);
+}
+
+.fd-delta.is-bad {
+  background: var(--fd-red);
+}
+
+.fd-delta.is-flat {
+  background: var(--fd-vanilla-soft);
+}

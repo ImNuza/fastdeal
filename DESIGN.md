@@ -207,6 +207,17 @@ The product page's **All stores** list works the same way: every listing, the pa
 | `FdEmptyState` | `icon` is an `FdIcon` name; the line goes in the slot. Anything after it, like the New budget button, goes in the `action` slot. |
 | `FdTotalBar` | Sticks to the bottom of the screen and stops above the footer, so it must be the last thing in the page. `stacked` centres the phone page buttons with the count under them. |
 
+### Shared small pieces
+
+Defined once in `app.css`, so a colour or size change happens in one place:
+
+- **AI tag** (`.fd-ai-tag`): a small vanilla pill reading "AI", beside the product page's Worth it? title and under an AI suggested target on the Wishlist.
+- **Date range buttons** (`.fd-range` with `.fd-range-btn`, `.is-active` on the open one): 48px pills, blue when active. The Admin board and the Compare price history.
+- **Change pill** (`.fd-delta`): "+5%" or "-2.1%" in ink. Add `is-good` (tea green), `is-bad` (soft red) or `is-flat` (vanilla). The page decides which way is good: more shoppers on the Admin board, a lower price on the Compare price history.
+- **Photo boxes:** a square box around a product photo uses flex centring, never grid (`display: grid; place-items: center`), because in a grid the photo's `height: 100%` does not resolve and a tall photo is cut off at the bottom.
+
+Pages other than Home load as their own file when opened (`src/router/index.js`), and the store price chart registers only the Chart.js parts it uses, so the first load stays small.
+
 ### Logo
 
 `<FdLogo />` from `src/components/FdLogo.vue`. Built from live text, so it always uses Anton.

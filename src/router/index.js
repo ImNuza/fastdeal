@@ -2,18 +2,21 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { watch } from 'vue'
 import { useAuthStore } from '../store/auth.js'
 import HomeView from '../views/HomeView.vue'
-import CompareView from '../views/CompareView.vue'
-import TrendingView from '../views/TrendingView.vue'
-import LoginView from '../views/LoginView.vue'
-import SignupView from '../views/SignupView.vue'
-import WishlistView from '../views/WishlistView.vue'
-import FriendsView from '../views/FriendsView.vue'
-import NotificationsView from '../views/NotificationsView.vue'
-import AccountView from '../views/AccountView.vue'
-import SetUsernameView from '../views/SetUsernameView.vue'
-import ProductView from '../views/ProductView.vue'
-import AdminView from '../views/AdminView.vue'
-import ErrorView from '../views/ErrorView.vue'
+
+// Home is the landing page, so it comes with the first load. Every other page is its own file,
+// downloaded only when it is opened, so the first load stays small on phones.
+const CompareView = () => import('../views/CompareView.vue')
+const TrendingView = () => import('../views/TrendingView.vue')
+const LoginView = () => import('../views/LoginView.vue')
+const SignupView = () => import('../views/SignupView.vue')
+const WishlistView = () => import('../views/WishlistView.vue')
+const FriendsView = () => import('../views/FriendsView.vue')
+const NotificationsView = () => import('../views/NotificationsView.vue')
+const AccountView = () => import('../views/AccountView.vue')
+const SetUsernameView = () => import('../views/SetUsernameView.vue')
+const ProductView = () => import('../views/ProductView.vue')
+const AdminView = () => import('../views/AdminView.vue')
+const ErrorView = () => import('../views/ErrorView.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

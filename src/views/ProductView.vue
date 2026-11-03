@@ -877,17 +877,6 @@ const breadcrumbs = computed(function () {
   }
 }
 
-/* AI tag beside the Worth it? title, like the Photo search tag on Home. */
-.fd-ai-tag {
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-  background: var(--fd-vanilla);
-  color: var(--fd-ink);
-  font-family: var(--fd-font-body);
-  font-size: var(--fd-small);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
 
 /* The same gap under the hero as under the breadcrumbs, so the AI verdict sits as close. */
 .fd-product-hero {
