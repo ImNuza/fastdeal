@@ -64,8 +64,9 @@
   /* Padding: one inside padding for every card and panel, and one for list rows (like the
      Wishlist's), so every page has the same breathing room. Pop-ups keep their own, larger one. */
   --fd-card-pad: 1.25rem;
-  /* Inside a tab card (Wishlist, Friends, Notifications, Admin), the same on all four sides. */
-  --fd-panel-pad: 1.5rem;
+  /* Inside a card that holds cards (the folder-tab card, the product page's Worth it? and All
+     listings cards), the same on all four sides: 16px on phones, 24px from 577px. */
+  --fd-panel-pad: 1rem;
   --fd-row-pad: 0.75rem 1.25rem;
 
   /* The space between two sections of a page (a section title and what belongs to it), the same
@@ -88,6 +89,12 @@
   /* The tallest a list in a folder tab card grows before it scrolls inside the card: fits the
      screen, but never shorter than 20rem or taller than 40rem. */
   --fd-list-max: clamp(20rem, calc(100svh - var(--fd-nav-height) - 16rem), 40rem);
+}
+
+@media (min-width: 577px) {
+  :root {
+    --fd-panel-pad: 1.5rem;
+  }
 }
 
 @media (min-width: 768px) {

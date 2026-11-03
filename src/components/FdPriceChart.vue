@@ -134,12 +134,18 @@ const tipFlip = computed(function () {
   <div class="card fd-chart-card">
     <div class="fd-chart-head">
       <div>
-        <h2 class="fd-section-title">Price history</h2>
-        <p class="fd-chart-value">{{ sgd(today.price) }}</p>
-        <p class="fd-change-row">
-          <span v-if="change !== null" class="fd-change" :class="changeClass">{{ changeText }}</span>
-          <span>vs {{ dayText(first.day) }}</span>
-        </p>
+        <!-- No visible title: the price and "Lowest price today" say what the card is. Screen readers
+             still hear it as the Price history section. -->
+        <h2 class="visually-hidden">Price history</h2>
+        <!-- The price with how it moved over the range beside it, then what the price is -->
+        <div class="fd-chart-value-row">
+          <p class="fd-chart-value">{{ sgd(today.price) }}</p>
+          <p v-if="change !== null" class="fd-change-row">
+            <span class="fd-change" :class="changeClass">{{ changeText }}</span>
+            <span>since {{ dayText(first.day) }}</span>
+          </p>
+        </div>
+        <p class="fd-chart-what">Lowest price today</p>
       </div>
       <div class="fd-chart-side">
         <div v-if="ranges.length" class="fd-range" role="group" aria-label="Date range">
@@ -204,13 +210,27 @@ const tipFlip = computed(function () {
   margin-bottom: 1.5rem;
 }
 
+.fd-chart-value-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
 /* Today's price: Anton at the page title size, like the "You save" amount */
 .fd-chart-value {
-  margin: 0.25rem 0 0.5rem;
+  margin: 0;
   color: var(--fd-blue);
   font-family: var(--fd-font-display);
   font-size: var(--fd-page-title);
   line-height: 1;
+}
+
+.fd-chart-what {
+  margin: 0 0 0.5rem;
+  color: var(--fd-text);
+  font-size: var(--fd-small);
 }
 
 .fd-change-row {

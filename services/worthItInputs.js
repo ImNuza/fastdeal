@@ -69,10 +69,10 @@ export function verdictInputs(product, sale) {
 
   const typical = product.typicalPrice
   rows.push(typical
-    ? { key: 'typical', label: 'Typical price', source: LIVE, sent: true,
+    ? { key: 'typical', label: 'Usual price', source: LIVE, sent: true,
         value: money(typical) + ', the middle price of ' + count }
-    : { key: 'typical', label: 'Typical price', source: LIVE, sent: false,
-        value: 'Fewer than 3 listings, so there is no typical price' })
+    : { key: 'typical', label: 'Usual price', source: LIVE, sent: false,
+        value: 'Fewer than 3 listings, so there is no usual price' })
 
   rows.push({
     key: 'range', label: 'Price range', source: LIVE, sent: true,
@@ -101,7 +101,7 @@ export function verdictInputs(product, sale) {
 
   let summary = 'Your pick ' + money(pick.total)
   summary += pick.total <= cheapest.total ? ' (the cheapest)' : ', cheapest ' + money(cheapest.total)
-  if (typical) summary += ', typical ' + money(typical)
+  if (typical) summary += ', usual ' + money(typical)
   if (onSale.length) summary += ', ' + onSale.length + ' on sale now'
   if (sale) summary += ', ' + sale.name.replace(/ sale$/, '') + ' in ' + sale.daysAway + (sale.daysAway === 1 ? ' day' : ' days')
   return { rows: rows, summary: summary + '.' }
@@ -119,7 +119,7 @@ export function verdictPrompt(rows) {
     'A listing can be a different model, size or condition from the shopper\'s pick):\n' +
     facts + '\n\n' +
     'Decide whether the shopper should BUY NOW at the price of their pick, or WAIT for the next big sale.\n' +
-    'Use only the facts above. Compare the pick with the cheapest listing, the typical price and the price range. ' +
+    'Use only the facts above. Compare the pick with the cheapest listing, the usual price and the price range. ' +
     'A listing with a "was" price is already on sale. ' +
     'Do not invent past prices, discounts or sale dates that are not in the facts.\n\n' +
     'Return JSON only, in exactly this shape:\n' +
@@ -148,15 +148,15 @@ export function ruleVerdict(product, sale) {
     const below = Math.round((1 - pick.total / typical) * 100)
     return {
       decision: 'buy', headline: 'Good price now', source: 'rules',
-      reason: 'Your pick ' + money(pick.total) + ' is ' + below + '% under the typical ' +
+      reason: 'Your pick ' + money(pick.total) + ' is ' + below + '% under the usual ' +
         money(typical) + ' across ' + stores.length + ' listings.'
     }
   }
   if (typical && pick.total >= typical * 1.1) {
     const above = Math.round((pick.total / typical - 1) * 100)
     return {
-      decision: 'wait', headline: 'Above the typical price', source: 'rules',
-      reason: 'Your pick ' + money(pick.total) + ' is ' + above + '% over the typical ' + money(typical) +
+      decision: 'wait', headline: 'Above the usual price', source: 'rules',
+      reason: 'Your pick ' + money(pick.total) + ' is ' + above + '% over the usual ' + money(typical) +
         ' across ' + stores.length + ' listings. Check the cheaper listings below.'
     }
   }
@@ -164,15 +164,15 @@ export function ruleVerdict(product, sale) {
     return {
       decision: 'wait', headline: 'Wait for ' + saleName, source: 'rules',
       reason: (typical
-        ? 'Your pick ' + money(pick.total) + ' is not under the typical ' + money(typical) + '.'
-        : 'Only ' + stores.length + (stores.length === 1 ? ' listing has' : ' listings have') + ' a price, so there is no typical price.') +
+        ? 'Your pick ' + money(pick.total) + ' is not under the usual ' + money(typical) + '.'
+        : 'Only ' + stores.length + (stores.length === 1 ? ' listing has' : ' listings have') + ' a price, so there is no usual price.') +
         ' The ' + saleName + ' sale is in ' + days + '.'
     }
   }
   if (typical) {
     return {
       decision: 'buy', headline: 'Fair price', source: 'rules',
-      reason: 'Your pick ' + money(pick.total) + ' is close to the typical ' + money(typical) +
+      reason: 'Your pick ' + money(pick.total) + ' is close to the usual ' + money(typical) +
         (sale ? ', and the next big sale is ' + days + ' away.' : '.')
     }
   }

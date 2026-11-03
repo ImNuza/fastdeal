@@ -550,7 +550,7 @@ const listTotal = computed(function () { return filteredUsers.value.length })
 =================================== */
 
 .fd-kpi {
-  padding: 1rem 1.25rem;
+  padding: var(--fd-card-pad);
 }
 
 .fd-kpi-top {
@@ -810,7 +810,7 @@ const listTotal = computed(function () { return filteredUsers.value.length })
 
 .fd-board-title {
   margin: 0;
-  padding: 1rem 1.25rem 0;
+  padding: var(--fd-card-pad) var(--fd-card-pad) 0;
   color: var(--fd-beige);
   font-size: var(--fd-small);
   font-weight: 700;
@@ -820,7 +820,7 @@ const listTotal = computed(function () { return filteredUsers.value.length })
 
 .fd-board-empty {
   margin: 0;
-  padding: 1rem 1.25rem 1.25rem;
+  padding: var(--fd-card-pad);
   color: var(--fd-beige);
 }
 
@@ -937,7 +937,7 @@ const listTotal = computed(function () { return filteredUsers.value.length })
 .fd-board-side {
   display: flex;
   flex-direction: column;
-  padding: 0 1.25rem 1.25rem;
+  padding: 0 var(--fd-card-pad) var(--fd-card-pad);
 }
 
 .fd-board-side-title {
@@ -957,7 +957,7 @@ const listTotal = computed(function () { return filteredUsers.value.length })
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  padding: var(--fd-row-pad);
   border-radius: var(--fd-radius);
   background: var(--fd-paper);
   box-shadow: 0 0.5rem 1.25rem rgb(0 0 0 / 18%);

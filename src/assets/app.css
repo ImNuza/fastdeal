@@ -353,6 +353,15 @@ tr.cheapest td {
   color: var(--fd-ink) !important;
 }
 
+/* Green and red text ("Saved!", errors) in the app's own result colours, not Bootstrap's */
+.text-success {
+  color: var(--fd-green-text) !important;
+}
+
+.text-danger {
+  color: var(--fd-red-text) !important;
+}
+
 .text-bg-dark {
   background-color: var(--fd-blue) !important;
   color: var(--fd-beige) !important;
@@ -769,9 +778,6 @@ tr.cheapest td {
     letter-spacing: 0.04em;
   }
 
-  .fd-tabs-panel {
-    --fd-panel-pad: 1rem;
-  }
 }
 
 /* Search and sort above the list, ending where the cards end so the scrollbar's column (its

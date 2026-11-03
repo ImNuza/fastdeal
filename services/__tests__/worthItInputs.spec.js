@@ -56,14 +56,14 @@ describe('TestSuite1: verdictInputs', () => {
   })
 
   it('Test6: writes a short Based on summary', () => {
-    expect(verdictInputs(PRODUCT, SALE).summary).toBe('Your pick S$30.00 (the cheapest), typical S$40.00, 1 on sale now, 11.11 in 11 days.')
+    expect(verdictInputs(PRODUCT, SALE).summary).toBe('Your pick S$30.00 (the cheapest), usual S$40.00, 1 on sale now, 11.11 in 11 days.')
   })
 
   it('Test7: reads the listing the shopper picked, and names a listing that can be another model', () => {
     const pick = { ...store('Lazada', 40), name: 'Pikachu Plush 30cm' }
     const { rows, summary } = verdictInputs({ ...PRODUCT, pick: pick }, SALE)
     expect(row(rows, 'pick').value).toBe('S$40.00 at Lazada, listed as "Pikachu Plush 30cm"')
-    expect(summary).toBe('Your pick S$40.00, cheapest S$30.00, typical S$40.00, 1 on sale now, 11.11 in 11 days.')
+    expect(summary).toBe('Your pick S$40.00, cheapest S$30.00, usual S$40.00, 1 on sale now, 11.11 in 11 days.')
   })
 
   it('Test8: uses the cheapest listing as the pick when the search no longer has the clicked one', () => {
@@ -99,7 +99,7 @@ describe('TestSuite3: ruleVerdict', () => {
     const verdict = ruleVerdict(PRODUCT, SALE)
     expect(verdict.decision).toBe('buy')
     expect(verdict.source).toBe('rules')
-    expect(verdict.reason).toBe('Your pick S$30.00 is 25% under the typical S$40.00 across 3 listings.')
+    expect(verdict.reason).toBe('Your pick S$30.00 is 25% under the usual S$40.00 across 3 listings.')
   })
 
   it('Test2: says wait when the price is close to typical and a big sale is near', () => {
@@ -125,6 +125,6 @@ describe('TestSuite3: ruleVerdict', () => {
   it('Test5: judges the pick, not the cheapest listing, and says wait when it is 10% or more over typical', () => {
     const verdict = ruleVerdict({ ...PRODUCT, pick: store('Amazon.sg', 60) }, { ...SALE, daysAway: 40 })
     expect(verdict.decision).toBe('wait')
-    expect(verdict.reason).toBe('Your pick S$60.00 is 50% over the typical S$40.00 across 3 listings. Check the cheaper listings below.')
+    expect(verdict.reason).toBe('Your pick S$60.00 is 50% over the usual S$40.00 across 3 listings. Check the cheaper listings below.')
   })
 })

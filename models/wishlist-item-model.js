@@ -53,10 +53,17 @@ const wishlistItemSchema = new mongoose.Schema(
       default: null
     },
 
-    // 'ai' while the target is the AI's suggestion from the price history, with its one-line
-    // reason. Both clear when the shopper changes the target.
+    // 'ai' on rows saved when the AI set the target itself. No longer set: the AI now only
+    // suggests (targetSuggestion). Kept so old rows still read.
     targetSource: {
       type: String,
+      default: null
+    },
+
+    // The AI's suggested target from the price history and the listings, with its one-line
+    // reason. Only the grey hint in the Wishlist's target box: it never sets an alert.
+    targetSuggestion: {
+      type: Number,
       default: null
     },
 

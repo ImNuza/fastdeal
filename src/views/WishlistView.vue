@@ -229,19 +229,14 @@ function initials(name) {
   return name.split(/\s+/).slice(0, 2).map(function (word) { return word.charAt(0) }).join('').toUpperCase()
 }
 
-// The faint hint in an empty target box. An AI-set target shows there, like "Your name" on a form,
-// and stays the alert price until the shopper types their own. Otherwise the box is plain empty.
+// The faint hint in an empty target box, like "Your name" on a form: the AI's suggested target from
+// the price history and the listings. Only a hint: no alert is set until the shopper types a price.
+// With no suggestion the box is plain empty.
 function targetHint(item) {
-  if (item.targetSource === 'ai' && Number(item.targetPrice) > 0) {
-    return Number(item.targetPrice).toFixed(2)
-  }
-  return null
+  return Number(item.targetSuggestion) > 0 ? Number(item.targetSuggestion).toFixed(2) : null
 }
 
 async function onTarget(item, event) {
-  // Clearing the box keeps the AI's target rather than setting the alert to S$0
-  if (event.target.value === '' && item.targetSource === 'ai') return
-
   const nextTarget = Number(event.target.value)
   const previousTarget = Number(item.targetPrice)
 
@@ -690,7 +685,7 @@ const listTotal = computed(function () { return listRows.value.length })
                   <div class="input-group fd-target-input">
                     <span class="input-group-text">S$</span>
                     <input :id="'target-' + item.name" class="form-control" type="number" min="0" step="0.01"
-                      :value="item.targetSource === 'ai' ? '' : item.targetPrice"
+                      :value="item.targetPrice || ''"
                       :placeholder="targetHint(item)" :aria-label="'Target price for ' + item.name"
                       @change="onTarget(item, $event)" />
                   </div>
@@ -699,9 +694,8 @@ const listTotal = computed(function () { return listRows.value.length })
                     <FdIcon name="check" />
                   </span>
                 </div>
-                <!-- Set by the AI from the price history, shown as the box's grey hint; goes away once
-                     the shopper types their own target. -->
-                <p v-if="item.targetSource === 'ai'" class="fd-target-ai" :title="item.targetReason || null">
+                <!-- The box's hint is the AI's suggestion; the tag shows while the box is empty. -->
+                <p v-if="!item.targetPrice && targetHint(item)" class="fd-target-ai" :title="item.targetReason || null">
                   <span class="fd-ai-tag">AI</span> suggested<span v-if="item.targetReason" class="visually-hidden">: {{ item.targetReason }}</span>
                 </p>
               </div>
@@ -716,7 +710,7 @@ const listTotal = computed(function () { return listRows.value.length })
                         title="Friends who saved this. Buy together" @click="onBuyTogether(item)">
                         <FdIcon name="friends" />
                       </button>
-                      <!-- Shown once any friend is invited, not only when all are -->
+                      <!-- Shown above the button once any friend is invited, not only when all are -->
                       <span v-if="friendsFor(item.productKey).some(f => f.invited)" class="fd-sent">Sent!</span>
                     </div>
 
@@ -1428,16 +1422,16 @@ span.fd-wish-product {
   gap: 0.5rem;
 }
 
-/* "Sent!" hangs below the friends button, so the button stays in line with moon and trash */
+/* "Sent!" floats above the friends button, so the button stays in line with moon and trash */
 .fd-friends-wrap {
   position: relative;
 }
 
 .fd-sent {
   position: absolute;
-  top: 100%;
+  bottom: 100%;
   left: 50%;
-  margin-top: 0.15rem;
+  margin-bottom: 0.15rem;
   transform: translateX(-50%);
   color: var(--fd-green-text);
   font-size: var(--fd-small);
@@ -1504,6 +1498,22 @@ span.fd-wish-product {
 
   .fd-wish-actions {
     justify-content: flex-start;
+    align-items: flex-end;
+  }
+
+  /* "Sent!" takes up space above the friends button here, so it never crosses the card's
+     border; the buttons stay lined up along the bottom */
+  .fd-friends-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .fd-sent {
+    position: static;
+    order: -1;
+    margin: 0 0 0.15rem;
+    transform: none;
   }
 }
 

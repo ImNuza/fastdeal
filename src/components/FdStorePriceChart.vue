@@ -16,6 +16,9 @@ onMounted(function () {
   const muted = css.getPropertyValue('--fd-text-muted').trim() || '#585f3e'
   const line = css.getPropertyValue('--fd-grey-line').trim() || '#d4d1cb'
   const font = { family: css.getPropertyValue('--fd-font-body').trim() || 'sans-serif', size: 14 }
+  // The app's own tea green for the cheapest and brand blue for the rest, from tokens.css
+  const green = css.getPropertyValue('--fd-green').trim() || '#b3c77a'
+  const blue = css.getPropertyValue('--fd-blue').trim() || '#27508a'
   const labels = []
   const prices = []
   const colors = []
@@ -26,9 +29,11 @@ onMounted(function () {
     }
   }
   for (let i = 0; i < props.rows.length; i++) {
-    labels.push(props.rows[i].store)
+    // Long store names are cut short so they fit beside the bars on phones; the tooltip shows the full one
+    const store = props.rows[i].store
+    labels.push(store.length > 16 ? store.slice(0, 15) + '…' : store)
     prices.push(props.rows[i].total)
-    colors.push(props.rows[i].total === cheapest ? '#2f8f5b' : '#25508c')
+    colors.push(props.rows[i].total === cheapest ? green : blue)
   }
   chart = new Chart(canvas.value, {
     type: 'bar',
@@ -36,14 +41,22 @@ onMounted(function () {
     options: {
       indexAxis: 'y',
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: function (items) { return props.rows[items[0].dataIndex].store },
+            label: function (item) { return 'S$' + Number(item.raw).toFixed(2) }
+          }
+        }
+      },
       // The app's body font and muted text colour, like the Price history chart
       scales: {
         x: {
           beginAtZero: true,
           border: { display: false },
           grid: { color: line },
-          ticks: { maxTicksLimit: 6, color: muted, font: font, callback: function (value) { return 'S$' + value } }
+          ticks: { maxTicksLimit: 6, maxRotation: 0, color: muted, font: font, callback: function (value) { return 'S$' + value } }
         },
         y: { grid: { display: false }, ticks: { color: muted, font: font } }
       }
