@@ -4,6 +4,7 @@ import User from '../models/user-model.js'
 import Notification from '../models/notification-model.js'
 import { search } from '../models/shoppingapimodel.js'
 import { sendPriceAlertEmail } from './emailServices.js'
+import { getProduct } from './productService.js'
 
 // Exclude accessories that should not be compared with full products.
 const excluded =
@@ -48,6 +49,61 @@ function comparable(productName, listing) {
 
 function sgd(n) {
   return 'S$' + Number(n).toFixed(2)
+}
+
+// The price on a product page, the same one the Wishlist page shows: the saved listing
+// ("Your pick"), else the cheapest store. null when the page has no store price.
+export function pagePrice(product) {
+  if (product.pick && Number(product.pick.price) > 0) {
+    return product.pick
+  }
+
+  const stores = (product.stores || []).filter(store => Number(store.price) > 0)
+
+  if (!stores.length) {
+    return null
+  }
+
+  return stores.reduce((lowest, store) =>
+    Number(store.price) < Number(lowest.price)
+      ? store
+      : lowest
+  )
+}
+
+// The live price of a saved product. With a productId, its product page (cached, so no SerpApi
+// credit most of the time). Without one (saved before 21 Oct), or when the page fails, the
+// cheapest listing in a search for its name.
+async function livePrice(item) {
+  if (item.productId) {
+    try {
+      const product = await getProduct(item.productId, item.q || item.productName)
+      const listing = pagePrice(product)
+
+      if (listing) {
+        return listing
+      }
+    } catch (error) {
+      // Fall back to the search below.
+    }
+  }
+
+  const data = await search(item.productName)
+
+  const matches = (data?.listings || []).filter(row =>
+    comparable(item.productName, row)
+  )
+
+  if (!matches.length) {
+    return null
+  }
+
+  // Choose the cheapest comparable listing.
+  return matches.reduce((lowest, row) =>
+    Number(row.price) < Number(lowest.price)
+      ? row
+      : lowest
+  )
 }
 
 // One target-hit alert per target, and one price-drop alert per new lowest price
@@ -183,30 +239,19 @@ export async function checkTargetPrice(uid, productKey) {
     }
   }
 
-  // 3. Retrieve and verify prices using the backend search service.
+  // 3. Retrieve the live price, the same one the Wishlist page shows.
   let listing
 
   try {
-    const data = await search(claimed.productName)
+    listing = await livePrice(claimed)
 
-    const matches = (data?.listings || []).filter(row =>
-      comparable(claimed.productName, row)
-    )
-
-    if (!matches.length) {
+    if (!listing) {
       return {
         checked: true,
         reached: false,
         reason: 'no-comparable-listings'
       }
     }
-
-    // Choose the cheapest comparable listing.
-    listing = matches.reduce((lowest, item) =>
-      Number(item.price) < Number(lowest.price)
-        ? item
-        : lowest
-    )
   } catch (error) {
     // Allow retry if retrieving the price fails.
     // Only clear this check if its target has not changed.
