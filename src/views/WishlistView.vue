@@ -1255,9 +1255,12 @@ span.fd-wish-product {
 }
 
 .fd-wish-image {
-  display: grid;
+  /* Flex, not grid: in a grid the photo's 100% height does not resolve, so a tall photo kept its
+     own height and was cut off at the bottom */
+  display: flex;
   flex-shrink: 0;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
   width: 6rem;
   height: 6rem;
   overflow: hidden;
@@ -1334,7 +1337,6 @@ span.fd-wish-product {
   font-weight: 700;
 }
 
-/* Under an AI-set target: the small vanilla AI tag (as on the product page), then "suggested". */
 /* The AI's target as a faint hint in the box, lighter than typed text */
 .fd-target-input .form-control::placeholder {
   color: var(--fd-text-muted);
@@ -1351,16 +1353,6 @@ span.fd-wish-product {
   cursor: help;
 }
 
-.fd-ai-tag {
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-  background: var(--fd-vanilla);
-  color: var(--fd-ink);
-  font-family: var(--fd-font-body);
-  font-size: var(--fd-small);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
 
 .fd-target-row {
   display: flex;

@@ -38,10 +38,10 @@ const change = computed(function () {
   return Math.round(((today.value.price - first.value.price) / first.value.price) * 1000) / 10
 })
 
-// For prices a drop is good news: green down, red up
+// The change pill (fd-delta in app.css): for prices a drop is good news, so down is green
 const changeClass = computed(function () {
   if (!change.value) return 'is-flat'
-  return change.value < 0 ? 'is-down' : 'is-up'
+  return change.value < 0 ? 'is-good' : 'is-bad'
 })
 
 const changeText = computed(function () {
@@ -142,7 +142,7 @@ const tipFlip = computed(function () {
         <div class="fd-chart-value-row">
           <p class="fd-chart-value">{{ sgd(today.price) }}</p>
           <p v-if="change !== null" class="fd-change-row">
-            <span class="fd-change" :class="changeClass">{{ changeText }}</span>
+            <span class="fd-delta" :class="changeClass">{{ changeText }}</span>
             <span>since {{ dayText(first.day) }}</span>
           </p>
         </div>
@@ -245,27 +245,6 @@ const tipFlip = computed(function () {
   font-weight: 700;
 }
 
-/* Pill chip like the Admin board's. For prices a drop is good news: green down, red up */
-.fd-change {
-  padding: 0.125rem 0.625rem;
-  border-radius: 999px;
-  color: var(--fd-ink);
-  font-size: var(--fd-small);
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.fd-change.is-down {
-  background: var(--fd-green);
-}
-
-.fd-change.is-up {
-  background: var(--fd-red);
-}
-
-.fd-change.is-flat {
-  background: var(--fd-vanilla-soft);
-}
 
 .fd-chart-side {
   display: flex;
@@ -275,28 +254,6 @@ const tipFlip = computed(function () {
   gap: 1rem;
 }
 
-/* Pill buttons like the Admin board's date range */
-.fd-range {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.fd-range-btn {
-  min-height: var(--fd-control);
-  padding: 0 1.25rem;
-  border: var(--fd-border) solid var(--fd-vanilla-line);
-  border-radius: 999px;
-  background: var(--fd-paper);
-  color: var(--fd-text);
-  font-size: var(--fd-button);
-  font-weight: 700;
-}
-
-.fd-range-btn.is-active {
-  border-color: var(--fd-blue);
-  background: var(--fd-blue);
-  color: var(--fd-beige);
-}
 
 .fd-key {
   display: inline-block;

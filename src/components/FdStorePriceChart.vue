@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import Chart from 'chart.js/auto'
+import { BarController, BarElement, CategoryScale, Chart, LinearScale, Tooltip } from 'chart.js'
+
+// Only the parts a horizontal bar chart with tooltips needs, not all of Chart.js
+Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip)
 
 // rows: { store, total }, cheapest first. pick: the index of the shopper's pick in rows, or -1.
 // tone: the AI verdict, 'buy' or 'wait', which colours the pick's bar like the verdict card.

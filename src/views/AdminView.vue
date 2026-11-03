@@ -81,9 +81,10 @@ const compareText = computed(function () {
   return 'Compared to previous ' + days.value + ' days'
 })
 
+// The change pill (fd-delta in app.css): more shoppers is good news here, so up is green
 function deltaClass(d) {
   if (d === null || d === 0) return 'is-flat'
-  return d > 0 ? 'is-up' : 'is-down'
+  return d > 0 ? 'is-good' : 'is-bad'
 }
 
 function deltaText(d) {
@@ -523,28 +524,6 @@ const listTotal = computed(function () { return filteredUsers.value.length })
   margin: 2rem 0 1rem;
 }
 
-.fd-range {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.fd-range-btn {
-  min-height: var(--fd-control);
-  padding: 0 1.25rem;
-  border: var(--fd-border) solid var(--fd-vanilla-line);
-  border-radius: 999px;
-  background: var(--fd-paper);
-  color: var(--fd-text);
-  font-size: var(--fd-button);
-  font-weight: 700;
-}
-
-.fd-range-btn.is-active {
-  border-color: var(--fd-blue);
-  background: var(--fd-blue);
-  color: var(--fd-beige);
-}
-
 /* ===================================
    KPI CARDS
 =================================== */
@@ -584,30 +563,6 @@ const listTotal = computed(function () { return filteredUsers.value.length })
   height: 1.25rem;
 }
 
-/* Change chip in the brand colours, pill shaped like the Wishlist price-drop tag:
-   green up, red down, vanilla when flat or new */
-.fd-delta {
-  flex-shrink: 0;
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-  color: var(--fd-ink);
-  font-family: var(--fd-font-body);
-  font-size: var(--fd-small);
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.fd-delta.is-up {
-  background: var(--fd-green);
-}
-
-.fd-delta.is-down {
-  background: var(--fd-red);
-}
-
-.fd-delta.is-flat {
-  background: var(--fd-vanilla-soft);
-}
 
 /* ===================================
    CHARTS
@@ -849,8 +804,10 @@ const listTotal = computed(function () { return filteredUsers.value.length })
 }
 
 .fd-stage-image {
-  display: grid;
-  place-items: center;
+  /* Flex, not grid, so a tall photo fits the box instead of being cut off */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 3.5rem;
   height: 3.5rem;
   overflow: hidden;
@@ -985,9 +942,11 @@ const listTotal = computed(function () { return filteredUsers.value.length })
 }
 
 .fd-board-image {
-  display: grid;
+  /* Flex, not grid, so a tall photo fits the box instead of being cut off */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  place-items: center;
   width: 2.75rem;
   height: 2.75rem;
   overflow: hidden;
