@@ -5,8 +5,9 @@ import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../store/auth.js'
 import { useWishlistStore } from '../store/wishlist.js'
 
-// Save and Sleep on it buttons for one product. Used on the product page.
-// Save can be undone. A hold cannot: it is there to stop an impulse buy, so it runs until the timer ends.
+// Save to wishlist button for one product. Used on the product page. Sleep on it lives on the
+// Wishlist page only. A product already on hold there cannot be removed here either: the hold is
+// there to stop an impulse buy, so it runs until the timer ends.
 const props = defineProps({
   // Product title, as the wishlist stores it
   name: {
@@ -30,7 +31,7 @@ const productId = computed(function () {
 })
 
 const { user } = storeToRefs(useAuthStore())
-const { isAsleep, isSaved, removeSaved, saveProduct, savedFrom, sleepEndsAt, sleepOn } = useWishlistStore()
+const { isAsleep, isSaved, removeSaved, saveProduct, savedFrom } = useWishlistStore()
 
 const route = useRoute()
 const router = useRouter()
@@ -56,18 +57,6 @@ const asleep = computed(function () {
   return isAsleep(props.name, now.value, productId.value)
 })
 
-// "23h 12m left", the same format as the wishlist page
-const leftText = computed(function () {
-  const ms = sleepEndsAt(props.name, productId.value) - now.value
-  const days = Math.floor(ms / 86400000)
-  const hours = Math.floor((ms % 86400000) / 3600000)
-  const minutes = Math.max(Math.floor((ms % 3600000) / 60000), 1)
-  if (days > 0) {
-    return days + 'd ' + hours + 'h left'
-  }
-  return hours > 0 ? hours + 'h ' + minutes + 'm left' : minutes + 'm left'
-})
-
 function loginNext() {
   router.push({ path: '/login', query: { next: route.fullPath } })
 }
@@ -86,19 +75,6 @@ function onRemove() {
   note.value = 'Removed from wishlist.'
 }
 
-function onSleep() {
-  if (!user.value) {
-    loginNext()
-    return
-  }
-  // Save from the real store first. sleepOn only changes a product that is already saved.
-  if (!saved.value) {
-    saveProduct(props.name, props.listing, props.product)
-  }
-  // The start price lets the wishlist verdict and the "Sleep On It completed" notification compare prices later.
-  sleepOn(props.name, 24, props.listing ? props.listing.price : undefined, productId.value)
-  note.value = 'Saved to wishlist and on hold for 1 day.'
-}
 </script>
 
 <template>
@@ -113,13 +89,10 @@ function onSleep() {
     </div>
     <button v-else class="btn btn-dark" type="button" :disabled="!listing" @click="onSave">Save to wishlist</button>
 
-    <button v-if="asleep" class="btn btn-outline-dark" type="button" disabled>On hold, {{ leftText }}</button>
-    <button v-else class="btn btn-outline-dark" type="button" :disabled="!listing" @click="onSleep">Sleep on it</button>
-
-    <!-- Any extra buttons from the page, such as Go to store, sit after Sleep on it and before the notes. -->
+    <!-- Any extra buttons from the page, such as Go to store, sit after Save and before the notes. -->
     <slot />
 
     <span v-if="note" class="small align-self-center" role="status">{{ note }}</span>
-    <span v-if="!user" class="small text-secondary align-self-center">Log in to save or hold this product.</span>
+    <span v-if="!user" class="small text-secondary align-self-center">Log in to save this product.</span>
   </div>
 </template>

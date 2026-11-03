@@ -260,8 +260,8 @@ async function confirmRoleChange() {
   }
 }
 
-// Phones: 10 rows a page, with the page buttons in the bar. Wider: the count only.
-const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal, isPhone: listOnPhone } = useListPages(
+// 8 rows a page on every screen, with the page buttons in the bar under the list.
+const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal } = useListPages(
   filteredUsers,
   [roleFilter, search, userSort]
 )
@@ -489,8 +489,8 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
       </FdScrollArea>
     </FdTabs>
 
-    <FdTotalBar v-if="listTotal > 0" :stacked="listOnPhone">
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" :noun="roleFilter === 'admin' ? 'admins' : 'users'" label="Users" :top="tabsCard?.panel" />
+    <FdTotalBar v-if="listTotal > 0" stacked>
+      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :noun="roleFilter === 'admin' ? 'admins' : 'users'" label="Users" :top="tabsCard?.panel" />
     </FdTotalBar>
     </section>
   </div>

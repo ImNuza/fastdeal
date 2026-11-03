@@ -4,7 +4,8 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 // A list that scrolls inside its card, with the brand scrollbar beside it: arrows that jump to
 // the top or bottom and a blue handle to drag, since browsers on a Mac hide their own until you
 // scroll. The same scrollbar as the Friends and Notifications cards. The content scrolls natively
-// (wheel, trackpad, touch, keyboard) and the bar follows; the bar can also drive it.
+// (wheel, trackpad, touch, keyboard) and the bar follows; the bar can also drive it. When the whole
+// list fits, the handle is half the track at the top and the bar is locked: nothing moves.
 defineProps({
   label: {
     type: String,
@@ -38,61 +39,47 @@ function updateBar() {
   }
   const room = el.scrollHeight - el.clientHeight
   canScroll.value = room > 1
-  // A small handle: its share of the track, kept between 12% and 40%; 20% with nothing to scroll.
+  // The handle shows how much of the list is in view, shorter the more there is to scroll: never
+  // under 12% so it stays easy to grab, and never over half the track, which is its size when
+  // everything fits.
   thumbSize.value = canScroll.value
-    ? Math.min(Math.max((el.clientHeight / el.scrollHeight) * 100, 12), 40)
-    : 20
-  thumbTop.value = canScroll.value
-    ? (el.scrollTop / room) * (100 - thumbSize.value)
-    : Math.min(thumbTop.value, 100 - thumbSize.value)
-}
-
-function moveIdleThumb(top) {
-  thumbTop.value = Math.min(Math.max(top, 0), 100 - thumbSize.value)
+    ? Math.min(Math.max((el.clientHeight / el.scrollHeight) * 100, 12), 50)
+    : 50
+  thumbTop.value = canScroll.value ? (el.scrollTop / room) * (100 - thumbSize.value) : 0
 }
 
 // The arrows jump straight to the very top (-1) or the very bottom (1).
 function scrollStep(direction) {
-  if (!canScroll.value) {
-    moveIdleThumb(direction < 0 ? 0 : 100)
-    return
-  }
+  if (!canScroll.value) return
   const el = listEl.value
   el.scrollTo({ top: direction < 0 ? 0 : el.scrollHeight, behavior: 'smooth' })
 }
 
 // A press on the empty track jumps one page toward the press.
 function onTrackPress(event) {
+  if (!canScroll.value) return
   const el = listEl.value
   const thumb = trackEl.value.querySelector('.fd-scrollbar-thumb').getBoundingClientRect()
   const direction = event.clientY < thumb.top ? -1 : 1
-  if (!canScroll.value) {
-    moveIdleThumb(thumbTop.value + direction * thumbSize.value)
-    return
-  }
   el.scrollBy({ top: direction * el.clientHeight * 0.9, behavior: 'smooth' })
 }
 
 // Dragging the handle: moving it the full free length of the track scrolls everything.
 let dragStartY = 0
 let dragStartScroll = 0
-let dragStartTop = 0
 
 function onThumbDown(event) {
   event.preventDefault()
+  if (!canScroll.value) return
   dragStartY = event.clientY
   dragStartScroll = listEl.value.scrollTop
-  dragStartTop = thumbTop.value
   event.currentTarget.setPointerCapture(event.pointerId)
 }
 
 function onThumbMove(event) {
   if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
   const el = listEl.value
-  if (!canScroll.value) {
-    moveIdleThumb(dragStartTop + ((event.clientY - dragStartY) / trackEl.value.clientHeight) * 100)
-    return
-  }
+  if (!canScroll.value) return
   const free = trackEl.value.clientHeight * (1 - thumbSize.value / 100)
   if (free > 0) {
     el.scrollTop = dragStartScroll + ((event.clientY - dragStartY) * (el.scrollHeight - el.clientHeight)) / free
@@ -136,8 +123,8 @@ defineExpose({ toTop })
     </div>
 
     <!-- Hidden from screen readers: the list itself scrolls with the keyboard. -->
-    <div v-if="bar" class="fd-scrollbar" aria-hidden="true">
-      <button class="fd-scrollbar-arrow" type="button" tabindex="-1" @click="scrollStep(-1)">
+    <div v-if="bar" class="fd-scrollbar" :class="{ 'is-locked': !canScroll }" aria-hidden="true">
+      <button class="fd-scrollbar-arrow" type="button" tabindex="-1" :disabled="!canScroll" @click="scrollStep(-1)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round"><path d="m18 15-6-6-6 6" /></svg>
       </button>
@@ -145,7 +132,7 @@ defineExpose({ toTop })
         <div class="fd-scrollbar-thumb" :style="{ top: thumbTop + '%', height: thumbSize + '%' }"
           @pointerdown="onThumbDown" @pointermove="onThumbMove"></div>
       </div>
-      <button class="fd-scrollbar-arrow" type="button" tabindex="-1" @click="scrollStep(1)">
+      <button class="fd-scrollbar-arrow" type="button" tabindex="-1" :disabled="!canScroll" @click="scrollStep(1)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
       </button>
@@ -278,5 +265,22 @@ defineExpose({ toTop })
 
 .fd-scrollbar-thumb:active {
   cursor: grabbing;
+}
+
+/* Nothing to scroll: the handle stays at the top, and nothing moves or reacts to hover. */
+.fd-scrollbar.is-locked .fd-scrollbar-arrow,
+.fd-scrollbar.is-locked .fd-scrollbar-track,
+.fd-scrollbar.is-locked .fd-scrollbar-thumb {
+  cursor: default;
+}
+
+.fd-scrollbar.is-locked .fd-scrollbar-arrow:hover {
+  background: transparent;
+  color: var(--fd-text-muted);
+}
+
+.fd-scrollbar.is-locked .fd-scrollbar-thumb:hover,
+.fd-scrollbar.is-locked .fd-scrollbar-thumb:active {
+  background: var(--fd-blue);
 }
 </style>

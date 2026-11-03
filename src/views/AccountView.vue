@@ -7,6 +7,7 @@ import { signOutUser } from '../services/auth.js'
 import { updateUser } from '../services/userApi.js'
 import FdIcon from '../components/FdIcon.vue'
 import FdAvatar from '../components/FdAvatar.vue'
+import FdConfirmDialog from '../components/FdConfirmDialog.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -36,9 +37,28 @@ const initials = computed(function () {
   return name.slice(0, 2).toUpperCase()
 })
 
+// Log out asks first, in the same confirm pop-up as removing a friend or a wishlist item.
+const confirmLogout = ref(false)
+const logoutBusy = ref(false)
+const logoutError = ref('')
+
+function closeLogout() {
+  confirmLogout.value = false
+  logoutError.value = ''
+}
+
 async function onLogout() {
-  await signOutUser()
-  router.push('/')
+  logoutBusy.value = true
+  logoutError.value = ''
+  try {
+    await signOutUser()
+    confirmLogout.value = false
+    router.push('/')
+  } catch (err) {
+    logoutError.value = 'Could not log out. Please try again.'
+  } finally {
+    logoutBusy.value = false
+  }
 }
 
 // Telegram username editing
@@ -142,7 +162,19 @@ async function saveTelegram() {
 
     </section>
 
-    <button class="btn btn-dark fd-btn-lg mt-4" type="button" @click="onLogout">Log out</button>
+    <button class="btn btn-dark fd-btn-lg mt-4" type="button" @click="confirmLogout = true">Log out</button>
+
+    <FdConfirmDialog
+      v-if="confirmLogout"
+      title="Log out"
+      confirm-label="Log out"
+      :busy="logoutBusy"
+      :error="logoutError"
+      @confirm="onLogout"
+      @cancel="closeLogout"
+    >
+      Log out of FastDeal on this device? Your wishlist and friends stay saved for when you log back in.
+    </FdConfirmDialog>
   </div>
 </template>
 
