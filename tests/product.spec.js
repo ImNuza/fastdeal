@@ -22,7 +22,8 @@ test.describe('Product page', () => {
     await expect(page.getByRole('heading', { name: 'All listings' })).toBeVisible();
     const table = page.getByRole('table', { name: 'All listings' });
     await expect(table.getByRole('row')).toHaveCount(productIphone.stores.length + 1);
-    await expect(page.getByText(new RegExp('of ' + productIphone.stores.length + ' listings$'))).toBeVisible();
+    // Wide screens: "Showing 10 listings". Phones: "Showing 1-10 of 10 listings".
+    await expect(page.getByText(new RegExp('^Showing (.+ of )?' + productIphone.stores.length + ' listings$'))).toBeVisible();
 
     // The listing clicked on Compare is Your pick.
     const pick = table.getByRole('row', { name: new RegExp(productIphone.pick.store) });

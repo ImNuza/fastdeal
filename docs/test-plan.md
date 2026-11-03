@@ -191,6 +191,11 @@ listing as the pick when the clicked one is gone, the "different model" line in 
 a pick 10% or more over the typical price is a wait.
 Totals: 34 E2E tests in 11 files, 88 unit tests in 11 files.
 
+Batch 8 (3 Nov, after the Week 12 consult): 7 demo searches with seeded 30-day history (backend only; Zoe builds the UI).
+Unit: `priceHistory.spec.js` +8 (`seededPrices`, `summarizeHistory`, `lastDays`), `serpapiKeys.spec.js` +1 (PR #55).
+E2E tests for the history UI come with Zoe's UI, with `history` mocked from a fixture.
+Totals: 34 E2E tests in 11 files, 97 unit tests in 11 files.
+
 Batch 4, after Ronald's AI verdict merges: Compare filters and sort, the cheapest badge, the verdict (with a saved Gemini response). About 3 tests. Then check `product.spec.js` and `target-price-alert.spec.js`.
 
 Rules for this batch:

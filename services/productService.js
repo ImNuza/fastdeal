@@ -12,7 +12,7 @@ import SearchCache from '../models/search-cache-model.js'
 import { toProductKey } from '../models/product-key.js'
 import { search } from '../models/shoppingapimodel.js'
 import { typicalPrice } from './typicalPrice.js'
-import { recordPrices } from './priceHistory.js'
+import { recordPrices, findHistory } from './priceHistory.js'
 
 const HOUR = 3600000
 // Store prices older than this are loaded again
@@ -287,8 +287,9 @@ function findPick(rows, productId, title) {
 export async function getProduct(productId, q) {
   let product = await ProductCache.findOne({ productId: productId, expiresAt: { $gt: new Date() } }).lean()
   const productKey = toProductKey(q || (product && product.q) || '')
-  const fresh = product && product.storesFetchedAt &&
-    Date.now() - new Date(product.storesFetchedAt).getTime() < PRICES_HOURS * HOUR
+  // A demo product page (seeded) is never fetched again.
+  const fresh = product && (product.demo || (product.storesFetchedAt &&
+    Date.now() - new Date(product.storesFetchedAt).getTime() < PRICES_HOURS * HOUR))
   if (!fresh) {
     product = await loadFromSerpApi(productId, productKey, q, product)
   }
@@ -306,6 +307,8 @@ export async function getProduct(productId, q) {
     return a.total - b.total
   })
   const pick = findPick(stores, product.productId, product.title)
+  // The 30-day history, only for the demo products the seed wrote it for. null for any other.
+  const history = await findHistory(product.productId)
 
   return {
     productId: product.productId,
@@ -329,6 +332,9 @@ export async function getProduct(productId, q) {
     stores: stores,
     // The clicked listing ("Your pick"), or null when the search no longer has it.
     pick: pick,
+    history: history,
+    // true for a demo product page (seeded): its details and prices are from fetchedAt
+    demo: Boolean(product.demo),
     fetchedAt: product.storesFetchedAt
   }
 }

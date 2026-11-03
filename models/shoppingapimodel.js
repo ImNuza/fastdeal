@@ -142,6 +142,8 @@ export async function search(q, sessionId) {
       searchTerm: cached.searchTerm || rawQuery,
       listings: cached.listings,
       fetchedAt: cached.fetchedAt,
+      // A demo search (seeded): its prices are from fetchedAt, the capture day
+      demo: Boolean(cached.demo),
       cached: true
     }
   }

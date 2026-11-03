@@ -2,7 +2,7 @@
 // Used by vitest to test the pure functions in services/priceHistory.js
 
 import { describe, it, expect } from 'vitest'
-import { sgDay, storePrices } from '../priceHistory.js'
+import { sgDay, storePrices, seededPrices, summarizeHistory, lastDays, MIN_HISTORY_DAYS } from '../priceHistory.js'
 
 describe('TestSuite1: sgDay', () => {
   it('Test1: gives the Singapore date, which is 8 hours ahead of UTC', () => {
@@ -90,5 +90,77 @@ describe('TestSuite2: storePrices', () => {
       { store: 'A', price: 99.5 },
       { store: 'B', price: 100 }
     ])
+  })
+})
+
+// Daily rows for summarizeHistory: one per day from 1 Oct, with these prices
+function days(prices, source) {
+  return prices.map(function (price, i) {
+    return { day: '2026-10-' + String(i + 1).padStart(2, '0'), price: price, source: source || 'seed' }
+  })
+}
+
+describe('TestSuite3: seededPrices', () => {
+  it('Test1: gives 30 days, oldest first, ending at the real captured price', () => {
+    const rows = seededPrices(100, 0)
+    expect(rows).toHaveLength(30)
+    expect(rows[0].daysAgo).toBe(29)
+    expect(rows[29]).toEqual({ daysAgo: 0, price: 100 })
+  })
+
+  it('Test2: gives the same prices every time, and a sale dip about 10 days ago', () => {
+    expect(seededPrices(100, 2)).toEqual(seededPrices(100, 2))
+    const dip = seededPrices(100, 0).find(function (row) { return row.daysAgo === 10 })
+    expect(dip.price).toBeLessThan(95)
+  })
+})
+
+describe('TestSuite4: summarizeHistory', () => {
+  it('Test1: has no history with fewer than ' + MIN_HISTORY_DAYS + ' days', () => {
+    expect(summarizeHistory([])).toBe(null)
+    expect(summarizeHistory(days([10, 11, 12]))).toBe(null)
+  })
+
+  it('Test2: finds the low, high, average and the day of the low', () => {
+    const prices = [20, 19, 18, 17, 16, 15, 14, 15, 16, 17, 18, 19, 20, 21]
+    const history = summarizeHistory(days(prices))
+    expect(history.days).toBe(14)
+    expect(history.low).toBe(14)
+    expect(history.lowDay).toBe('2026-10-07')
+    expect(history.high).toBe(21)
+    expect(history.average).toBe(17.5)
+    expect(history.last).toBe(21)
+  })
+
+  it('Test3: keeps the lowest price of each day when several stores have one', () => {
+    const rows = days([10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10])
+    rows.push({ day: '2026-10-03', price: 8, source: 'product' })
+    const history = summarizeHistory(rows)
+    expect(history.low).toBe(8)
+    expect(history.days).toBe(14)
+  })
+
+  it('Test4: gives the 7-day change in percent, and marks seeded rows', () => {
+    const history = summarizeHistory(days([10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11]))
+    expect(history.weekChange).toBe(10)
+    expect(history.seeded).toBe(true)
+    expect(summarizeHistory(days([10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10], 'search')).seeded).toBe(false)
+  })
+})
+
+describe('TestSuite5: lastDays', () => {
+  it('Test1: keeps the 30 days back from the newest row, not from today', () => {
+    const rows = [
+      { day: '2026-09-01', price: 5 },
+      { day: '2026-10-05', price: 6 },
+      { day: '2026-10-06', price: 7 },
+      { day: '2026-11-03', price: 8 }
+    ]
+    // 30 days ending 3 Nov start on 5 Oct, so 1 Sep is left out
+    expect(lastDays(rows).map(function (row) { return row.day })).toEqual(['2026-10-05', '2026-10-06', '2026-11-03'])
+  })
+
+  it('Test2: gives no rows for no rows', () => {
+    expect(lastDays([])).toEqual([])
   })
 })

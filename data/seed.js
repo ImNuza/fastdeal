@@ -1,7 +1,14 @@
 // Demo data for the demo@smu.edu.sg account. Run: npm run seed. Safe to run again: it deletes its own rows first.
-// Real data only: no made-up people, prices or searches.
+// Real data, except one thing: the 30-day price history of the demo products.
 //   - Products: data/demo-products.json, five products team members really saved, with the real store,
 //     price, image and Google Shopping product id.
+//   - Demo searches: data/demo-searches.json, 7 real searches and their product pages, saved once by
+//     data/capture-demo.js. They go into searchCache and productCache with demo: true, so these searches
+//     and their product pages never call SerpApi again and stay until DEMO_UNTIL.
+//   - Price history: SerpApi gives none, so the seed writes 30 made-up days for each listing in the demo
+//     searches and each wishlist product (services/priceHistory.js seededPrices), ending on the capture
+//     day at the real captured price. The rows have source 'seed', so the app labels them as demo data
+//     and the Home card never shows them.
 //   - Friends: the team's own accounts. They saved the same products, so Buy Together shows.
 //     One more team account (REQUEST_FROM) has a friend request waiting.
 //     Friends who saved a demo product also send a Buy Together invite or alert to demo.
@@ -16,8 +23,12 @@ import Notification from '../models/notification-model.js'
 import SleepHold from '../models/sleep-hold-model.js'
 import User from '../models/user-model.js'
 import WishlistItem from '../models/wishlist-item-model.js'
+import PriceDay from '../models/price-day-model.js'
+import ProductCache from '../models/product-cache-model.js'
+import SearchCache from '../models/search-cache-model.js'
 import { toPairKey } from '../models/pair-key.js'
 import { toProductKey } from '../models/product-key.js'
+import { seededPrices, sgDay } from '../services/priceHistory.js'
 
 dotenv.config()
 
@@ -27,6 +38,27 @@ const HOUR = 3600000
 const DAY = 24 * HOUR
 
 const products = JSON.parse(readFileSync(new URL('./demo-products.json', import.meta.url), 'utf8'))
+const demo = JSON.parse(readFileSync(new URL('./demo-searches.json', import.meta.url), 'utf8'))
+
+// The demo searches and product pages stay in the cache until after Week 18, when grading ends
+const DEMO_UNTIL = new Date('2027-01-31T00:00:00+08:00')
+// Noon on the capture day: the last day of every seeded history
+const CAPTURED = Date.parse(demo.capturedOn + 'T12:00:00+08:00')
+
+// 30 days of made-up prices for one listing, ending at its real price on the capture day.
+// The productKey is "seed:" + the product id, so these rows never meet a live row.
+// shift gives each product its own line.
+function historyRows(productId, store, price, shift) {
+  return seededPrices(price, shift).map(function (point) {
+    return {
+      updateOne: {
+        filter: { productKey: 'seed:' + productId, store: store, day: sgDay(CAPTURED - point.daysAgo * DAY) },
+        update: { $set: { price: point.price, source: 'seed', productId: productId } },
+        upsert: true
+      }
+    }
+  })
+}
 
 // Team accounts that are friends with demo. Each saved at least one of the demo products.
 const TEAM_FRIENDS = [
@@ -110,6 +142,48 @@ async function seed() {
       }
       return row
     }))
+
+    // Demo searches and their product pages, pinned in the cache (demo: true) until DEMO_UNTIL.
+    // Old demo rows go first, so a page that left the demo searches is fetched live again.
+    await SearchCache.deleteMany({ demo: true })
+    await ProductCache.deleteMany({ demo: true })
+    await SearchCache.bulkWrite(demo.searches.map(function (row) {
+      return {
+        updateOne: {
+          filter: { queryKey: row.queryKey },
+          update: { $set: Object.assign({}, row, { demo: true, expiresAt: DEMO_UNTIL }) },
+          upsert: true
+        }
+      }
+    }))
+    await ProductCache.bulkWrite(demo.pages.map(function (row) {
+      return {
+        updateOne: {
+          filter: { productId: row.productId },
+          update: { $set: Object.assign({}, row, { demo: true, expiresAt: DEMO_UNTIL }) },
+          upsert: true
+        }
+      }
+    }))
+
+    // Price history: 30 days for every listing in the demo searches and every wishlist product.
+    // Old seed rows go first.
+    await PriceDay.deleteMany({ source: 'seed' })
+    // A wishlist product that is also a listing in a demo search keeps the listing's history.
+    let history = []
+    let shift = 0
+    const seeded = []
+    for (const row of demo.searches) {
+      for (const listing of row.listings) {
+        history = history.concat(historyRows(listing.productId, listing.store, listing.price, shift++))
+        seeded.push(listing.productId)
+      }
+    }
+    for (const product of products) {
+      if (seeded.indexOf(product.productId) !== -1) continue
+      history = history.concat(historyRows(product.productId, product.store, product.price, shift++))
+    }
+    await PriceDay.bulkWrite(history, { ordered: false })
 
     // Friends: team accounts that exist in the database. A missing account is skipped.
     const team = await User.find({ email: { $in: [...TEAM_FRIENDS, REQUEST_FROM] } }).select('firebaseUid email username').lean()
@@ -220,7 +294,9 @@ async function seed() {
     await Notification.insertMany(notifications)
 
     console.log(
-      'Seeded demo with ' + products.length + ' wishlist items, ' + friends.length + ' friends, ' +
+      'Seeded demo with ' + products.length + ' wishlist items, ' + demo.searches.length + ' demo searches, ' +
+        demo.pages.length + ' demo product pages, ' + history.length + ' price history days, ' +
+        friends.length + ' friends, ' +
         (requester ? 1 : 0) + ' friend request and ' + notifications.length + ' notifications (' +
         buyTogetherCount + ' about Buy Together)' +
         (demoUserUid ? '. demo.user is clean.' : '. DEMO_USER_FIREBASE_UID is not set, so demo.user was skipped.')

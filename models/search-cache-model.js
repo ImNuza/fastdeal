@@ -25,6 +25,13 @@ const searchCacheSchema = new mongoose.Schema(
       default: Date.now
     },
 
+    // true for the demo searches and product pages the seed writes (data/demo-searches.json).
+    // They are never fetched again, so the demo uses no SerpApi credit and keeps its history.
+    demo: {
+      type: Boolean,
+      default: false
+    },
+
     expiresAt: {
       type: Date,
       required: true
