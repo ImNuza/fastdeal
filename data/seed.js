@@ -4,6 +4,7 @@
 //     price, image and Google Shopping product id.
 //   - Friends: the team's own accounts. They saved the same products, so Buy Together shows.
 //     One more team account (REQUEST_FROM) has a friend request waiting.
+//     Friends who saved a demo product also send a Buy Together invite or alert to demo.
 // demo@smu.edu.sg is an admin. demo.user@smu.edu.sg is a normal user with nothing saved and no friends,
 // so the E2E tests can save, remove and send friend requests from a clean start.
 // Needs MONGODB_URI and DEMO_FIREBASE_UID in .env. Optional: DEMO_USER_FIREBASE_UID.
@@ -161,11 +162,67 @@ async function seed() {
         createdAt: new Date(now - 5 * HOUR)
       })
     }
+
+    // Buy Together: friends who really saved one of the demo products. Nothing is made up: if no
+    // friend saved a demo product, no Buy Together notification is added.
+    const demoKeys = products.map(function (product) { return toProductKey(product.name) })
+    const friendUids = friends.map(function (friend) { return friend.firebaseUid })
+    const friendItems = await WishlistItem.find({
+      firebaseUid: { $in: friendUids },
+      productKey: { $in: demoKeys }
+    }).select('firebaseUid productKey productName').lean()
+
+    const sleepEnded = products[SLEEP_ENDED_INDEX]
+    const sleepEndedKey = toProductKey(sleepEnded.name)
+
+    // The product whose Sleep on it ended: one "Buy together?" alert naming the friends who saved it
+    const names = []
+    for (const item of friendItems) {
+      if (item.productKey !== sleepEndedKey) continue
+      for (const friend of friends) {
+        if (friend.firebaseUid === item.firebaseUid && names.indexOf(friend.username) === -1) names.push(friend.username)
+      }
+    }
+    let buyTogetherCount = 0
+    if (names.length) {
+      notifications.push({
+        firebaseUid: uid,
+        type: 'group-order',
+        title: 'Buy together?',
+        body: names.join(', ') + ' also saved ' + sleepEnded.name + '. Order together to split the shipping.',
+        link: '/notifications',
+        productKey: sleepEndedKey,
+        createdAt: new Date(now - 2 * HOUR)
+      })
+      buyTogetherCount++
+    }
+
+    // Any other shared product: one friend per product invites demo to buy it together
+    const invitedKeys = []
+    for (const item of friendItems) {
+      if (item.productKey === sleepEndedKey || invitedKeys.indexOf(item.productKey) !== -1 || buyTogetherCount >= 4) continue
+      invitedKeys.push(item.productKey)
+      for (const friend of friends) {
+        if (friend.firebaseUid !== item.firebaseUid) continue
+        notifications.push({
+          firebaseUid: uid,
+          type: 'group-invite',
+          title: friend.username + ' wants to buy together!',
+          body: friend.username + ' saved ' + item.productName + ' and wants to split the shipping.',
+          link: '/notifications',
+          productKey: item.productKey,
+          fromUid: friend.firebaseUid,
+          createdAt: new Date(now - (buyTogetherCount + 1) * 3 * HOUR)
+        })
+        buyTogetherCount++
+      }
+    }
     await Notification.insertMany(notifications)
 
     console.log(
       'Seeded demo with ' + products.length + ' wishlist items, ' + friends.length + ' friends, ' +
-        (requester ? 1 : 0) + ' friend request and ' + notifications.length + ' notifications' +
+        (requester ? 1 : 0) + ' friend request and ' + notifications.length + ' notifications (' +
+        buyTogetherCount + ' about Buy Together)' +
         (demoUserUid ? '. demo.user is clean.' : '. DEMO_USER_FIREBASE_UID is not set, so demo.user was skipped.')
     )
   } catch (error) {
