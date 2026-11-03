@@ -206,18 +206,21 @@ const listingsEl = ref(null)
   <div v-else-if="result">
     <FdBreadcrumbs :items="[{ label: 'FastDeal', to: '/' }, { label: itemName(route.query.q) }]" />
     <p v-if="route.query.from === 'photo'" class="small text-secondary mb-1">Identified from your photo</p>
-    <h1 class="fd-page-title">{{ result.name }}</h1>
-    <p class="fd-page-subtitle">Cheapest now is {{ sgd(cheapest) }}.</p>
+    <h1 class="fd-page-title mb-3">{{ result.name }}</h1>
 
     <p v-if="note" class="small mb-3" role="status">{{ note }}</p>
 
     <!-- Price history: the real history of this search once it has enough days, else the demo history. -->
-    <section v-if="chartHistory" class="mb-4">
-      <h2 class="fd-section-title">Price history</h2>
-      <p v-if="searchHistory" class="small text-secondary">Lowest price across all stores each day, from real searches.</p>
-      <p v-else class="small text-secondary">Lowest price each day for the last 30 days, for the cheapest listing in this search (demo data).</p>
-      <FdPriceChart :points="chartHistory" />
+    <section v-if="chartHistory">
+      <FdPriceChart :points="chartHistory"
+        :note="searchHistory
+          ? 'Lowest price across all stores each day, from real searches.'
+          : 'Lowest price each day for the cheapest listing in this search (demo data).'" />
     </section>
+
+    <!-- Product listings: the filters, the cards, and their page buttons -->
+    <section :class="{ 'fd-section-gap': chartHistory }">
+    <h2 class="fd-section-title fd-listings-title">Product listings</h2>
 
     <!-- Phones: the button is the card's header and the filters open under it, in the same box. -->
     <div class="card fd-card-pad mb-3 fd-filters" :class="{ 'is-open': filtersOpen }">
@@ -266,6 +269,7 @@ const listingsEl = ref(null)
         </div>
       </div>
     </div>
+
 
     <p v-if="!rows.length" class="alert alert-warning">No listings match these filters.</p>
 
@@ -320,13 +324,15 @@ const listingsEl = ref(null)
         </li>
       </ul>
 
-      <!-- Sticks to the bottom of the screen while the listings scroll past, like the Wishlist's total bar. -->
+      <!-- Page buttons under the listings. Not sticky: with the "Showing" line the bar is too tall
+           and covered the cards, and no other list page sticks its bar any more. -->
       <div class="fd-listings-bar" :class="{ 'has-pager': listTotal > 0 }">
         <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" noun="listings" label="Listings" :top="listingsEl" />
       </div>
     </div>
+    </section>
 
-    <section v-if="searchedWith.length" class="mt-5">
+    <section v-if="searchedWith.length" class="fd-section-gap">
       <h2 class="fd-section-title fd-also-title">Customers who viewed this also viewed</h2>
       <!-- Below 992px: the first 10 on a belt that rolls past nonstop, the same as Home's Trending Today. -->
       <FdBelt class="d-lg-none" :items="searchedWith.slice(0, 10)" label="Customers who viewed this also viewed">
@@ -363,6 +369,10 @@ const listingsEl = ref(null)
 <style scoped>
 /* A section title, with a little more room above the cards than its usual 0.5rem. */
 .fd-also-title {
+  margin-bottom: 1rem;
+}
+
+.fd-listings-title {
   margin-bottom: 1rem;
 }
 
@@ -415,9 +425,6 @@ const listingsEl = ref(null)
 /* Sticks to the bottom of the screen while scrolling through the listings and settles under
    the last card, like the Wishlist's total bar. */
 .fd-listings-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -593,7 +600,8 @@ const listingsEl = ref(null)
   flex-direction: column;
   justify-content: center;
   gap: 0.75rem;
-  padding: 1rem 0 1.25rem;
+  /* No bottom padding, so the next section sits exactly the section gap below */
+  padding: 1rem 0 0;
 }
 
 </style>

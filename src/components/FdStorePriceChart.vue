@@ -12,6 +12,10 @@ const height = computed(function () {
 })
 
 onMounted(function () {
+  const css = getComputedStyle(document.documentElement)
+  const muted = css.getPropertyValue('--fd-text-muted').trim() || '#585f3e'
+  const line = css.getPropertyValue('--fd-grey-line').trim() || '#d4d1cb'
+  const font = { family: css.getPropertyValue('--fd-font-body').trim() || 'sans-serif', size: 14 }
   const labels = []
   const prices = []
   const colors = []
@@ -33,9 +37,15 @@ onMounted(function () {
       indexAxis: 'y',
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
+      // The app's body font and muted text colour, like the Price history chart
       scales: {
-        x: { beginAtZero: true, ticks: { maxTicksLimit: 6, callback: function (value) { return 'S$' + value } } },
-        y: { grid: { display: false } }
+        x: {
+          beginAtZero: true,
+          border: { display: false },
+          grid: { color: line },
+          ticks: { maxTicksLimit: 6, color: muted, font: font, callback: function (value) { return 'S$' + value } }
+        },
+        y: { grid: { display: false }, ticks: { color: muted, font: font } }
       }
     }
   })
