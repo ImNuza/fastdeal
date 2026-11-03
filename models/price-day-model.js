@@ -25,8 +25,9 @@ const priceDaySchema = new mongoose.Schema(
     },
 
     // Where this price came from: 'search' (a live search) or 'product' (a live product page).
-    // null for rows the seed script wrote, which are made up for the demo account; the Home
-    // price tracking only plots rows with a source, so it never shows seeded prices.
+    // 'seed' for the made-up 30-day history of the demo products (data/seed.js), keyed
+    // "seed:<productId>". Only these rows make a history. The Home "Comparing pays" card reads only
+    // 'search' and 'product' rows, so it never shows seeded prices.
     source: {
       type: String,
       default: null

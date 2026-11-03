@@ -39,8 +39,12 @@ Run `npm run build` and `npm run test:e2e` before a change goes to `main`.
 - Demo logins: `demo@smu.edu.sg` (admin, has the demo data) and `demo.user@smu.edu.sg` (normal user). Same password, read from `E2E_DEMO_PASSWORD` in `.env`. A test tagged `@admin` or `@user` in its title runs as that account. An untagged test runs logged out.
 - Selectors: `getByRole`, then `getByLabel`, then `data-testid="feature-element"`. Never CSS classes.
 - Tests must not create users. Run `npm run seed` before a full run. The seed keeps `demo@smu.edu.sg` as admin.
-- The seed uses real data only: products from `data/demo-products.json` (saved by team members), the team accounts
-  as demo's friends, and a friend request from `dewa`. `demo.user@smu.edu.sg` stays empty, with no friends.
+- The seed uses real data, with one exception: products from `data/demo-products.json` (saved by team members), the team
+  accounts as demo's friends, and a friend request from `dewa`. `demo.user@smu.edu.sg` stays empty, with no friends.
+  The exception: 30 made-up days of price history (`source: 'seed'` in `priceDays`) for every listing in the 7 demo
+  searches (`data/demo-searches.json`) and the 5 wishlist products. Only those products have history.
+- `data/demo-searches.json` is saved once by `node data/capture-demo.js` (about 90 SerpApi searches). Do not run it
+  again without a reason. The seed pins those searches and product pages in the cache (`demo: true`) until 31 Jan 2027.
 
 ## Keys
 - Keys live in `.env` (not tracked). Never print, paste or log a key value.

@@ -15,7 +15,7 @@ import { search,identifyImage } from './models/shoppingapimodel.js'
 import { worthIt } from './models/worth-it-model.js'
 import SearchLog from './models/search-log-model.js'
 import PriceDay from './models/price-day-model.js'
-import { sgDay } from './services/priceHistory.js'
+import { sgDay, findHistory, historyByProductId } from './services/priceHistory.js'
 import { SALE_EVENTS, STORE_SALES } from './data/sale-calendar.js'
 import { toProductKey } from './models/product-key.js'
 import Notification from './models/notification-model.js'
@@ -454,6 +454,11 @@ app.get('/api/search', async (req, res) => {
   try {
     // search() also writes the searchLogs row for Trending (only when sid is sent).
     const result = await search(req.query.q, req.query.sid)
+    // Each listing with a 30-day history gets it as listing.history (the demo searches only).
+    const histories = await historyByProductId(result.listings.map(function (row) { return row.productId }))
+    result.listings = result.listings.map(function (row) {
+      return histories[row.productId] ? Object.assign({}, row, { history: histories[row.productId] }) : row
+    })
     res.json(result)
   } catch (error) {
     // The serpapi library rejects with a plain string, so error.message can be missing.
@@ -550,6 +555,13 @@ app.get('/api/product/:productId', async (req, res) => {
   } catch (error) {
     res.status(404).json({ error: String((error && error.message) || error) })
   }
+})
+
+// 30-day price history for one product, by its product id (a wishlist item has it).
+// { history: null } for a product without a seeded history (only the demo products have one).
+app.get('/api/price-history', async (req, res) => {
+  const history = await findHistory(text(req.query.productId))
+  res.json({ history: history })
 })
 
 // AI "Worth It" verdict: buy now or wait for a big sale, for one product.

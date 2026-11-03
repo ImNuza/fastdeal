@@ -111,16 +111,38 @@ Free plan limits: SerpApi gives 250 searches a month per key. To save searches, 
 each search for 6 hours and each product page for 24 hours, and a repeat uses no search.
 Each AI verdict is kept for the rest of the day.
 
+6a. Demo searches and price history
+-----------------------------------
+SerpApi gives no price history. So FastDeal has 7 demo searches whose listings have a 30-day price
+history. Type one of these in the search bar (case and extra spaces do not matter):
+  Apple iPhone 16 Pro
+  Sony WH-1000XM5 wireless headphones
+  Owala bottle
+  Dyson V15 Detect
+  Nespresso Capsules 50 Pack
+  Kindle Paperwhite
+  Samsung Galaxy S25 Ultra
+- The searches and their product pages are real SerpApi results, saved once by
+  node data/capture-demo.js into data/demo-searches.json. npm run seed puts them in the cache with
+  demo: true, so they never call SerpApi again. Their prices are from the capture day.
+- The 30-day history is made up: npm run seed writes 30 days for each listing in these searches and
+  each demo wishlist product, ending at the real captured price. The rows have source "seed".
+- Any other search is live, and its products have no history.
+- API: GET /api/search gives listing.history for each listing that has one, GET /api/product/:id
+  gives history (or null), and GET /api/price-history?productId= gives { history }.
+  history is { days, low, lowDay, high, average, last, weekChange, seeded, points: [{ day, price }] }.
+
 
 7. Tests
 --------
 Two kinds of tests. Neither one calls SerpApi or Gemini: the tests use saved responses from
 tests/fixtures/.
 
-Unit tests (Vitest), 89 tests in 11 files, in the __tests__ folders:
+Unit tests (Vitest), 97 tests in 11 files, in the __tests__ folders:
   npm run test:unit
 They test the pure logic: the typical price, the store price rows, the budget planner, the AI verdict
-inputs, prompt and rule fallback, the SerpApi key fallback, keys, formats and search history.
+inputs, prompt and rule fallback, the seeded price history and its 30-day window, the SerpApi key
+fallback, keys, formats and search history.
 
 End-to-end tests (Playwright), 34 tests in 11 files, in tests/:
 1. Once, install the browser:
