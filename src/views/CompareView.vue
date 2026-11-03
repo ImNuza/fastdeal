@@ -65,12 +65,14 @@ const chartHistory = computed(function () {
   if (searchHistory.value) {
     return searchHistory.value
   }
+  // The cheapest listing that has a history, so the last point matches the cheapest price shown.
+  let best = null
   for (const row of result.value.listings) {
-    if (row.history) {
-      return row.history.points
+    if (row.history && (!best || row.price < best.price)) {
+      best = row
     }
   }
-  return null
+  return best ? best.history.points : null
 })
 const alsoShown = ref(ALSO_ROW)
 
@@ -213,7 +215,7 @@ const listingsEl = ref(null)
     <section v-if="chartHistory" class="mb-4">
       <h2 class="fd-section-title">Price history</h2>
       <p v-if="searchHistory" class="small text-secondary">Lowest price across all stores each day, from real searches.</p>
-      <p v-else class="small text-secondary">Lowest price each day for the last 30 days, for one listing in this search (demo data).</p>
+      <p v-else class="small text-secondary">Lowest price each day for the last 30 days, for the cheapest listing in this search (demo data).</p>
       <FdPriceChart :points="chartHistory" />
     </section>
 
