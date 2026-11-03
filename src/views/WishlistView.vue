@@ -420,9 +420,31 @@ function openBudget(draft, event) {
 }
 
 function closeBudget() {
+  confirmClose.value = false
   askingName.value = false
   closeDraft()
   nextTick(() => budgetOpener?.focus())
+}
+
+// Closing asks first when something would be lost: a new budget with anything filled in, or a
+// saved one changed since its last save (it only saves itself after Find best combination).
+// The ask takes the budget pop-up's place instead of stacking on it; Cancel brings it back.
+const confirmClose = ref(false)
+const closeButton = ref(null)
+
+const unsavedBudget = computed(function () {
+  if (editingDraft.value) return draftChanged.value
+  return budget.value !== '' || included.value.length > 0 || plan.value !== null
+})
+
+function requestCloseBudget() {
+  if (unsavedBudget.value) confirmClose.value = true
+  else closeBudget()
+}
+
+function cancelCloseBudget() {
+  confirmClose.value = false
+  nextTick(() => closeButton.value?.focus())
 }
 
 // Save as draft: a saved budget updates under its name; a new one asks for a name first.
@@ -702,7 +724,8 @@ const listTotal = computed(function () { return listRows.value.length })
 
   <!-- Plan a budget pop-up for one budget: its name, the budget, and the ranked items. Opened from
        the budget list in the Plan a budget tab. Uses the welcome prompt's dialog styles from app.css. -->
-  <div v-if="editing" class="fd-entry-backdrop" @click.self="closeBudget" @keydown.esc="closeBudget">
+  <div v-if="editing" v-show="!confirmClose" class="fd-entry-backdrop" @click.self="requestCloseBudget"
+    @keydown.esc="requestCloseBudget">
     <section class="fd-entry-dialog fd-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="fd-budget-title">
       <h2 id="fd-budget-title" class="fd-page-title">{{ editingDraft ? editingDraft.name : 'Plan a budget' }}</h2>
 
@@ -765,11 +788,11 @@ const listTotal = computed(function () { return listRows.value.length })
             <span>{{ sgd(option.left) }} left of {{ sgd(Number(budget)) }}</span>
           </p>
           <!-- Always shown once there is a result. With only one mix there is nothing else to try. -->
-          <button class="btn btn-dark fd-btn-lg w-100 mb-2" type="button"
+          <button class="btn btn-dark fd-btn-lg d-block w-100" type="button"
             :disabled="!plan.saved && plan.options.length < 2"
             @click="nextOption">{{ !plan.saved && plan.options.length < 2 ? 'No other combination fits' : 'Try another combination' }}</button>
         </template>
-        <p v-else class="alert alert-secondary mb-3">
+        <p v-else class="alert alert-secondary mb-0">
           Nothing fits in {{ sgd(Number(budget)) }}.
           <template v-if="cheapestPlannable()">The cheapest item is {{ cheapestPlannable().name }} at {{
             sgd(best(cheapestPlannable()).price) }}.</template>
@@ -777,7 +800,8 @@ const listTotal = computed(function () { return listRows.value.length })
 
       </section>
 
-      <button class="btn btn-outline-dark fd-btn-lg w-100 mt-2" type="button" @click="closeBudget">Close</button>
+      <button ref="closeButton" class="btn btn-outline-dark fd-btn-lg d-block w-100 fd-budget-close" type="button"
+        @click="requestCloseBudget">Close</button>
 
       <!-- Save for later, under Close once there is a result. A new budget asks for its name first. -->
       <template v-if="plan">
@@ -921,6 +945,23 @@ const listTotal = computed(function () { return listRows.value.length })
     </template>
     <template v-else>
       Delete the budget <strong>{{ confirmRemove.name }}</strong>? Your saved products stay on the wishlist.
+    </template>
+  </FdConfirmDialog>
+
+  <FdConfirmDialog
+    v-if="confirmClose"
+    title="Close without saving?"
+    confirm-label="Close"
+    danger
+    @confirm="closeBudget"
+    @cancel="cancelCloseBudget"
+  >
+    <template v-if="editingDraft">
+      Your changes to <strong>{{ editingDraft.name }}</strong> will not be saved.
+    </template>
+    <template v-else>
+      This budget has not been saved, so it will be lost.
+      <template v-if="plan">Use <strong>Save it for later</strong> to keep it.</template>
     </template>
   </FdConfirmDialog>
 </template>
@@ -1483,6 +1524,11 @@ span.fd-wish-product {
 .fd-budget-total strong {
   color: var(--fd-blue);
   font-size: var(--fd-body);
+}
+
+/* Same gap as the buttons in the other pop-ups (.fd-entry-actions) */
+.fd-budget-close {
+  margin-top: 0.75rem;
 }
 
 /* ===================================
