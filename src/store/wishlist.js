@@ -217,7 +217,16 @@ export const useWishlistStore = defineStore('wishlist', () => {
         sleepVerdictSeen: false
       })
     }
-    write(function () { return axios.post('/api/wishlist', body) })
+    // A new item's target comes back from the server, which may set it from the AI.
+    write(async function () {
+      const res = await axios.post('/api/wishlist', body)
+      const item = findSaved(body.name, body.productId)
+      if (item && res.data && !saved) {
+        item.targetPrice = res.data.targetPrice
+        item.targetSource = res.data.targetSource
+        item.targetReason = res.data.targetReason
+      }
+    })
   }
 
   // The store a saved product was saved from, or '' if it is not saved or the store was not recorded.
@@ -244,6 +253,8 @@ export const useWishlistStore = defineStore('wishlist', () => {
     }
 
     item.targetPrice = newTarget
+    item.targetSource = null
+    item.targetReason = null
 
     return write(function () {
       return axios.patch(keyPath(item), {

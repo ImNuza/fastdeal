@@ -13,6 +13,7 @@ import Friendship from './models/friendship-model.js'
 import { toPairKey } from './models/pair-key.js'
 import { search,identifyImage } from './models/shoppingapimodel.js'
 import { worthIt } from './models/worth-it-model.js'
+import { suggestTarget } from './models/target-price-model.js'
 import SearchLog from './models/search-log-model.js'
 import PriceDay from './models/price-day-model.js'
 import { sgDay, findHistory, findSearchHistory, historyByProductId } from './services/priceHistory.js'
@@ -1012,6 +1013,8 @@ function toWishItem(row) {
     savedPrice: row.savedPrice,
     savedStore: row.savedStore,
     targetPrice: row.targetPrice,
+    targetSource: row.targetSource || null,
+    targetReason: row.targetReason || null,
     savedAt: row.savedAt ? row.savedAt.getTime() : 0,
     sleepUntil: row.sleepUntil ? row.sleepUntil.getTime() : 0,
     sleepPriceAtStart: row.sleepPriceAtStart,
@@ -1070,16 +1073,28 @@ app.post('/api/wishlist', requireUser, async (req, res) => {
       await existing.save()
       return res.json(toWishItem(existing))
     }
+    // The target: one sent with the item, else the AI's suggestion when the product has price
+    // history, else 10% under the saved price.
+    const productId = text(req.body.productId) || null
+    let targetPrice = priceOrNull(req.body.targetPrice)
+    let ai = null
+    if (!targetPrice) {
+      const history = await findHistory(productId)
+      ai = history ? await suggestTarget({ name, savedPrice: price, store, history, sale: nextBigSale() }) : null
+      targetPrice = ai ? ai.price : Math.round(price * 0.9 * 100) / 100
+    }
     const row = await WishlistItem.create({
       firebaseUid: req.uid,
       productName: name,
       productKey,
-      productId: text(req.body.productId) || null,
+      productId,
       q: text(req.body.q) || null,
       image: text(req.body.image) || null,
       savedPrice: price,
       savedStore: store,
-      targetPrice: priceOrNull(req.body.targetPrice) || Math.round(price * 0.9 * 100) / 100,
+      targetPrice,
+      targetSource: ai ? 'ai' : null,
+      targetReason: ai ? ai.reason : null,
       savedAt: dateOrNull(req.body.savedAt) || new Date(),
       sleepUntil: dateOrNull(req.body.sleepUntil),
       sleepPriceAtStart: priceOrNull(req.body.sleepPriceAtStart),
@@ -1113,6 +1128,9 @@ app.patch('/api/wishlist/:productKey', requireUser, async (req, res) => {
       // Reset email state only if the target actually changes.
       if (row.targetPrice !== newTarget) {
         set.targetPrice = newTarget
+        // The shopper's own number now, not the AI's.
+        set.targetSource = null
+        set.targetReason = null
         set.targetEmailFor = null
         set.targetNotifiedFor = null
         set.lastCheckedAt = null

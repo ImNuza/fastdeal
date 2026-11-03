@@ -21,9 +21,6 @@ import FdTabs from '../components/FdTabs.vue'
 import FdListSearch from '../components/FdListSearch.vue'
 import FdScrollArea from '../components/FdScrollArea.vue'
 import FdEmptyState from '../components/FdEmptyState.vue'
-import FdTotalBar from '../components/FdTotalBar.vue'
-import FdPager from '../components/FdPager.vue'
-import { useListPages } from '../services/listPages.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -140,7 +137,6 @@ const tabs = computed(function () {
 })
 
 // The tab card (for the pager to scroll back to) and the scrolling list inside it
-const tabsCard = ref(null)
 const scrollArea = ref(null)
 
 watch(myUid, load)
@@ -269,15 +265,20 @@ function initials(f) {
   return name.slice(0, 2).toUpperCase()
 }
 
-// 8 rows a page on every screen, with the page buttons in the bar under the list.
-const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal } = useListPages(
-  function () {
-    if (activeTab.value === 'friends') return shownFriends.value
-    if (activeTab.value === 'add') return searchQuery.value.trim() ? searchResults.value : sent.value
-    return requests.value
-  },
-  [activeTab, friendQuery, searchQuery]
-)
+// The whole list, scrolling inside its card, with the total under the card.
+const listRows = computed(function () {
+  if (activeTab.value === 'friends') return shownFriends.value
+  if (activeTab.value === 'add') return searchQuery.value.trim() ? searchResults.value : sent.value
+  return requests.value
+})
+const listTotal = computed(function () { return listRows.value.length })
+const totalNoun = computed(function () {
+  const one = listTotal.value === 1
+  if (activeTab.value === 'friends') return one ? 'friend' : 'friends'
+  if (activeTab.value === 'requests') return one ? 'request' : 'requests'
+  if (searchQuery.value.trim()) return one ? 'person' : 'people'
+  return one ? 'pending request' : 'pending requests'
+})
 </script>
 
 <template>
@@ -288,7 +289,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
     <p class="fd-page-subtitle">Add friends by their username. If you both want the same thing, buy it together and split the shipping.</p>
 
     <!-- The open tab and the card under it are one piece, like a folder tab. -->
-    <FdTabs ref="tabsCard" v-model="activeTab" :tabs="tabs" label="Friends">
+    <FdTabs v-model="activeTab" :tabs="tabs" label="Friends">
       <p v-if="errorText" class="alert alert-danger" role="alert">{{ errorText }}</p>
       <!-- The search sits above the scrolling list, so the list and its scrollbar start together
            under it. -->
@@ -299,7 +300,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
         <FdListSearch v-model="searchQuery" placeholder="Type a username" label="Search people by username" :busy="searching" />
       </div>
 
-      <FdScrollArea ref="scrollArea" fill label="Friends content" :bar="(activeTab === 'friends' ? friends.length : listTotal) > 0">
+      <FdScrollArea ref="scrollArea" fill page label="Friends content" :bar="(activeTab === 'friends' ? friends.length : listTotal) > 0">
         <!-- Friends -->
         <section v-if="activeTab === 'friends'">
           <div v-if="loadingFriends" class="text-secondary">
@@ -315,7 +316,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
             <p v-if="!shownFriends.length" class="alert alert-secondary">No friends match "{{ friendQuery }}".</p>
 
             <div v-else class="friend-rows">
-              <div v-for="f in pageRows" :key="f.pairKey" class="friend-card">
+              <div v-for="f in listRows" :key="f.pairKey" class="friend-card">
                 <FdAvatar>{{ initials(f) }}</FdAvatar>
                 <div class="friend-info">
                   <div class="friend-username">{{ f.username || '(no username)' }}</div>
@@ -341,7 +342,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
           <!-- Before anything is typed: the requests you sent that are still waiting. -->
           <template v-if="!searchQuery.trim()">
             <div v-if="sent.length" class="friend-rows">
-              <div v-for="req in pageRows" :key="req.pairKey" class="friend-card">
+              <div v-for="req in listRows" :key="req.pairKey" class="friend-card">
                 <FdAvatar>{{ initials(req) }}</FdAvatar>
                 <div class="friend-info">
                   <div class="friend-username">{{ req.username }}</div>
@@ -364,7 +365,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
 
           <!-- Once something is typed: the matching people. -->
           <div v-else-if="searchResults.length" class="friend-rows">
-            <div v-for="r in pageRows" :key="r.pairKey" class="friend-card">
+            <div v-for="r in listRows" :key="r.pairKey" class="friend-card">
               <FdAvatar>{{ initials(r) }}</FdAvatar>
               <div class="friend-info">
                 <div class="friend-username">{{ r.username }}</div>
@@ -403,7 +404,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
         <!-- Requests -->
         <section v-else>
           <div v-if="requests.length" class="friend-rows">
-            <div v-for="req in pageRows" :key="req.pairKey" class="friend-card">
+            <div v-for="req in listRows" :key="req.pairKey" class="friend-card">
               <FdAvatar>{{ initials(req) }}</FdAvatar>
               <div class="friend-info">
                 <div class="friend-username">{{ req.username || req.email }}</div>
@@ -432,9 +433,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
     </FdTabs>
 
     <!-- Sticks to the bottom of the screen while scrolling, like the Wishlist's total bar. -->
-    <FdTotalBar v-if="listTotal > 0" stacked>
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :noun="activeTab === 'friends' ? 'friends' : activeTab === 'requests' ? 'requests' : searchQuery.trim() ? 'people' : 'pending requests'" label="Friends" :top="tabsCard?.panel" />
-    </FdTotalBar>
+    <p v-if="listTotal > 0" class="fd-list-total">Total: {{ listTotal }} {{ totalNoun }}</p>
   </div>
 
   <FdConfirmDialog

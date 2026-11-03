@@ -2,9 +2,9 @@
 import { computed } from 'vue'
 import { PAGE_SIZE } from '../services/listPages.js'
 
-// Page buttons under a list: Prev, the page numbers, and Next, centred, even for one page. The
-// "Showing 9 to 16 of 45 products" line is not shown; screen readers hear it when the page
-// changes. After a move, the top of the list scrolls back into view.
+// Page buttons under a list: Prev, the page numbers, and Next, centred, even for one page, with
+// "Showing 9 to 16 of 45 listings" under them. After a move, the top of the list scrolls back
+// into view.
 const props = defineProps({
   pageCount: {
     type: Number,
@@ -110,7 +110,7 @@ function go(n) {
       </button>
     </div>
 
-    <p class="fd-pager-showing visually-hidden" aria-live="polite">{{ showing }}</p>
+    <p class="fd-pager-showing" aria-live="polite">{{ showing }}</p>
   </nav>
 </template>
 

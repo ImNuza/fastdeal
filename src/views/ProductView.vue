@@ -11,8 +11,6 @@ import { storeToRefs } from 'pinia'
 import { useProductStore } from '../store/product.js'
 import { itemName } from '../services/itemName.js'
 import { fetchWorthIt } from '../services/productApi.js'
-import FdPager from '../components/FdPager.vue'
-import { useListPages } from '../services/listPages.js'
 import FdStorePriceChart from '../components/FdStorePriceChart.vue'
 
 // One product: the listings from its search (the same ones Compare shows), cheapest first, with the
@@ -107,32 +105,6 @@ const saving = computed(function () {
   return { amount: amount, percent: Math.round((amount / row.oldPrice) * 100) }
 })
 
-// All listings shows STORES_IN_VIEW rows at a time and scrolls for the rest. Rows differ in height
-// (a "Listed as" line, a note), so the box is measured to end exactly at the bottom of the third row.
-// Re-measured whenever the rows change size: a new product, or the screen width changing.
-const STORES_IN_VIEW = 3
-const storeRows = ref(null)
-const storesHeight = ref('none')
-let storesObserver = null
-
-function measureStores() {
-  const rows = storeRows.value ? storeRows.value.children : []
-  if (rows.length <= STORES_IN_VIEW) {
-    storesHeight.value = 'none'
-    return
-  }
-  const top = rows[0].getBoundingClientRect().top
-  const bottom = rows[STORES_IN_VIEW - 1].getBoundingClientRect().bottom
-  storesHeight.value = Math.ceil(bottom - top) + 'px'
-}
-
-watch(storeRows, function (el) {
-  storesObserver?.disconnect()
-  if (el) {
-    storesObserver = new ResizeObserver(measureStores)
-    storesObserver.observe(el)
-  }
-})
 
 
 // The verdict as one paragraph: the reason, what it was based on, and the fallback note when
@@ -250,7 +222,6 @@ onMounted(async function () {
 
 // Stop the elapsed timer if the user leaves the page mid-load.
 onUnmounted(function () {
-  storesObserver?.disconnect()
   if (worthItTimer) {
     clearInterval(worthItTimer)
     worthItTimer = null
@@ -268,12 +239,8 @@ const breadcrumbs = computed(function () {
   return items
 })
 
-// 8 rows a page on every screen, with the page buttons in the bar under the list.
-const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal } = useListPages(
-  allStores,
-  null
-)
-const storeTable = ref(null)
+// Every listing at once, with the page scrolling, and the total under the card.
+const listTotal = computed(function () { return allStores.value.length })
 </script>
 
 <template>
@@ -293,7 +260,7 @@ const storeTable = ref(null)
     <div class="row g-4 g-lg-5 fd-product-hero">
       <div class="col-md-4">
         <div class="fd-product-frame">
-          <img v-if="product.image" :src="product.image" :alt="product.title" class="fd-product-img" />
+          <img v-img-loading v-if="product.image" :src="product.image" :alt="product.title" class="fd-product-img" />
           <span v-else class="fd-product-ph" aria-hidden="true">{{ storeInitial(product.title) }}</span>
         </div>
       </div>
@@ -408,17 +375,17 @@ const storeTable = ref(null)
          table for screen readers. Google Shopping gives no shipping amount, so there is no Total column. -->
     <!-- Holds the listings and their bar, so the bar sticks only while the listings scroll past. -->
     <div class="fd-store-block">
-    <div ref="storeTable" class="fd-store-table fd-store-panel" role="table" aria-label="All listings">
+    <div class="fd-store-table fd-store-panel" role="table" aria-label="All listings">
       <div class="fd-store-head" role="row">
         <span role="columnheader">Store</span>
         <span role="columnheader">Price</span>
         <span role="columnheader">Shipping</span>
         <span role="columnheader"><span class="visually-hidden">Link</span></span>
       </div>
-      <!-- Three listings at a time; the rest scroll inside, with the brand scrollbar like the Wishlist. -->
-      <FdScrollArea label="All listings" class="fd-store-scroll" :style="{ maxHeight: storesHeight }">
-      <div ref="storeRows" class="fd-store-rows" role="rowgroup">
-        <div v-for="(row, i) in pageRows" :key="i + row.store" class="fd-store-row" role="row">
+      <!-- Every listing; the page scrolls, like the Wishlist. -->
+      <FdScrollArea page label="All listings">
+      <div class="fd-store-rows" role="rowgroup">
+        <div v-for="(row, i) in allStores" :key="i + row.store" class="fd-store-row" role="row">
           <div class="fd-store-cell fd-store-cell-name" role="cell">
             <strong class="d-block">{{ row.store }}</strong>
             <span v-if="row.note" class="d-block small text-secondary">{{ row.note }}</span>
@@ -431,7 +398,8 @@ const storeTable = ref(null)
           <div class="fd-store-cell" role="cell">
             <span class="fd-store-label" aria-hidden="true">Price</span>
             <strong>{{ sgd(row.total) }}</strong>
-            <s v-if="row.oldPrice" class="small text-secondary ms-1">{{ sgd(row.oldPrice) }}</s>
+            <!-- On its own line: beside the price it ran into the Shipping column. -->
+            <s v-if="row.oldPrice" class="d-block small text-secondary">{{ sgd(row.oldPrice) }}</s>
             <!-- Against your pick: Your pick on its own row, else how much less or more. -->
             <span v-if="baseRow && row === baseRow" class="fd-diff fd-diff-pick">{{ pickedRow ? 'Your pick' : 'Cheapest' }}</span>
             <template v-else-if="baseRow">
@@ -457,9 +425,7 @@ const storeTable = ref(null)
       </FdScrollArea>
     </div>
     <!-- The total under the card, worded and placed like the Friends and Wishlist totals. -->
-    <div v-if="listTotal > 0" class="fd-store-foot has-pager">
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" noun="listings" label="Listings" :top="storeTable" />
-    </div>
+    <p v-if="listTotal > 0" class="fd-list-total fd-store-total">Total: {{ listTotal }} {{ listTotal === 1 ? 'listing' : 'listings' }}</p>
     </div>
 
     <!-- What buyers say: one card per review, in a row that scrolls sideways. -->
@@ -506,6 +472,12 @@ const storeTable = ref(null)
 </template>
 
 <style scoped>
+/* The total belongs to the card, so the next section starts closer under it, about the same as
+   the 48px between the other sections. */
+.fd-store-total {
+  margin-bottom: 1.25rem;
+}
+
 /* Cards on this page use the app's card padding token (--fd-card-pad), like every other page. */
 .fd-worth-it {
   /* Block, not Bootstrap's column flex, so the verdict tag can float in the top right corner. */
@@ -539,8 +511,8 @@ const storeTable = ref(null)
 }
 
 .fd-store-head {
-  /* Clear of the scrollbar's column, so the header lines up with the rows (like the Wishlist). */
-  margin: 0 1.75rem 0.75rem 0;
+  /* The full width of the rows, which have no scrollbar beside them (the page scrolls). */
+  margin: 0 0 0.75rem;
   white-space: nowrap;
   border-radius: 999px;
   background: var(--fd-blue);
@@ -549,13 +521,6 @@ const storeTable = ref(null)
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-/* Phones: the listings have no scrollbar (see FdScrollArea), so no room is kept for one. */
-@media (max-width: 767.98px) {
-  .fd-store-head {
-    margin-right: 0;
-  }
 }
 
 /* The card around All listings: paper, vanilla line and corners, like the Wishlist and Friends
@@ -567,24 +532,6 @@ const storeTable = ref(null)
   background: var(--fd-paper);
 }
 
-/* Under the card, on the right: small and muted like the Wishlist's total. It belongs to the
-   card, so the next section starts closer under it: the card's bottom to the next title is about
-   the same as the 48px between the other sections. */
-/* The pager on the left (phones only), the total on the right */
-/* Sticks to the bottom of the screen while scrolling through the listings and settles under
-   the last card, like the Compare page's bar. */
-.fd-store-foot {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem 1rem;
-  margin: 0 0 1.25rem;
-  padding: 0.5rem 0;
-  border-top: var(--fd-border) solid var(--fd-vanilla-line);
-  background: var(--fd-beige);
-}
 
 
 .fd-store-rows {
@@ -873,12 +820,5 @@ const storeTable = ref(null)
 }
 
 
-/* Phones: the page buttons centred, with their "Showing" line under them. */
-.fd-store-foot.has-pager {
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 1rem 0 1.25rem;
-}
 
 </style>
