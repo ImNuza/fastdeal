@@ -632,6 +632,7 @@ button.fd-deck-back:hover {
   .fd-reel .fd-deck-name {
     min-height: 3.45em;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
   }
 }
 
@@ -710,6 +711,7 @@ button.fd-deck-back:hover {
   text-transform: uppercase;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 /* Same as the values band text (.fd-value-text). */
