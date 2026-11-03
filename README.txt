@@ -86,8 +86,8 @@ VPN. Atlas must allow your IP address (Network Access in Atlas).
 ------------------------
 - MONGODB_URI            MongoDB Atlas connection string, database "fastdeal".
 - SERPAPI_API_KEY        SerpApi key (Google Shopping, Google product pages).
-- SERPAPI_API_KEY_2, _3  Optional backup keys. When one key runs out of searches, the server
-                         uses the next one.
+- SERPAPI_API_KEY_2 to _10  Optional backup keys. When one key runs out of searches, the server
+                         uses the next one. A key that is not set is skipped.
 - GEMINI_API_KEY         Google Gemini key (search clean-up, photo search, Worth it verdict).
 - VITE_FIREBASE_*        Firebase Authentication settings for the browser. Not secret.
 - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
@@ -117,7 +117,7 @@ Each AI verdict is kept for the rest of the day.
 Two kinds of tests. Neither one calls SerpApi or Gemini: the tests use saved responses from
 tests/fixtures/.
 
-Unit tests (Vitest), 88 tests in 11 files, in the __tests__ folders:
+Unit tests (Vitest), 89 tests in 11 files, in the __tests__ folders:
   npm run test:unit
 They test the pure logic: the typical price, the store price rows, the budget planner, the AI verdict
 inputs, prompt and rule fallback, the SerpApi key fallback, keys, formats and search history.

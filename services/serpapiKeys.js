@@ -1,4 +1,4 @@
-// SerpApi calls with up to three keys: SERPAPI_API_KEY, SERPAPI_API_KEY_2 and SERPAPI_API_KEY_3.
+// SerpApi calls with up to ten keys: SERPAPI_API_KEY, then SERPAPI_API_KEY_2 to SERPAPI_API_KEY_10.
 // Each free key has its own monthly searches. When SerpApi says a key ran out of searches
 // (or the key is wrong), the call is tried again with the next key, and that key stays in use
 // until the server restarts. A key that is not set is skipped, so one key works too.
@@ -6,10 +6,16 @@ import { getJson } from 'serpapi'
 
 let current = 0
 
+// The highest key number read. A new key only needs to be added to .env (and Render).
+const MAX_KEYS = 10
+
 // Read when called, not at import: server.js loads .env first, but tests and scripts may not.
 function serpKeys() {
-  return [process.env.SERPAPI_API_KEY, process.env.SERPAPI_API_KEY_2, process.env.SERPAPI_API_KEY_3]
-    .filter(Boolean)
+  const keys = [process.env.SERPAPI_API_KEY]
+  for (let n = 2; n <= MAX_KEYS; n++) {
+    keys.push(process.env['SERPAPI_API_KEY_' + n])
+  }
+  return keys.filter(Boolean)
 }
 
 export function hasSerpKey() {
