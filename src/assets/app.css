@@ -624,14 +624,28 @@ tr.cheapest td {
 /* Lists in folder tabs: Friends, Notifications, Wishlist, and Admin's Manage Users share one
    layout. Folder tabs on top (FdTabs), a search and sort row (FdListSearch, .fd-sort), the list
    scrolling inside the card (FdScrollArea with fill), an empty message (FdEmptyState), and the
-   total bar at the bottom of the screen (FdTotalBar). See DESIGN.md. */
+   total under the card (.fd-list-total). See DESIGN.md. */
 
 /* A page built around a tab card fills the screen below the navbar: a short list stretches the
-   card down to the total bar, a longer one makes the page scroll with the bar stuck at the bottom. */
+   card down to the bottom, and a longer one scrolls inside the card. */
 .fd-list-page {
   display: flex;
   flex-direction: column;
   min-height: calc(100svh - var(--fd-nav-height) - 2.5rem);
+}
+
+/* When the page itself scrolls (FdScrollArea page): on phones the card ends with its list, so the
+   page needs no height of its own. From 768px the card always reaches the bottom of the screen,
+   however short the list: the page is one screen tall minus the standard gaps above (40px) and
+   below (64px), so the card, the total under it, and the 64px gap fill exactly one screen. */
+.fd-list-page:has(.fd-scroll-area.is-page) {
+  min-height: 0;
+}
+
+@media (min-width: 768px) {
+  .fd-list-page:has(.fd-scroll-area.is-page) {
+    min-height: calc(100svh - var(--fd-nav-height) - 2.5rem - 4rem);
+  }
 }
 
 /* Folder tabs. No strip behind them: the others sit on the page, and the open one is a raised
@@ -718,10 +732,20 @@ tr.cheapest td {
   flex-direction: column;
   margin-top: calc(var(--fd-border) * -1);
   margin-bottom: 1.5rem;
-  padding: var(--fd-card-pad);
+  /* The same on all four sides; a little more than a card's, as this card holds cards. */
+  padding: var(--fd-panel-pad);
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: var(--fd-radius);
   background: var(--fd-paper);
+}
+
+/* Phones: a list that lets the page scroll is only as tall as its rows, so a short list leaves
+   no empty space at the bottom of the card. From 768px the card stretches down the screen. */
+@media (max-width: 767.98px) {
+  .fd-tabs:has(.fd-scroll-area.is-page),
+  .fd-tabs-panel:has(.fd-scroll-area.is-page) {
+    flex-grow: 0;
+  }
 }
 
 /* With the first tab open, the card's top-left corner is square so the tab joins it cleanly. */
@@ -746,7 +770,7 @@ tr.cheapest td {
   }
 
   .fd-tabs-panel {
-    padding: 1rem;
+    --fd-panel-pad: 1rem;
   }
 }
 
@@ -762,6 +786,17 @@ tr.cheapest td {
 
 .fd-list-tools > .fd-list-search {
   flex: 1 1 16rem;
+}
+
+/* A list in page mode (FdScrollArea page: Wishlist, Friends, Notifications) has no scrollbar,
+   so the row runs the full width, in line with the cards. */
+.fd-tabs-panel:has(.fd-scroll-area.is-page) .fd-list-tools {
+  margin-right: 0;
+}
+
+/* Page mode's card ends with its list, so the total sits right under it. */
+.fd-tabs-panel:has(.fd-scroll-area.is-page) {
+  margin-bottom: 0;
 }
 
 /* Phones: the list has no scrollbar (see FdScrollArea), so no room is kept for one, and the
@@ -1025,4 +1060,35 @@ tr.cheapest td {
   color: #25508c;
   font-size: 6rem;
   line-height: 1;
+}
+
+/* Product photo still loading (v-img-loading): a soft vanilla shimmer across its box. */
+.fd-img-loading {
+  background: linear-gradient(100deg, var(--fd-paper) 30%, var(--fd-vanilla-soft) 50%, var(--fd-paper) 70%) !important;
+  background-size: 300% 100% !important;
+  animation: fd-img-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes fd-img-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fd-img-loading {
+    animation: none;
+    background: var(--fd-vanilla-soft) !important;
+  }
+}
+
+/* The total under a Wishlist, Friends, or Notifications card: small and muted, on the right. */
+.fd-list-total {
+  margin: 0.75rem 0 0;
+  color: var(--fd-text-muted);
+  font-size: var(--fd-small);
+  text-align: right;
 }

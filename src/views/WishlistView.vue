@@ -14,9 +14,6 @@ import { useWishlistStore } from '../store/wishlist.js'
 import FdTabs from '../components/FdTabs.vue'
 import FdListSearch from '../components/FdListSearch.vue'
 import FdEmptyState from '../components/FdEmptyState.vue'
-import FdTotalBar from '../components/FdTotalBar.vue'
-import FdPager from '../components/FdPager.vue'
-import { useListPages } from '../services/listPages.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -137,7 +134,6 @@ const TABS = [
 const activeTab = ref('all')
 
 // The tab card (for the pager to scroll back to) and the scrolling list inside it
-const tabsCard = ref(null)
 const scrollArea = ref(null)
 
 const tabFilters = {
@@ -226,6 +222,9 @@ const shownItems = computed(function () {
 })
 
 // Placeholder for products without a photo: the first letter of the first two words.
+// Saved photos whose link no longer loads show the initials instead, like a product with no photo.
+const brokenImages = ref({})
+
 function initials(name) {
   return name.split(/\s+/).slice(0, 2).map(function (word) { return word.charAt(0) }).join('').toUpperCase()
 }
@@ -495,11 +494,11 @@ function onBuyTogether(item) {
   openBuyTogether(item)
 }
 
-// 8 rows a page on every screen, with the page buttons in the bar under the list.
-const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal } = useListPages(
-  function () { return activeTab.value === 'budget' ? shownDrafts.value : shownItems.value },
-  [activeTab, query, budgetQuery, sortBy, budgetSort]
-)
+// The whole list, scrolling inside its card, with the total under the card.
+const listRows = computed(function () {
+  return activeTab.value === 'budget' ? shownDrafts.value : shownItems.value
+})
+const listTotal = computed(function () { return listRows.value.length })
 </script>
 
 <template>
@@ -514,9 +513,9 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
     <template v-if="user">
       <!-- The open tab and the card under it are one piece, like a folder tab. Search, the column
            header, and the product cards all sit inside it; the cards scroll inside the card. -->
-      <FdTabs ref="tabsCard" v-model="activeTab" :tabs="TABS" label="Wishlist" id-prefix="fd-wtab">
+      <FdTabs v-model="activeTab" :tabs="TABS" label="Wishlist" id-prefix="fd-wtab">
       <!-- Plan a budget: tick, rank, set a budget, and save it as a draft for later -->
-      <FdScrollArea v-if="activeTab === 'budget'" ref="scrollArea" fill label="Plan a budget" :bar="drafts.length > 0">
+      <FdScrollArea v-if="activeTab === 'budget'" ref="scrollArea" fill page label="Plan a budget" :bar="drafts.length > 0">
         <!-- Your budgets: every saved draft, newest first, and a button to start a new one -->
         <div>
           <!-- No budgets: the empty message with New budget centred under it -->
@@ -541,7 +540,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
 
             <FdEmptyState v-if="!shownDrafts.length" icon="search">No budgets match "{{ budgetQuery.trim() }}".</FdEmptyState>
             <ul v-else class="fd-drafts list-unstyled mb-0">
-            <li v-for="d in pageRows" :key="d._id" class="fd-draft">
+            <li v-for="d in listRows" :key="d._id" class="fd-draft">
               <button class="fd-draft-open" type="button" @click="openBudget(d, $event)">
                 <span class="fd-draft-name">{{ d.name }}</span>
                 <span class="small text-secondary">
@@ -597,11 +596,11 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
           </div>
         </div>
 
-        <FdScrollArea ref="scrollArea" fill label="Saved products" :bar="tabItems.length > 0">
+        <FdScrollArea ref="scrollArea" fill page label="Saved products" :bar="tabItems.length > 0">
         <!-- Nothing in this tab: the same icon-and-line empty state as Notifications -->
         <FdEmptyState v-if="!shownItems.length" :icon="emptyIcon">{{ emptyText }}</FdEmptyState>
         <div v-else class="fd-wish-rows" role="rowgroup">
-          <div v-for="item in pageRows" :key="item.name" class="fd-wish-row" :class="{ 'is-asleep': asleep(item) }"
+          <div v-for="item in listRows" :key="item.name" class="fd-wish-row" :class="{ 'is-asleep': asleep(item) }"
             role="row">
             <div class="fd-wish-cell fd-wish-cell-product" role="cell">
               <!-- On hold the photo and name are plain text, not a link, so the product cannot be opened
@@ -609,8 +608,8 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
               <component :is="asleep(item) ? 'span' : 'router-link'" class="fd-wish-product"
                 v-bind="asleep(item) ? { 'aria-disabled': 'true' } : { to: productLink(item) }">
                 <span class="fd-wish-image">
-                  <img v-if="item.image" :src="item.image"
-                    alt="" />
+                  <img v-img-loading v-if="item.image && !brokenImages[item.name]" :src="item.image"
+                    alt="" @error="brokenImages[item.name] = true" />
                   <span v-else>{{ initials(item.name) }}</span>
                 </span>
                 <span class="fd-section-subtitle mb-0">{{ item.name }}</span>
@@ -687,6 +686,10 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
                     <FdIcon name="check" />
                   </span>
                 </div>
+                <!-- Set by the AI from the price history; goes away once the shopper changes the target. -->
+                <p v-if="item.targetSource === 'ai'" class="fd-target-ai" :title="item.targetReason || null">
+                  <span class="fd-ai-tag">AI</span> suggested<span v-if="item.targetReason" class="visually-hidden">: {{ item.targetReason }}</span>
+                </p>
               </div>
               <div class="fd-wish-cell fd-wish-action-cell" role="cell">
                 <div class="fd-wish-action-group">
@@ -728,9 +731,9 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
 
 
     <!-- Last in the page so it can stick to the bottom of the screen and stop above the footer. -->
-    <FdTotalBar v-if="listTotal > 0" stacked>
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :noun="activeTab === 'budget' ? 'budgets' : 'products'" label="Wishlist" :top="tabsCard?.panel" />
-    </FdTotalBar>
+    <p v-if="listTotal > 0" class="fd-list-total">
+      Total: {{ listTotal }} {{ activeTab === 'budget' ? (listTotal === 1 ? 'budget' : 'budgets') : (listTotal === 1 ? 'product' : 'products') }}
+    </p>
   </div>
 
   <!-- Plan a budget pop-up for one budget: its name, the budget, and the ranked items. Opened from
@@ -1121,7 +1124,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
 /* ===================================
    PAGE, TABS, AND CARD
    The tabs, search, sort, empty message, and total bar are the shared ones (FdTabs,
-   FdListSearch, FdEmptyState, FdTotalBar), styled in app.css like Friends and Notifications.
+   FdListSearch, FdEmptyState), styled in app.css like Friends and Notifications.
 =================================== */
 
 /* The column header, then the scrolling cards filling the rest of the card */
@@ -1156,9 +1159,9 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
   padding: var(--fd-row-pad);
 }
 
-/* The header pill sits above the scrolling cards, clear of the scrollbar's column */
+/* The header pill sits above the cards, the same width as them (the page scrolls, no scrollbar). */
 .fd-wish-headbar {
-  margin: 0 1.75rem 0.75rem 0;
+  margin: 0 0 0.75rem;
 }
 
 .fd-wish-head {
@@ -1321,6 +1324,28 @@ span.fd-wish-product {
   color: var(--fd-ink);
   font-size: var(--fd-small);
   font-weight: 700;
+}
+
+/* Under an AI-set target: the small vanilla AI tag (as on the product page), then "suggested". */
+.fd-target-ai {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0.375rem 0 0;
+  color: var(--fd-text-muted);
+  font-size: var(--fd-small);
+  cursor: help;
+}
+
+.fd-ai-tag {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--fd-vanilla);
+  color: var(--fd-ink);
+  font-family: var(--fd-font-body);
+  font-size: var(--fd-small);
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .fd-target-row {

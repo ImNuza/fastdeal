@@ -53,6 +53,18 @@ const wishlistItemSchema = new mongoose.Schema(
       default: null
     },
 
+    // 'ai' while the target is the AI's suggestion from the price history, with its one-line
+    // reason. Both clear when the shopper changes the target.
+    targetSource: {
+      type: String,
+      default: null
+    },
+
+    targetReason: {
+      type: String,
+      default: null
+    },
+
     // 1 = most important. null = not a priority.
     priority: {
       type: Number,

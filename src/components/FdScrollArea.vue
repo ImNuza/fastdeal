@@ -5,7 +5,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 // the top or bottom and a blue handle to drag, since browsers on a Mac hide their own until you
 // scroll. The same scrollbar as the Friends and Notifications cards. The content scrolls natively
 // (wheel, trackpad, touch, keyboard) and the bar follows; the bar can also drive it. When the whole
-// list fits, the handle is half the track at the top and the bar is locked: nothing moves.
+// list fits, the scrollbar is hidden.
 defineProps({
   label: {
     type: String,
@@ -19,6 +19,12 @@ defineProps({
   // For a list in a folder tab card: it fills the rest of the card and grows with a longer
   // list up to --fd-list-max, then scrolls inside
   fill: {
+    type: Boolean,
+    default: false
+  },
+  // No box on any screen: the list runs its full length and the page scrolls, with no scrollbar,
+  // as on phones (Wishlist, Friends, Notifications)
+  page: {
     type: Boolean,
     default: false
   }
@@ -39,12 +45,12 @@ function updateBar() {
   }
   const room = el.scrollHeight - el.clientHeight
   canScroll.value = room > 1
-  // The handle shows how much of the list is in view, shorter the more there is to scroll: never
-  // under 12% so it stays easy to grab, and never over half the track, which is its size when
-  // everything fits.
+  // A short handle, so it travels further down the track: half the share of the list in view,
+  // so it still gets shorter the more there is to scroll, kept between 10% (easy to grab) and
+  // 25% of the track, which is also its size when everything fits.
   thumbSize.value = canScroll.value
-    ? Math.min(Math.max((el.clientHeight / el.scrollHeight) * 100, 12), 50)
-    : 50
+    ? Math.min(Math.max((el.clientHeight / el.scrollHeight) * 50, 10), 25)
+    : 25
   thumbTop.value = canScroll.value ? (el.scrollTop / room) * (100 - thumbSize.value) : 0
 }
 
@@ -110,7 +116,7 @@ defineExpose({ toTop })
 </script>
 
 <template>
-  <div class="fd-scroll-area" :class="{ 'is-fill': fill }">
+  <div class="fd-scroll-area" :class="{ 'is-fill': fill, 'is-page': page }">
     <!-- The list, with an optional footer under it that stays put, such as New budget. The
          scrollbar beside them runs the full height of both. -->
     <div class="fd-scroll-area-main">
@@ -123,7 +129,7 @@ defineExpose({ toTop })
     </div>
 
     <!-- Hidden from screen readers: the list itself scrolls with the keyboard. -->
-    <div v-if="bar" class="fd-scrollbar" :class="{ 'is-locked': !canScroll }" aria-hidden="true">
+    <div v-if="bar && !page" class="fd-scrollbar" :class="{ 'is-locked': !canScroll }" aria-hidden="true">
       <button class="fd-scrollbar-arrow" type="button" tabindex="-1" :disabled="!canScroll" @click="scrollStep(-1)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round"><path d="m18 15-6-6-6 6" /></svg>
@@ -185,6 +191,20 @@ defineExpose({ toTop })
 /* Room after the last item, so at the end of the scroll its bottom edge shows above the line */
 .fd-scroll-area-list > div {
   padding-bottom: 1.25rem;
+}
+
+/* page: no box inside the card on any screen, so the list runs its full length. */
+.fd-scroll-area.is-page {
+  max-height: none !important;
+}
+
+.fd-scroll-area.is-page .fd-scroll-area-list {
+  overflow-y: visible;
+}
+
+/* No box edge to clear, so no extra room after the last row: the card's own padding is enough. */
+.fd-scroll-area.is-page .fd-scroll-area-list > div {
+  padding-bottom: 0;
 }
 
 /* Phones: no box inside the card. The list runs its full length and the page scrolls instead.
@@ -267,20 +287,9 @@ defineExpose({ toTop })
   cursor: grabbing;
 }
 
-/* Nothing to scroll: the handle stays at the top, and nothing moves or reacts to hover. */
-.fd-scrollbar.is-locked .fd-scrollbar-arrow,
-.fd-scrollbar.is-locked .fd-scrollbar-track,
-.fd-scrollbar.is-locked .fd-scrollbar-thumb {
-  cursor: default;
-}
-
-.fd-scrollbar.is-locked .fd-scrollbar-arrow:hover {
-  background: transparent;
-  color: var(--fd-text-muted);
-}
-
-.fd-scrollbar.is-locked .fd-scrollbar-thumb:hover,
-.fd-scrollbar.is-locked .fd-scrollbar-thumb:active {
-  background: var(--fd-blue);
+/* Nothing to scroll: no scrollbar. It keeps its room, so the list does not jump sideways when a
+   longer page needs it again. */
+.fd-scrollbar.is-locked {
+  visibility: hidden;
 }
 </style>

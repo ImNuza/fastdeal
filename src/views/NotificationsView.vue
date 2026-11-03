@@ -13,9 +13,6 @@ import FdTabs from '../components/FdTabs.vue'
 import FdListSearch from '../components/FdListSearch.vue'
 import FdScrollArea from '../components/FdScrollArea.vue'
 import FdEmptyState from '../components/FdEmptyState.vue'
-import FdTotalBar from '../components/FdTotalBar.vue'
-import FdPager from '../components/FdPager.vue'
-import { useListPages } from '../services/listPages.js'
 
 const showTelegramPrompt = ref(false)
 
@@ -65,7 +62,6 @@ function openNotification(n) {
 const activeTab = ref(TABS.some(function (t) { return t.id === route.query.tab }) ? route.query.tab : 'all')
 
 // The tab card (for the pager to scroll back to) and the scrolling list inside it
-const tabsCard = ref(null)
 const scrollArea = ref(null)
 
 function inTab(tab, n) {
@@ -238,11 +234,8 @@ function closeGroupInvite() { inviteItem.value = null }
 
 onMounted(load)
 
-// 8 rows a page on every screen, with the page buttons in the bar under the list.
-const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal } = useListPages(
-  shown,
-  [activeTab, query, show]
-)
+// The whole list, scrolling inside its card, with the total under the card.
+const listTotal = computed(function () { return shown.value.length })
 </script>
 
 <template>
@@ -251,7 +244,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
     <p class="fd-page-subtitle">Price drops, Sleep on it reminders, and news from your friends.</p>
 
     <!-- The open tab and the card under it are one piece, like a folder tab. -->
-    <FdTabs ref="tabsCard" v-model="activeTab" :tabs="tabs" label="Notifications" id-prefix="fd-ntab">
+    <FdTabs v-model="activeTab" :tabs="tabs" label="Notifications" id-prefix="fd-ntab">
       <!-- Search and the filter only once the open tab has something to search, like the Wishlist. -->
       <div v-if="tabItems.length" class="fd-list-tools notif-tools">
         <FdListSearch v-model="query" placeholder="Search notifications" label="Search notifications" />
@@ -262,11 +255,9 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
             <option value="unread">Unread only</option>
           </select>
         </div>
-        <!-- At the end of the search row, not in the sticky bar, which holds only the page buttons. -->
-        <button v-if="totalUnread" class="btn btn-outline-dark notif-mark-all" type="button" @click="markAllRead">Mark all as read</button>
       </div>
 
-      <FdScrollArea ref="scrollArea" fill label="Notifications list" :bar="tabItems.length > 0">
+      <FdScrollArea ref="scrollArea" fill page label="Notifications list" :bar="tabItems.length > 0">
         <FdEmptyState v-if="!tabItems.length" icon="bell">No notifications here yet.</FdEmptyState>
 
         <!-- A search with no matches is a grey note, like Friends' "No friends match". -->
@@ -280,7 +271,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
         <!-- One list with a line between rows: round icon, title with an unread dot, time,
              then the message. Buy Together rows keep their buttons under the message. -->
         <ul v-else class="notif-rows">
-          <li v-for="n in pageRows" :key="n._id" class="notif-row-item">
+          <li v-for="n in shown" :key="n._id" class="notif-row-item">
             <div v-if="isBuyTogether(n) || isGroupInvite(n)" class="notif-row">
               <FdAvatar class="notif-icon" :icon="iconFor(n)" />
               <div class="notif-main">
@@ -312,10 +303,13 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
       </FdScrollArea>
     </FdTabs>
 
-    <!-- Sticks to the bottom of the screen, like the Friends and Wishlist bars. -->
-    <FdTotalBar v-if="listTotal > 0" stacked>
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" noun="notifications" label="Notifications" :top="tabsCard?.panel" />
-    </FdTotalBar>
+    <!-- Under the card: Mark all as read on the left, on every tab; with nothing unread it stays,
+         greyed out, instead of disappearing. The total on the right. -->
+    <div v-if="notifications.length" class="notif-foot">
+      <button class="btn btn-outline-dark notif-mark-all" type="button" :disabled="!totalUnread"
+        @click="markAllRead">{{ totalUnread ? 'Mark all as read' : 'All read' }}</button>
+      <p v-if="listTotal > 0" class="fd-list-total notif-total">Total: {{ listTotal }} {{ listTotal === 1 ? 'notification' : 'notifications' }}</p>
+    </div>
 
     <FdTelegramPrompt v-if="showTelegramPrompt" @close="showTelegramPrompt = false" />
 
@@ -407,8 +401,24 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
   flex-basis: 16rem;
 }
 
-.notif-mark-all {
-  flex-shrink: 0;
+/* All read: the button says so and fades like a disabled pager button. */
+.notif-mark-all:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Under the card: the button on the left, the total on the right, centred on each other. */
+.notif-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.notif-foot .notif-total {
+  margin: 0 0 0 auto;
 }
 
 .notif-rows {

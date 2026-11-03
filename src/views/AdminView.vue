@@ -10,9 +10,6 @@ import { sgd } from '../services/format.js'
 import FdTabs from '../components/FdTabs.vue'
 import FdListSearch from '../components/FdListSearch.vue'
 import FdScrollArea from '../components/FdScrollArea.vue'
-import FdTotalBar from '../components/FdTotalBar.vue'
-import FdPager from '../components/FdPager.vue'
-import { useListPages } from '../services/listPages.js'
 
 const adminStore = useAdminStore()
 const { stats, users, loading, error } = storeToRefs(adminStore)
@@ -31,7 +28,6 @@ const ROLE_TABS = [
 const roleFilter = ref('all')
 
 // The tab card (for the pager to scroll back to) and the scrolling list inside it
-const tabsCard = ref(null)
 const scrollArea = ref(null)
 
 // Day hovered or tapped on each chart; null means today (the last day)
@@ -260,11 +256,8 @@ async function confirmRoleChange() {
   }
 }
 
-// 8 rows a page on every screen, with the page buttons in the bar under the list.
-const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal } = useListPages(
-  filteredUsers,
-  [roleFilter, search, userSort]
-)
+// The whole list, with the page scrolling, and the total under the card, like Notifications.
+const listTotal = computed(function () { return filteredUsers.value.length })
 </script>
 
 <template>
@@ -296,7 +289,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
               :style="{ order: slot.order }">
               <router-link class="fd-stage-link" :to="compareLink(slot.p)">
                 <span class="fd-stage-image">
-                  <img v-if="slot.p.image" :src="slot.p.image" alt="" />
+                  <img v-img-loading v-if="slot.p.image" :src="slot.p.image" alt="" />
                 </span>
                 <span class="fd-stage-name">{{ slot.p.name }}</span>
                 <span class="fd-stage-pill">{{ slot.p.savers }} saved</span>
@@ -315,7 +308,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
               <router-link class="fd-board-row" :to="compareLink(p)">
                 <span class="fd-board-rank">{{ String(i + 4).padStart(2, '0') }}</span>
                 <span class="fd-board-image">
-                  <img v-if="p.image" :src="p.image" alt="" />
+                  <img v-img-loading v-if="p.image" :src="p.image" alt="" />
                 </span>
                 <span class="fd-board-info">
                   <span class="fd-board-name">{{ p.name }}</span>
@@ -445,7 +438,7 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
     <section class="fd-manage">
     <h2 class="fd-section-title">Manage Users</h2>
 
-    <FdTabs ref="tabsCard" v-model="roleFilter" :tabs="ROLE_TABS" label="Users by role" id-prefix="fd-role-tab">
+    <FdTabs v-model="roleFilter" :tabs="ROLE_TABS" label="Users by role" id-prefix="fd-role-tab">
       <!-- Search and sort only once the open tab has someone to search, like the Wishlist. -->
       <div v-if="roleUsers.length" class="fd-list-tools">
         <FdListSearch v-model="search" placeholder="Search name or email" label="Search users by username or email" />
@@ -459,9 +452,9 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
 
       <div v-if="roleSuccess" class="alert alert-success" role="status">{{ roleSuccess }}</div>
 
-      <FdScrollArea ref="scrollArea" class="fd-user-scroll" label="Users list" :bar="roleUsers.length > 0">
+      <FdScrollArea ref="scrollArea" page label="Users list" :bar="roleUsers.length > 0">
         <div v-if="filteredUsers.length" class="fd-user-rows">
-          <div v-for="u in pageRows" :key="u.firebaseUid" class="fd-user-card">
+          <div v-for="u in filteredUsers" :key="u.firebaseUid" class="fd-user-card">
             <FdAvatar>{{ initials(u) }}</FdAvatar>
             <div class="fd-user-info">
               <div class="fd-user-name">
@@ -489,9 +482,9 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
       </FdScrollArea>
     </FdTabs>
 
-    <FdTotalBar v-if="listTotal > 0" stacked>
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :noun="roleFilter === 'admin' ? 'admins' : 'users'" label="Users" :top="tabsCard?.panel" />
-    </FdTotalBar>
+    <p v-if="listTotal > 0" class="fd-list-total">
+      Total: {{ listTotal }} {{ roleFilter === 'admin' ? (listTotal === 1 ? 'admin' : 'admins') : (listTotal === 1 ? 'user' : 'users') }}
+    </p>
     </section>
   </div>
 
@@ -1064,18 +1057,6 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal 
 /* Folder tabs, search, sort, and the total bar are the shared ones (FdTabs and friends, styles in
    app.css). Unlike the other tab lists, this one has a set height: short lists leave white space
    under them, longer ones scroll inside, and the page scrolls around the card. */
-.fd-tabs-panel .fd-user-scroll {
-  flex: 0 0 auto;
-  height: var(--fd-list-max);
-}
-
-/* Phones: no box inside the card. The list runs its full length and the page scrolls instead. */
-@media (max-width: 767.98px) {
-  .fd-tabs-panel .fd-user-scroll {
-    height: auto;
-  }
-}
-
 .fd-user-rows {
   display: flex;
   flex-direction: column;

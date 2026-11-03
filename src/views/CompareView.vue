@@ -274,7 +274,7 @@ const listingsEl = ref(null)
         <li v-for="row in pageRows" :key="rowKey(row)">
           <article class="fd-listing-card" :class="{ cheapest: row.price === lowInView }">
             <div class="fd-listing-media">
-              <img
+              <img v-img-loading
                 v-if="hasImage(row)"
                 :src="row.image"
                 :alt="row.name || result.name"
@@ -326,14 +326,14 @@ const listingsEl = ref(null)
       </div>
     </div>
 
-    <section v-if="searchedWith.length" class="mb-4 mt-4">
+    <section v-if="searchedWith.length" class="mt-5">
       <h2 class="fd-section-title fd-also-title">Customers who viewed this also viewed</h2>
       <!-- Below 992px: the first 10 on a belt that rolls past nonstop, the same as Home's Trending Today. -->
       <FdBelt class="d-lg-none" :items="searchedWith.slice(0, 10)" label="Customers who viewed this also viewed">
         <template #default="{ item, tabindex }">
           <router-link :to="{ path: '/compare', query: { q: item.query } }" class="fd-item-link" :tabindex="tabindex">
             <div class="card h-100 fd-item">
-              <img :src="item.image" alt="" class="fd-item-img">
+              <img v-img-loading :src="item.image" alt="" class="fd-item-img">
               <h5 class="fd-item-title">{{ itemName(item.query) }}</h5>
             </div>
           </router-link>
@@ -345,7 +345,7 @@ const listingsEl = ref(null)
         <div class="col-6 col-md-4 col-lg-3" v-for="item in searchedWith.slice(0, alsoShown)" :key="item._id">
           <router-link :to="{ path: '/compare', query: { q: item.query } }" class="fd-item-link">
             <div class="card h-100 fd-item">
-              <img :src="item.image" class="fd-item-img">
+              <img v-img-loading :src="item.image" class="fd-item-img">
               <h5 class="fd-item-title">{{ itemName(item.query) }}</h5>
             </div>
           </router-link>
@@ -423,7 +423,8 @@ const listingsEl = ref(null)
   justify-content: flex-end;
   /* Same height as the Wishlist's bar, which holds a full-size button. */
   min-height: calc(var(--fd-control) + 1.5rem + var(--fd-border));
-  margin-bottom: 1.5rem;
+  /* Nothing under the bar but the page's own 64px to the footer, or the next section's margin. */
+  margin-bottom: 0;
   padding: 0.75rem 0;
   border-top: var(--fd-border) solid var(--fd-vanilla-line);
   background: var(--fd-beige);

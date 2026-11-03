@@ -354,7 +354,7 @@ onBeforeUnmount(function () {
       <FdBelt v-else :items="trendingToday" label="Trending today">
         <template #default="{ item, tabindex }">
           <router-link :to="{ path: '/compare', query: { q: item.query } }" class="fd-slide" :tabindex="tabindex">
-            <img v-if="showImage(item)" :src="item.image" alt="" class="fd-slide-img"
+            <img v-img-loading v-if="showImage(item)" :src="item.image" alt="" class="fd-slide-img"
               @error="brokenImages[item.query] = true" />
             <span v-else class="fd-slide-img fd-img-tile" aria-hidden="true">{{ initials(itemName(item.query)) }}</span>
             <span class="fd-slide-name">{{ itemName(item.query) }}</span>
@@ -399,7 +399,7 @@ onBeforeUnmount(function () {
               </span>
               <span class="fd-deck-name">{{ itemName(weekItem.query) }}</span>
               <span v-if="weekItem.count" class="fd-deck-meta">Searched {{ weekItem.count }} {{ weekItem.count === 1 ? 'time' : 'times' }}</span>
-              <img v-if="showImage(weekItem)" :src="weekItem.image" alt="" class="fd-deck-img"
+              <img v-img-loading v-if="showImage(weekItem)" :src="weekItem.image" alt="" class="fd-deck-img"
                 @error="brokenImages[weekItem.query] = true" />
               <span v-else class="fd-deck-img fd-img-tile" aria-hidden="true">{{ initials(itemName(weekItem.query)) }}</span>
             </router-link>
@@ -427,7 +427,7 @@ onBeforeUnmount(function () {
               </span>
               <span class="fd-deck-name">{{ itemName(item.query) }}</span>
               <span v-if="item.count" class="fd-deck-meta">Searched {{ item.count }} {{ item.count === 1 ? 'time' : 'times' }}</span>
-              <img v-if="showImage(item)" :src="item.image" alt="" class="fd-deck-img"
+              <img v-img-loading v-if="showImage(item)" :src="item.image" alt="" class="fd-deck-img"
                 @error="brokenImages[item.query] = true" />
               <span v-else class="fd-deck-img fd-img-tile" aria-hidden="true">{{ initials(itemName(item.query)) }}</span>
             </a>
