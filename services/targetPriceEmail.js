@@ -52,10 +52,11 @@ function sgd(n) {
 
 // One target-hit alert per target, and one price-drop alert per new lowest price
 // below the saved price. Each claim is atomic, so two checks at once add one alert.
+// target is the shopper's own target, or null when only the 10% drop alarm applies.
 async function addPriceNotification(item, currentPrice, target, listing) {
   const store = listing.store || 'a store'
 
-  if (currentPrice <= target) {
+  if (target && currentPrice <= target) {
     const claim = await WishlistItem.updateOne(
       { _id: item._id, targetPrice: target, targetNotifiedFor: { $ne: target } },
       { $set: { targetNotifiedFor: target } }
@@ -97,6 +98,23 @@ async function addPriceNotification(item, currentPrice, target, listing) {
 // Limit repeated server-side price searches to once per 30 minutes.
 const RECHECK_MS = 30 * 60 * 1000
 
+// Every saved product has a built-in alarm at 10% under the price it was saved at. A target the
+// shopper types is in addition: the check runs at whichever line the price reaches.
+const DROP_ALARM = 0.9
+
+function dropLine(savedPrice) {
+  return Math.round(Number(savedPrice) * DROP_ALARM * 100) / 100
+}
+
+// The shopper's own target, or null. A target the old automatic rule saved (exactly 10% under the
+// saved price) is the built-in alarm, not the shopper's own.
+export function ownTarget(item) {
+  const target = Number(item.targetPrice)
+  if (!(target > 0)) return null
+  if (item.targetSource === 'user') return target
+  return target === dropLine(item.savedPrice) ? null : target
+}
+
 export async function checkTargetPrice(uid, productKey) {
   // 1. Retrieve the saved product belonging to this user.
   const existing = await WishlistItem.findOne({
@@ -111,7 +129,12 @@ export async function checkTargetPrice(uid, productKey) {
     }
   }
 
-  const target = Number(existing.targetPrice)
+  // stored: the target saved on the item (null when the shopper set none), used to notice a target
+  // change mid-check. own: the shopper's own target. target: the line this check alerts at, the
+  // shopper's own target if they set one, else the 10% drop alarm.
+  const stored = Number(existing.targetPrice) > 0 ? Number(existing.targetPrice) : null
+  const own = ownTarget(existing)
+  const target = own || dropLine(existing.savedPrice)
 
   if (!Number.isFinite(target) || target <= 0) {
     return {
@@ -135,7 +158,7 @@ export async function checkTargetPrice(uid, productKey) {
     {
       _id: existing._id,
       firebaseUid: uid,
-      targetPrice: target,
+      targetPrice: stored,
       targetEmailFor: { $ne: target },
       $or: [
         { lastCheckedAt: null },
@@ -190,7 +213,7 @@ export async function checkTargetPrice(uid, productKey) {
     await WishlistItem.updateOne(
       {
         _id: claimed._id,
-        targetPrice: target
+        targetPrice: stored
       },
       {
         $set: {
@@ -210,7 +233,7 @@ export async function checkTargetPrice(uid, productKey) {
     {
       _id: claimed._id,
       firebaseUid: uid,
-      targetPrice: target
+      targetPrice: stored
     },
     {
       $set: {
@@ -232,7 +255,7 @@ export async function checkTargetPrice(uid, productKey) {
   // 5. Add a target-hit or price-drop alert to the Notifications page.
   // A failure here must not stop the email.
   try {
-    await addPriceNotification(claimed, currentPrice, target, listing)
+    await addPriceNotification(claimed, currentPrice, own, listing)
   } catch (error) {
     console.error('[Price notification] Could not create:', error)
   }
@@ -281,7 +304,7 @@ export async function checkTargetPrice(uid, productKey) {
     {
       _id: claimed._id,
       firebaseUid: uid,
-      targetPrice: target,
+      targetPrice: stored,
       targetEmailFor: { $ne: target }
     },
     {
@@ -311,8 +334,9 @@ export async function checkTargetPrice(uid, productKey) {
       currentPrice,
       store: listing.store || 'Unknown store',
       productLink: listing.link || '',
-      alertType: 'target',
-      targetPrice: target
+      // The shopper's own target reads as a target alert; the built-in alarm as a price drop
+      alertType: own ? 'target' : 'drop',
+      targetPrice: own
     })
   } catch (error) {
     // Gmail rejected the send or the SMTP operation failed.
@@ -322,7 +346,7 @@ export async function checkTargetPrice(uid, productKey) {
         {
           _id: claimed._id,
           firebaseUid: uid,
-          targetPrice: target,
+          targetPrice: stored,
           targetEmailFor: target
         },
         {
@@ -349,7 +373,7 @@ export async function checkTargetPrice(uid, productKey) {
       {
         _id: claimed._id,
         firebaseUid: uid,
-        targetPrice: target,
+        targetPrice: stored,
         targetEmailFor: target
       },
       {

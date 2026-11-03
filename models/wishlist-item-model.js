@@ -53,8 +53,8 @@ const wishlistItemSchema = new mongoose.Schema(
       default: null
     },
 
-    // 'ai' on rows saved when the AI set the target itself. No longer set: the AI now only
-    // suggests (targetSuggestion). Kept so old rows still read.
+    // 'user' when the shopper typed the target. Older rows hold null (the automatic line 10% under
+    // the saved price, which is now the built-in drop alarm) or 'ai'.
     targetSource: {
       type: String,
       default: null
@@ -69,6 +69,13 @@ const wishlistItemSchema = new mongoose.Schema(
 
     targetReason: {
       type: String,
+      default: null
+    },
+
+    // When the AI was last asked for a suggestion, so an item it could not suggest for is asked
+    // again a day later, not on every Wishlist visit
+    targetSuggestedAt: {
+      type: Date,
       default: null
     },
 

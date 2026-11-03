@@ -1015,6 +1015,8 @@ function toWishItem(row) {
     savedPrice: row.savedPrice,
     savedStore: row.savedStore,
     targetPrice: row.targetPrice,
+    // 'user' when the shopper typed the target; older rows may hold the automatic 10% line
+    targetSource: row.targetSource || null,
     targetSuggestion: row.targetSuggestion || null,
     targetReason: row.targetReason || null,
     savedAt: row.savedAt ? row.savedAt.getTime() : 0,
@@ -1068,6 +1070,50 @@ async function cachedListings(productId, q) {
   return []
 }
 
+// The AI's suggested target for a product: { price, reason } or null. Uses the product's 30-day
+// history (the seeded demo history, else the real history of its search), the store listings
+// from the caches, and the next big sale.
+async function suggestFor({ name, savedPrice, store, productId, q }) {
+  const history = await findHistory(productId) || await findSearchHistory(toProductKey(q || name))
+  const listings = summarizeListings(await cachedListings(productId, q))
+  return suggestTarget({ name, savedPrice, store, history, listings, sale: nextBigSale() })
+}
+
+// Fill in the AI suggestion for saved items that have none yet: items saved before suggestions
+// existed, or ones where the AI did not answer. A few at a time, spaced out so Gemini's rate limit
+// is not hit, and an item is asked again at most once a day. Returns the ones it filled.
+const SUGGEST_BATCH = 5
+const SUGGEST_GAP_MS = 1500
+app.post('/api/wishlist/suggest-targets', requireUser, async (req, res) => {
+  try {
+    const dayAgo = new Date(Date.now() - 24 * 3600000)
+    const rows = await WishlistItem.find({
+      firebaseUid: req.uid,
+      targetSuggestion: null,
+      $or: [{ targetSuggestedAt: null }, { targetSuggestedAt: { $lt: dayAgo } }]
+    }).limit(SUGGEST_BATCH)
+    const filled = []
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+      if (i > 0) await new Promise(function (resolve) { setTimeout(resolve, SUGGEST_GAP_MS) })
+      const ai = await suggestFor({
+        name: row.productName, savedPrice: row.savedPrice, store: row.savedStore,
+        productId: row.productId, q: row.q
+      })
+      row.targetSuggestedAt = new Date()
+      if (ai) {
+        row.targetSuggestion = ai.price
+        row.targetReason = ai.reason
+        filled.push({ productKey: row.productKey, targetSuggestion: ai.price, targetReason: ai.reason })
+      }
+      await row.save()
+    }
+    res.json(filled)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Save a product, or switch a saved product to another store and price.
 // targetPrice, savedAt and the sleep fields are used only for a new row: the one-time
 // copy of an old browser wishlist sends them.
@@ -1097,9 +1143,7 @@ app.post('/api/wishlist', requireUser, async (req, res) => {
     const targetPrice = priceOrNull(req.body.targetPrice)
     let ai = null
     if (!targetPrice) {
-      const history = await findHistory(productId)
-      const listings = summarizeListings(await cachedListings(productId, text(req.body.q)))
-      ai = await suggestTarget({ name, savedPrice: price, store, history, listings, sale: nextBigSale() })
+      ai = await suggestFor({ name, savedPrice: price, store, productId, q: text(req.body.q) })
     }
     const row = await WishlistItem.create({
       firebaseUid: req.uid,
@@ -1113,6 +1157,7 @@ app.post('/api/wishlist', requireUser, async (req, res) => {
       targetPrice,
       targetSuggestion: ai ? ai.price : null,
       targetReason: ai ? ai.reason : null,
+      targetSuggestedAt: targetPrice ? null : new Date(),
       savedAt: dateOrNull(req.body.savedAt) || new Date(),
       sleepUntil: dateOrNull(req.body.sleepUntil),
       sleepPriceAtStart: priceOrNull(req.body.sleepPriceAtStart),
@@ -1147,7 +1192,7 @@ app.patch('/api/wishlist/:productKey', requireUser, async (req, res) => {
       if (row.targetPrice !== newTarget) {
         set.targetPrice = newTarget
         // The shopper's own number now. The AI's suggestion stays, as the hint for an empty box.
-        set.targetSource = null
+        set.targetSource = newTarget ? 'user' : null
         set.targetEmailFor = null
         set.targetNotifiedFor = null
         set.lastCheckedAt = null
