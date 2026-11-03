@@ -240,6 +240,21 @@ export const useWishlistStore = defineStore('wishlist', () => {
     return Boolean(findSaved(name, productId))
   }
 
+  // The shopper's own target, or null. Every item also has a built-in alarm 10% under the price it
+  // was saved at (DROP_PERCENT); an older target saved at exactly that line is that alarm, not the
+  // shopper's own, so it does not show in the target box.
+  // Same sum the old automatic target used, so those saved targets match it to the cent
+  function dropLine(item) {
+    return Math.round(Number(item.savedPrice) * (1 - DROP_PERCENT / 100) * 100) / 100
+  }
+
+  function ownTarget(item) {
+    const target = Number(item.targetPrice)
+    if (!(target > 0)) return null
+    if (item.targetSource === 'user') return target
+    return target === dropLine(item) ? null : target
+  }
+
   async function setTarget(name, price) {
     const item = findSaved(name)
 
@@ -255,12 +270,31 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
     // An emptied box clears the target; the AI's suggestion stays as its hint.
     item.targetPrice = newTarget > 0 ? newTarget : null
+    item.targetSource = newTarget > 0 ? 'user' : null
 
     return write(function () {
       return axios.patch(keyPath(item), {
         targetPrice: newTarget
       })
     })
+  }
+
+  // Ask the server to fill in AI suggested targets for saved items that have none yet, then show
+  // them as the target boxes' hints. Quiet: a failure just leaves the boxes plain.
+  async function fillSuggestions() {
+    if (!user.value) return
+    try {
+      const res = await axios.post('/api/wishlist/suggest-targets', {}, { quiet: true })
+      for (const row of res.data || []) {
+        const item = (user.value.wishlist || []).find(function (w) { return w.productKey === row.productKey })
+        if (item) {
+          item.targetSuggestion = row.targetSuggestion
+          item.targetReason = row.targetReason
+        }
+      }
+    } catch (error) {
+      // No suggestions this visit; the next visit asks again
+    }
   }
 
   function removeSaved(name, productId) {
@@ -383,13 +417,13 @@ export const useWishlistStore = defineStore('wishlist', () => {
       // Display the best price in Wishlist.
       livePrices.value[name] = listing
 
-      // Only ask the backend to check when the displayed price
-      // meets the user's target threshold.
+      // Ask the backend to check (and alert) when the price reaches the shopper's own target or the
+      // built-in alarm 10% under the saved price.
+      const own = saved ? ownTarget(saved) : null
       if (
         saved &&
         saved.productKey &&
-        Number(saved.targetPrice) > 0 &&
-        listing.price <= Number(saved.targetPrice)
+        ((own && listing.price <= own) || listing.price <= dropLine(saved))
       ) {
         // Not awaited, so the next price does not wait for the email check.
         checkTarget(saved.productKey)
@@ -427,11 +461,8 @@ export const useWishlistStore = defineStore('wishlist', () => {
   function reached(item) {
     const listing = best(item)
 
-    return Boolean(
-      listing &&
-      Number(item.targetPrice) > 0 &&
-      listing.price <= Number(item.targetPrice)
-    )
+    const own = ownTarget(item)
+    return Boolean(listing && own && listing.price <= own)
   }
 
   // ---------------------------------------------------------------
@@ -828,7 +859,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
   return {
     now,
-    saveProduct, savedFrom, isSaved, setTarget, removeSaved,
+    saveProduct, savedFrom, isSaved, setTarget, ownTarget, removeSaved, fillSuggestions,
     sleepOn, isAsleep, sleepEndsAt, asleep,
     liveLoading, liveErrors, best, loadLivePrice, saving, cheaper, savingPercent, reached,
     verdictItem, verdictLoading, verdictError, hasFinishedSleep, activeVerdict,

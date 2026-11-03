@@ -30,7 +30,7 @@ const {
   buyItem, selected, inviting, inviteSent, error: buyError
 } = storeToRefs(wishlistStore)
 const {
-  removeSaved, setTarget, sleepOn,
+  removeSaved, setTarget, ownTarget, sleepOn, fillSuggestions,
   best, loadLivePrice, saving, cheaper, savingPercent, reached, asleep,
   hasFinishedSleep, openVerdict: loadVerdict, closeVerdict,
   clearPlan, findPlan, nextOption, rankOf, setRank, cheapestPlannable, startDraft, closeDraft, saveDraft, removeDraft,
@@ -74,6 +74,8 @@ onMounted(function () {
   clock = window.setInterval(function () {
     now.value = Date.now()
   }, 30000)
+  // Items saved before AI suggestions existed (or where the AI did not answer) get theirs now
+  fillSuggestions()
 })
 
 onBeforeUnmount(function () {
@@ -238,7 +240,8 @@ function targetHint(item) {
 
 async function onTarget(item, event) {
   const nextTarget = Number(event.target.value)
-  const previousTarget = Number(item.targetPrice)
+  // Compared with the shopper's own target: the box is empty when only the built-in alarm is set
+  const previousTarget = Number(ownTarget(item) || 0)
 
   if (nextTarget === previousTarget) return
 
@@ -685,7 +688,7 @@ const listTotal = computed(function () { return listRows.value.length })
                   <div class="input-group fd-target-input">
                     <span class="input-group-text">S$</span>
                     <input :id="'target-' + item.name" class="form-control" type="number" min="0" step="0.01"
-                      :value="item.targetPrice || ''"
+                      :value="ownTarget(item) || ''"
                       :placeholder="targetHint(item)" :aria-label="'Target price for ' + item.name"
                       @change="onTarget(item, $event)" />
                   </div>
@@ -694,9 +697,9 @@ const listTotal = computed(function () { return listRows.value.length })
                     <FdIcon name="check" />
                   </span>
                 </div>
-                <!-- The box's hint is the AI's suggestion; the tag shows while the box is empty. -->
-                <p v-if="!item.targetPrice && targetHint(item)" class="fd-target-ai" :title="item.targetReason || null">
-                  <span class="fd-ai-tag">AI</span> suggested<span v-if="item.targetReason" class="visually-hidden">: {{ item.targetReason }}</span>
+                <!-- The box's hint is the AI's suggestion; this small note shows while the box is empty. -->
+                <p v-if="!ownTarget(item) && targetHint(item)" class="fd-target-ai" :title="item.targetReason || null">
+                  *AI suggestion<span v-if="item.targetReason" class="visually-hidden">: {{ item.targetReason }}</span>
                 </p>
               </div>
               <div class="fd-wish-cell fd-wish-action-cell" role="cell">
@@ -1337,17 +1340,19 @@ span.fd-wish-product {
   font-weight: 700;
 }
 
-/* The AI's target as a faint hint in the box, lighter than typed text */
+/* The AI's target as a faint grey hint in the box, like "Full name" on a form: only a placeholder,
+   never a value, and it disappears as soon as the box is tapped */
 .fd-target-input .form-control::placeholder {
-  color: var(--fd-text-muted);
-  opacity: 0.45;
+  color: var(--fd-grey-text);
+  opacity: 0.5;
+}
+
+.fd-target-input .form-control:focus::placeholder {
+  color: transparent;
 }
 
 .fd-target-ai {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  margin: 0.375rem 0 0;
+  margin: 0.25rem 0 0;
   color: var(--fd-text-muted);
   font-size: var(--fd-small);
   cursor: help;
