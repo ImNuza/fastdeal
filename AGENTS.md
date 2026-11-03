@@ -50,7 +50,8 @@ Run `npm run build` and `npm run test:e2e` before a change goes to `main`.
 - Keys live in `.env` (not tracked). Never print, paste or log a key value.
 - `SERPAPI_API_KEY`, then `SERPAPI_API_KEY_2` up to `SERPAPI_API_KEY_10`: free plan keys from different members.
   `services/serpapiKeys.js` moves to the next key when one runs out. A key that is not set is skipped. Graders use the app until Week 18.
-- `GEMINI_API_KEY`: used by `models/shoppingapimodel.js` and `models/worth-it-model.js` (cached a day in `worthItCache`).
+- `GEMINI_API_KEY`, then `GEMINI_API_KEY_2` up to `GEMINI_API_KEY_10`: used by `models/shoppingapimodel.js` and
+  `models/worth-it-model.js` (cached a day in `worthItCache`). `services/geminiKeys.js` moves to the next key on any failure.
 - Render has its own copy of the keys. A new key must also be added in the Render dashboard.
 
 ## Gotchas

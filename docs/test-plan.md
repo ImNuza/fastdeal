@@ -196,6 +196,10 @@ Unit: `priceHistory.spec.js` +8 (`seededPrices`, `summarizeHistory`, `lastDays`)
 E2E tests for the history UI come with Zoe's UI, with `history` mocked from a fixture.
 Totals: 34 E2E tests in 11 files, 97 unit tests in 11 files.
 
+Batch 9 (3 Nov): new `services/__tests__/geminiKeys.spec.js` (5 tests, `fetch` mocked): the Gemini key fallback now
+reads `GEMINI_API_KEY_2` up to `_10`.
+Totals: 34 E2E tests in 11 files, 102 unit tests in 12 files.
+
 Batch 4, after Ronald's AI verdict merges: Compare filters and sort, the cheapest badge, the verdict (with a saved Gemini response). About 3 tests. Then check `product.spec.js` and `target-price-alert.spec.js`.
 
 Rules for this batch:

@@ -1,4 +1,4 @@
-// Gemini calls with up to two keys: GEMINI_API_KEY and GEMINI_API_KEY_2.
+// Gemini calls with up to ten keys: GEMINI_API_KEY, then GEMINI_API_KEY_2 to GEMINI_API_KEY_10.
 // Each free key has its own quota. When a Gemini request fails with the current key
 // (quota/auth/rate-limit, or any other error or network failure), the call is tried
 // again with the next key, and that key stays in use until the server restarts.
@@ -6,9 +6,16 @@
 
 let current = 0
 
+// The highest key number read. A new key only needs to be added to .env (and Render).
+const MAX_KEYS = 10
+
 // Read when called, not at import: server.js loads .env first, but tests and scripts may not.
 function geminiKeys() {
-  return [process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY_2].filter(Boolean)
+  const keys = [process.env.GEMINI_API_KEY]
+  for (let n = 2; n <= MAX_KEYS; n++) {
+    keys.push(process.env['GEMINI_API_KEY_' + n])
+  }
+  return keys.filter(Boolean)
 }
 
 export function hasGeminiKey() {
