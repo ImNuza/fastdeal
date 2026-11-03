@@ -21,7 +21,8 @@ function toRow(item, index) {
     rating: Number(item.rating) || 0,
     reviews: Number(item.reviews) || 0,
     freeShipping: Boolean(item.freeShipping),
-    onSale: item.oldPrice != null
+    onSale: item.oldPrice != null,
+    history: item.history || null
   }
 }
 
@@ -50,7 +51,7 @@ async function loadLive(q) {
     // Fire-and-forget: axios attaches the Firebase token (src/services/http.js);
     // a logged-out user gets 401, which we ignore so search is never affected.
     saveRecentSearch(data.query || q, data.productKey)
-    return { name: itemName(data.searchTerm || q), listings: rowsOut, productKey: data.productKey || q }
+    return { name: itemName(data.searchTerm || q), listings: rowsOut, productKey: data.productKey || q, history: data.history ? data.history.points : null }
   } catch (err) {
     return null
   }
@@ -96,7 +97,7 @@ export const useCompareStore = defineStore('compare', () => {
       return
     }
     const related = await orEmpty(fetchSearchedWith(live.productKey))
-    result.value = { name: live.name, listings: live.listings, related: related.slice(0, 8) }
+    result.value = { name: live.name, listings: live.listings, related: related.slice(0, 8), searchHistory: live.history }
     loading.value = false
   }
 

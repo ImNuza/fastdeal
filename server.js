@@ -15,7 +15,7 @@ import { search,identifyImage } from './models/shoppingapimodel.js'
 import { worthIt } from './models/worth-it-model.js'
 import SearchLog from './models/search-log-model.js'
 import PriceDay from './models/price-day-model.js'
-import { sgDay, findHistory, historyByProductId } from './services/priceHistory.js'
+import { sgDay, findHistory, findSearchHistory, historyByProductId } from './services/priceHistory.js'
 import { SALE_EVENTS, STORE_SALES } from './data/sale-calendar.js'
 import { toProductKey } from './models/product-key.js'
 import Notification from './models/notification-model.js'
@@ -459,6 +459,8 @@ app.get('/api/search', async (req, res) => {
     result.listings = result.listings.map(function (row) {
       return histories[row.productId] ? Object.assign({}, row, { history: histories[row.productId] }) : row
     })
+    
+    result.history = await findSearchHistory(result.productKey)
     res.json(result)
   } catch (error) {
     // The serpapi library rejects with a plain string, so error.message can be missing.

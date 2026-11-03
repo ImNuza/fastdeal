@@ -14,6 +14,7 @@ import { useCompareStore } from '../store/compare.js'
 import axios from 'axios'
 import FdPager from '../components/FdPager.vue'
 import FdIcon from '../components/FdIcon.vue'
+import FdPriceChart from '../components/FdPriceChart.vue'
 import { useListPages } from '../services/listPages.js'
 
 const route = useRoute()
@@ -52,6 +53,26 @@ const filtersOn = computed(function () {
 
 //searched with feature
 const searchedWith = ref([])
+
+//price chart
+const searchHistory = computed(function () {
+  return result.value && result.value.searchHistory ? result.value.searchHistory : null
+})
+
+const chartHistory = computed(function () {
+  if (!result.value) {
+    return null
+  }
+  if (searchHistory.value) {
+    return searchHistory.value
+  }
+  for (const row of result.value.listings) {
+    if (row.history) {
+      return row.history.points
+    }
+  }
+  return null
+})
 const showAll = ref(false)
 
 // Image URLs that failed to load, so those cards show the placeholder instead.
@@ -194,6 +215,14 @@ const listingsEl = ref(null)
     <p class="fd-page-subtitle">Cheapest now is {{ sgd(cheapest) }}.</p>
 
     <p v-if="note" class="small mb-3" role="status">{{ note }}</p>
+
+    <!-- Price history: the real history of this search once it has enough days, else the demo history. -->
+    <section v-if="chartHistory" class="mb-4">
+      <h2 class="fd-section-title">Price history</h2>
+      <p v-if="searchHistory" class="small text-secondary">Lowest price across all stores each day, from real searches.</p>
+      <p v-else class="small text-secondary">Lowest price each day for the last 30 days, for one listing in this search (demo data).</p>
+      <FdPriceChart :points="chartHistory" />
+    </section>
 
     <!-- Phones: the button is the card's header and the filters open under it, in the same box. -->
     <div class="card fd-card-pad mb-3 fd-filters" :class="{ 'is-open': filtersOpen }">

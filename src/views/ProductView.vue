@@ -13,6 +13,7 @@ import { itemName } from '../services/itemName.js'
 import { fetchWorthIt } from '../services/productApi.js'
 import FdPager from '../components/FdPager.vue'
 import { useListPages } from '../services/listPages.js'
+import FdStorePriceChart from '../components/FdStorePriceChart.vue'
 
 // One product: the listings from its search (the same ones Compare shows), cheapest first, with the
 // one the shopper clicked as Your pick, the AI verdict, what buyers say and the product details.
@@ -386,6 +387,13 @@ const storeTable = ref(null)
           @click="openAiRead">See how the AI decided</button>
       </template>
       </div>
+    </section>
+
+    <!-- Store prices: one bar per listing, cheapest in green. -->
+    <section v-if="allStores.length > 1" class="mb-5">
+      <h2 class="fd-section-title">Price by store</h2>
+      <p class="small text-secondary">What each store charges for this search. The cheapest is in green.</p>
+      <FdStorePriceChart :rows="allStores" />
     </section>
 
     <h2 id="fd-all-stores" class="fd-section-title">All listings</h2>

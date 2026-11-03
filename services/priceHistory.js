@@ -180,6 +180,20 @@ export async function findHistory(productId) {
   }
 }
 
+
+export async function findSearchHistory(productKey) {
+  if (!productKey) {
+    return null
+  }
+  try {
+    const rows = await PriceDay.find({ productKey: productKey, source: 'search' }).select('day price source').lean()
+    return summarizeHistory(lastDays(rows))
+  } catch (error) {
+    console.error('priceDays read failed:', error.message)
+    return null
+  }
+}
+
 // The history of every listing in one search, by product id, in one database read.
 // { [productId]: history }. A listing with no history is left out.
 export async function historyByProductId(productIds) {
