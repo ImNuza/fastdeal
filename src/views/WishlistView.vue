@@ -131,7 +131,7 @@ function untilText(item) {
 const TABS = [
   { id: 'all', label: 'All' },
   { id: 'drops', label: 'Price drops' },
-  { id: 'sleeping', label: 'Sleeping on it' },
+  { id: 'sleeping', label: 'Sleep on it' },
   { id: 'budget', label: 'Plan a budget' }
 ]
 const activeTab = ref('all')
@@ -495,8 +495,8 @@ function onBuyTogether(item) {
   openBuyTogether(item)
 }
 
-// Phones: 10 rows a page, with the page buttons in the bar. Wider: the count only.
-const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal, isPhone: listOnPhone } = useListPages(
+// 8 rows a page on every screen, with the page buttons in the bar under the list.
+const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal } = useListPages(
   function () { return activeTab.value === 'budget' ? shownDrafts.value : shownItems.value },
   [activeTab, query, budgetQuery, sortBy, budgetSort]
 )
@@ -604,14 +604,17 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
           <div v-for="item in pageRows" :key="item.name" class="fd-wish-row" :class="{ 'is-asleep': asleep(item) }"
             role="row">
             <div class="fd-wish-cell fd-wish-cell-product" role="cell">
-              <router-link class="fd-wish-product" :to="productLink(item)">
+              <!-- On hold the photo and name are plain text, not a link, so the product cannot be opened
+                   (and bought) until the hold ends. -->
+              <component :is="asleep(item) ? 'span' : 'router-link'" class="fd-wish-product"
+                v-bind="asleep(item) ? { 'aria-disabled': 'true' } : { to: productLink(item) }">
                 <span class="fd-wish-image">
                   <img v-if="item.image" :src="item.image"
                     alt="" />
                   <span v-else>{{ initials(item.name) }}</span>
                 </span>
                 <span class="fd-section-subtitle mb-0">{{ item.name }}</span>
-              </router-link>
+              </component>
               <!-- After Sleep on it ends: the verdict link sits under the product name -->
               <button v-if="hasFinishedSleep(item)" class="fd-verdict-link" type="button"
                 @click="openVerdict(item)">
@@ -725,8 +728,8 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
 
 
     <!-- Last in the page so it can stick to the bottom of the screen and stop above the footer. -->
-    <FdTotalBar v-if="listTotal > 0" :stacked="listOnPhone">
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" :noun="activeTab === 'budget' ? 'budgets' : 'products'" label="Wishlist" :top="tabsCard?.panel" />
+    <FdTotalBar v-if="listTotal > 0" stacked>
+      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :noun="activeTab === 'budget' ? 'budgets' : 'products'" label="Wishlist" :top="tabsCard?.panel" />
     </FdTotalBar>
   </div>
 
@@ -1209,6 +1212,11 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
   text-decoration: none;
 }
 
+/* On hold: not a link, so no pointer. */
+span.fd-wish-product {
+  cursor: default;
+}
+
 .fd-wish-product-details {
   display: flex;
   flex-direction: column;
@@ -1433,8 +1441,10 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
     grid-column: 1 / -1;
   }
 
+  /* The countdown drops under the product here, so it centres in the card; the product stays left. */
   .fd-wish-countdown {
-    justify-content: flex-start;
+    justify-content: center;
+    text-align: center;
   }
 
   .fd-wish-label {

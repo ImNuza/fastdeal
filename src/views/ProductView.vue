@@ -267,8 +267,8 @@ const breadcrumbs = computed(function () {
   return items
 })
 
-// Phones: 10 rows a page, with the page buttons in the bar. Wider: the count only.
-const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal, isPhone: listOnPhone } = useListPages(
+// 8 rows a page on every screen, with the page buttons in the bar under the list.
+const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal } = useListPages(
   allStores,
   null
 )
@@ -343,7 +343,7 @@ const storeTable = ref(null)
           </li>
         </ul>
 
-        <!-- Save to wishlist, Sleep on it, then Go to store (your pick's page) in one row. -->
+        <!-- Save to wishlist, then Go to store (your pick's page) in one row. -->
         <SaveSleepButtons :name="product.title" :listing="baseRow ? { store: baseRow.store, price: baseRow.price } : null"
           :product="saveInfo">
           <a v-if="baseRow && baseRow.link" class="btn btn-outline-dark" :href="baseRow.link"
@@ -449,8 +449,8 @@ const storeTable = ref(null)
       </FdScrollArea>
     </div>
     <!-- The total under the card, worded and placed like the Friends and Wishlist totals. -->
-    <div v-if="listTotal > 0" class="fd-store-foot" :class="{ 'has-pager': listOnPhone && listTotal > 0 }">
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" noun="listings" label="Listings" :top="storeTable" />
+    <div v-if="listTotal > 0" class="fd-store-foot has-pager">
+      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" noun="listings" label="Listings" :top="storeTable" />
     </div>
     </div>
 
@@ -710,6 +710,16 @@ const storeTable = ref(null)
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: var(--fd-radius);
   background: var(--fd-white);
+}
+
+/* Phones: the photo sits above the title, so a smaller square, centred, keeps the price and
+   buttons closer to the top of the screen. */
+@media (max-width: 767.98px) {
+  .fd-product-frame {
+    width: 12rem;
+    margin: 0 auto;
+    padding: 1rem;
+  }
 }
 
 /* The whole photo always shows, centred in the square. */

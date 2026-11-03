@@ -238,8 +238,8 @@ function closeGroupInvite() { inviteItem.value = null }
 
 onMounted(load)
 
-// Phones: 10 rows a page, with the page buttons in the bar. Wider: the count only.
-const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal, isPhone: listOnPhone } = useListPages(
+// 8 rows a page on every screen, with the page buttons in the bar under the list.
+const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal } = useListPages(
   shown,
   [activeTab, query, show]
 )
@@ -262,6 +262,8 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
             <option value="unread">Unread only</option>
           </select>
         </div>
+        <!-- At the end of the search row, not in the sticky bar, which holds only the page buttons. -->
+        <button v-if="totalUnread" class="btn btn-outline-dark notif-mark-all" type="button" @click="markAllRead">Mark all as read</button>
       </div>
 
       <FdScrollArea ref="scrollArea" fill label="Notifications list" :bar="tabItems.length > 0">
@@ -311,9 +313,8 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
     </FdTabs>
 
     <!-- Sticks to the bottom of the screen, like the Friends and Wishlist bars. -->
-    <FdTotalBar v-if="listTotal > 0 || totalUnread" :stacked="listOnPhone && listTotal > 0">
-      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" :buttons="listOnPhone" noun="notifications" label="Notifications" :top="tabsCard?.panel" />
-      <button v-if="totalUnread" class="btn btn-outline-dark" type="button" @click="markAllRead">Mark all as read</button>
+    <FdTotalBar v-if="listTotal > 0" stacked>
+      <FdPager v-model="listPage" :page-count="listPageCount" :total="listTotal" noun="notifications" label="Notifications" :top="tabsCard?.panel" />
     </FdTotalBar>
 
     <FdTelegramPrompt v-if="showTelegramPrompt" @close="showTelegramPrompt = false" />
@@ -404,6 +405,10 @@ const { page: listPage, pageCount: listPageCount, pageRows, rowCount: listTotal,
 /* The Show dropdown is a little narrower than a Sort by. */
 .notif-tools .fd-sort {
   flex-basis: 16rem;
+}
+
+.notif-mark-all {
+  flex-shrink: 0;
 }
 
 .notif-rows {

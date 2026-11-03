@@ -3,7 +3,7 @@
 // friends"), and any page-wide button such as Mark all as read. Put it last in a .fd-list-page,
 // so it stops above the footer. Styles are in app.css (.fd-total-bar).
 defineProps({
-  // True while FdPager shows its page buttons (phones), so they centre with the count under them
+  // True while the bar holds FdPager's page buttons, so they centre
   stacked: {
     type: Boolean,
     default: false

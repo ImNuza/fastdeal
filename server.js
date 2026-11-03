@@ -601,7 +601,8 @@ async function topSince(since, until) {
         count: { $sum: 1 }
     } },
     { $sort: { count: -1 } },
-    { $limit: 13 }
+    // Enough for Home: the top 5 for today plus 10 more for the week.
+    { $limit: 15 }
   ])
 }
 

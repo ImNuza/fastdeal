@@ -1,10 +1,12 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import FdSearchBar from '../components/FdSearchBar.vue'
 import FdIcon from '../components/FdIcon.vue'
+import FdBelt from '../components/FdBelt.vue'
 import { itemName } from '../services/itemName.js'
 import axios from 'axios'
 import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
 import { useTrendingStore } from '../store/trending.js'
 
 // Trending cards whose photo is missing or failed to load show the product's initials instead,
@@ -31,31 +33,74 @@ const values = [
 const trendingStore = useTrendingStore()
 const { topToday: trendingToday, todayFrom: trendingFrom, weekExtras: trendingWeek } = storeToRefs(trendingStore)
 
-// Trending Today belt: the cards roll past nonstop, like a conveyor belt. One pass repeats
-// the items until it holds at least BELT_MIN cards (so a short list still fills the screen),
-// and the pass is drawn twice; the animation moves exactly one pass, so it loops seamlessly.
-// It pauses on hover, focus, or touch, and never moves for anyone who asked for reduced motion.
-const BELT_MIN = 8
-const BELT_SECONDS_PER_CARD = 5
-
-const beltPass = computed(function () {
-  const items = trendingToday.value
-  if (!items.length) {
-    return []
-  }
-  let pass = []
-  while (pass.length < BELT_MIN) {
-    pass = pass.concat(items)
-  }
-  return pass
+// Trending This Week: the top 10, one big card at a time.
+// Arrows, a swipe, the arrow keys, or tapping a side card pick the card; both ends wrap around.
+const WEEK_MAX = 10
+const weekTop = computed(function () {
+  return trendingWeek.value.slice(0, WEEK_MAX)
+})
+const weekActive = ref(0)
+const weekItem = computed(function () {
+  return weekTop.value[weekActive.value] || weekTop.value[0]
 })
 
-const beltSeconds = computed(function () {
-  return beltPass.value.length * BELT_SECONDS_PER_CARD
-})
+// Wide screens show the whole top 10 as a row that glides one card over. Tapping the middle card
+// opens Compare; tapping one either side brings it to the middle instead.
+const router = useRouter()
 
-// Touch has no hover, so a finger on the belt holds it still until it lifts.
-const beltHeld = ref(false)
+function weekLink(item) {
+  return { path: '/compare', query: { q: item.query } }
+}
+
+// How far a card sits from the middle one, going the short way round, so the row loops:
+// with #1 in the middle, #10 sits on its left.
+function reelOffset(index) {
+  const count = weekTop.value.length
+  let offset = (index - weekActive.value + count) % count
+  if (offset > count / 2) {
+    offset -= count
+  }
+  return offset
+}
+
+function openReel(index) {
+  if (index === weekActive.value) {
+    router.push(weekLink(weekTop.value[index]))
+  } else {
+    showWeek(index)
+  }
+}
+
+function showWeek(index) {
+  const count = weekTop.value.length
+  if (!count) {
+    return
+  }
+  weekActive.value = (index + count) % count
+}
+
+let swipeStart = null
+
+function onDeckTouchStart(event) {
+  swipeStart = event.touches[0].clientX
+}
+
+function onDeckTouchEnd(event) {
+  if (swipeStart === null) {
+    return
+  }
+  const moved = event.changedTouches[0].clientX - swipeStart
+  swipeStart = null
+  if (Math.abs(moved) > 40) {
+    showWeek(weekActive.value + (moved < 0 ? 1 : -1))
+  }
+}
+
+watch(weekTop, function () {
+  if (weekActive.value >= weekTop.value.length) {
+    weekActive.value = 0
+  }
+})
 
 // Hero
 
@@ -197,7 +242,6 @@ onMounted(function () {
   target = readTarget()
   current = target
   applySpread(current)
-
 })
 
 onMounted(trendingStore.ensureTrending)
@@ -307,51 +351,93 @@ onBeforeUnmount(function () {
       <!-- Early in the day the server sends yesterday's list, so the title says so. -->
       <h2 class="fd-page-title">{{ trendingFrom === 'yesterday' ? 'Trending Yesterday' : 'Trending Today' }}</h2>
       <p v-if="!trendingToday.length" class="fd-trending-empty">Nothing trending yet today.</p>
-      <div
-        v-else
-        class="fd-belt"
-        :class="{ 'is-held': beltHeld }"
-        aria-label="Trending today"
-        @touchstart.passive="beltHeld = true"
-        @touchend="beltHeld = false"
-        @touchcancel="beltHeld = false"
-      >
-        <div class="fd-belt-track" :style="{ '--belt-seconds': beltSeconds + 's' }">
-          <template v-for="copy in 2" :key="'pass-' + copy">
-            <router-link
-              v-for="(item, index) in beltPass"
-              :key="copy + '-' + index"
-              :to="{ path: '/compare', query: { q: item.query } }"
-              class="fd-slide"
-              :tabindex="copy === 1 && index < trendingToday.length ? 0 : -1"
-              :aria-hidden="copy === 2 || index >= trendingToday.length"
-            >
-              <img v-if="showImage(item)" :src="item.image" alt="" class="fd-slide-img"
-                @error="brokenImages[item.query] = true" />
-              <span v-else class="fd-slide-img fd-img-tile" aria-hidden="true">{{ initials(itemName(item.query)) }}</span>
-              <span class="fd-slide-name">{{ itemName(item.query) }}</span>
-            </router-link>
-          </template>
-        </div>
-      </div>
+      <FdBelt v-else :items="trendingToday" label="Trending today">
+        <template #default="{ item, tabindex }">
+          <router-link :to="{ path: '/compare', query: { q: item.query } }" class="fd-slide" :tabindex="tabindex">
+            <img v-if="showImage(item)" :src="item.image" alt="" class="fd-slide-img"
+              @error="brokenImages[item.query] = true" />
+            <span v-else class="fd-slide-img fd-img-tile" aria-hidden="true">{{ initials(itemName(item.query)) }}</span>
+            <span class="fd-slide-name">{{ itemName(item.query) }}</span>
+          </router-link>
+        </template>
+      </FdBelt>
     </div>
   </section>
 
-  <!-- Trending this week: stays on the cream page background. -->
-  <section class="fd-trending-section fd-trending-week">
+  <!-- Trending this week: the top 10, one card at a time with an arrow either side. -->
+  <section v-if="weekTop.length" class="fd-trending-section fd-trending-week">
     <div class="container">
       <h2 class="fd-page-title">Trending This Week</h2>
-      <div class="row g-3">
-        <div class="col-6 col-md-4 col-lg-3" v-for="item in trendingWeek" :key="item._id">
-          <router-link class="fd-week-link" :to="{ path: '/compare', query: { q: item.query } }" style="text-decoration: none;">
-            <div class="card h-100 fd-week-card fd-card-pad" style="border-radius: 1rem;">
-              <img v-if="showImage(item)" :src="item.image" alt="" class="card-img-top" style="display: block; width: 100%; height: 170px; padding: 1.25rem; object-fit: contain; border-radius: 0.75rem; background: var(--fd-white); margin-bottom: 1.25rem;"
-                @error="brokenImages[item.query] = true">
-              <span v-else class="fd-week-tile fd-img-tile" aria-hidden="true">{{ initials(itemName(item.query)) }}</span>
-              <h5 class="card-title" style="margin: 0; font-size: var(--fd-body); font-weight: 600; line-height: 1.3;">{{ itemName(item.query) }}</h5>
-            </div>
-          </router-link>
+      <div
+        class="fd-deck-stage"
+        role="region"
+        aria-roledescription="carousel"
+        aria-label="Trending this week"
+        tabindex="0"
+        @keydown.left.prevent="showWeek(weekActive - 1)"
+        @keydown.right.prevent="showWeek(weekActive + 1)"
+        @touchstart.passive="onDeckTouchStart"
+        @touchend="onDeckTouchEnd"
+      >
+        <button type="button" class="btn btn-outline-dark fd-deck-arrow" aria-label="Previous product" @click="showWeek(weekActive - 1)">
+          <FdIcon name="chevron-left" />
+        </button>
+
+        <!-- Below 992px: the front card on a blank stack, one card tilted out on the left (tap for
+             the previous product) and two peeking on the right (tap for the next). -->
+        <div class="fd-deck">
+          <template v-if="weekTop.length > 1">
+            <button type="button" class="fd-deck-back is-prev" tabindex="-1" aria-hidden="true" @click="showWeek(weekActive - 1)"></button>
+            <span class="fd-deck-back is-next-far" aria-hidden="true"></span>
+            <button type="button" class="fd-deck-back is-next" tabindex="-1" aria-hidden="true" @click="showWeek(weekActive + 1)"></button>
+          </template>
+          <Transition name="fd-deck" mode="out-in">
+            <router-link :key="weekItem._id" :to="weekLink(weekItem)" class="fd-deck-card">
+              <span class="fd-deck-top">
+                <span class="fd-deck-rank">#{{ weekActive + 1 }} this week</span>
+                <span class="fd-deck-go" aria-hidden="true"><FdIcon name="chevron-right" /></span>
+              </span>
+              <span class="fd-deck-name">{{ itemName(weekItem.query) }}</span>
+              <span v-if="weekItem.count" class="fd-deck-meta">Searched {{ weekItem.count }} {{ weekItem.count === 1 ? 'time' : 'times' }}</span>
+              <img v-if="showImage(weekItem)" :src="weekItem.image" alt="" class="fd-deck-img"
+                @error="brokenImages[weekItem.query] = true" />
+              <span v-else class="fd-deck-img fd-img-tile" aria-hidden="true">{{ initials(itemName(weekItem.query)) }}</span>
+            </router-link>
+          </Transition>
         </div>
+
+        <!-- From 992px: the whole top 10 in a row, three in view, gliding one card over. The middle
+             card is blue; the others are paper and shrink back a little. -->
+        <div class="fd-reel">
+          <div class="fd-reel-track">
+            <a
+              v-for="(item, index) in weekTop"
+              :key="item._id"
+              :href="router.resolve(weekLink(item)).href"
+              class="fd-deck-card fd-reel-card"
+              :class="{ 'is-active': index === weekActive, 'is-far': Math.abs(reelOffset(index)) > 2 }"
+              :style="{ '--d': reelOffset(index) }"
+              :tabindex="index === weekActive ? 0 : -1"
+              :aria-hidden="index !== weekActive"
+              @click.prevent="openReel(index)"
+            >
+              <span class="fd-deck-top">
+                <span class="fd-deck-rank">#{{ index + 1 }} this week</span>
+                <span class="fd-deck-go" aria-hidden="true"><FdIcon name="chevron-right" /></span>
+              </span>
+              <span class="fd-deck-name">{{ itemName(item.query) }}</span>
+              <span v-if="item.count" class="fd-deck-meta">Searched {{ item.count }} {{ item.count === 1 ? 'time' : 'times' }}</span>
+              <img v-if="showImage(item)" :src="item.image" alt="" class="fd-deck-img"
+                @error="brokenImages[item.query] = true" />
+              <span v-else class="fd-deck-img fd-img-tile" aria-hidden="true">{{ initials(itemName(item.query)) }}</span>
+            </a>
+          </div>
+        </div>
+
+        <span class="visually-hidden" aria-live="polite">{{ weekActive + 1 }} of {{ weekTop.length }}</span>
+        <button type="button" class="btn btn-outline-dark fd-deck-arrow" aria-label="Next product" @click="showWeek(weekActive + 1)">
+          <FdIcon name="chevron-right" />
+        </button>
       </div>
     </div>
   </section>
@@ -374,69 +460,296 @@ onBeforeUnmount(function () {
   font-size: var(--fd-page-subtitle);
 }
 
-/* Trending Today belt: one long row of cards that rolls left nonstop. The track holds the pass
-   twice, so moving it by half its width lands on an identical frame and the loop never jumps. */
-/* Card width matches the Trending This Week grid (two, three, then four across), worked out
-   from the belt's own width with container units, plus the same 1rem gap. */
-.fd-belt {
-  --gap: 1rem;
-  --card: calc((100cqw - var(--gap)) / 2);
-  container-type: inline-size;
-  overflow: hidden;
-  padding: 0.5rem 0 1rem;
+/* Trending This Week card: blue with beige text, like the values band, with a round 48px
+   arrow either side, centred on the card's height. */
+.fd-deck-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
 }
 
 @media (min-width: 768px) {
-  .fd-belt {
-    --card: calc((100cqw - 2 * var(--gap)) / 3);
+  .fd-deck-stage {
+    gap: 2.5rem;
   }
 }
 
-@media (min-width: 992px) {
-  .fd-belt {
-    --card: calc((100cqw - 3 * var(--gap)) / 4);
-  }
+.fd-deck {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 22rem;
+  border-radius: 1.25rem;
+  touch-action: pan-y;
 }
 
-.fd-belt-track {
+.fd-deck-stage:focus-visible {
+  outline: 3px solid var(--fd-vanilla);
+  outline-offset: 6px;
+  border-radius: 1.25rem;
+}
+
+.fd-deck-card {
+  position: relative;
+  z-index: 3;
   display: flex;
-  gap: var(--gap);
-  width: max-content;
-  animation: fd-belt-roll var(--belt-seconds) linear infinite;
+  flex-direction: column;
+  padding: 1rem 1.5rem 1.25rem;
+  border: var(--fd-border) solid var(--fd-blue);
+  border-radius: 1.25rem;
+  background: var(--fd-blue);
+  /* The one card here with a shadow, so the front card lifts off the stack behind it. */
+  box-shadow: var(--fd-shadow);
+  color: var(--fd-beige);
+  text-decoration: none;
+  transition: border-color 0.2s ease;
 }
 
-/* Hover, keyboard focus, or a finger on it holds the belt still so a card can be read and tapped. */
-.fd-belt:hover .fd-belt-track,
-.fd-belt:focus-within .fd-belt-track,
-.fd-belt.is-held .fd-belt-track {
-  animation-play-state: paused;
+.fd-deck-card:hover {
+  border-color: var(--fd-vanilla);
 }
 
-@keyframes fd-belt-roll {
-  from {
+.fd-deck-card:focus-visible {
+  outline: 3px solid var(--fd-vanilla);
+  outline-offset: 3px;
+}
+
+/* Paper cards behind the front one, like a stack: they keep still while the front card changes. */
+.fd-deck-back {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: var(--fd-border) solid var(--fd-vanilla-line);
+  border-radius: 1.25rem;
+  background: var(--fd-paper);
+}
+
+.fd-deck-back.is-prev {
+  z-index: 2;
+  transform: translate(-9%, 1.25rem) rotate(-5deg) scale(0.92);
+}
+
+.fd-deck-back.is-next {
+  z-index: 2;
+  transform: translate(5%, 0.5rem) rotate(2deg) scale(0.96);
+}
+
+.fd-deck-back.is-next-far {
+  z-index: 1;
+  transform: translate(9%, 1rem) rotate(4deg) scale(0.92);
+}
+
+button.fd-deck-back:hover {
+  border-color: var(--fd-blue);
+}
+
+/* The row of cards is for wide screens only. */
+.fd-reel {
+  display: none;
+}
+
+/* Wide screens: the whole top 10 in a row, three in view, that glides one card over like a scroll.
+   The middle card is the blue one; as it moves the others shrink back to paper. */
+@media (min-width: 992px) {
+  .fd-deck {
+    display: none;
+  }
+
+  /* Cards stay 17rem wide, the same as before; on the narrowest of these screens the arrows sit
+     right against the row, beside the side cards' 10% inset, so all three still fit. */
+  .fd-deck-stage {
+    gap: 0;
+  }
+
+  .fd-reel {
+    --reel-card: 17rem;
+    --reel-gap: 0.75rem;
+    display: block;
+    width: calc(3 * var(--reel-card) + 2 * var(--reel-gap));
+    overflow: hidden;
+    /* Room for the middle card's shadow, which the clip would otherwise cut off. */
+    padding: 0.5rem 0 2rem;
+  }
+
+  /* Every card sits in the same grid cell, moved sideways by its distance from the middle (--d),
+     so the row is as tall as its tallest card and loops round. */
+  .fd-reel-track {
+    display: grid;
+    justify-content: center;
+  }
+
+  .fd-reel-card {
+    grid-area: 1 / 1;
+    width: var(--reel-card);
+    border-color: var(--fd-vanilla-line);
+    background: var(--fd-paper);
+    box-shadow: none;
+    cursor: pointer;
+    transform: translateX(calc(var(--d) * (var(--reel-card) + var(--reel-gap)))) scale(0.9);
+    transition: transform 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), background-color 0.4s ease,
+      border-color 0.4s ease, box-shadow 0.4s ease;
+  }
+
+  /* Cards well out of view jump instead of gliding, so one wrapping round the loop never crosses the row. */
+  .fd-reel-card.is-far {
+    visibility: hidden;
+    transition: none;
+  }
+
+  .fd-reel-card:hover {
+    border-color: var(--fd-blue);
+  }
+
+  .fd-reel-card.is-active {
+    border-color: var(--fd-blue);
+    background: var(--fd-blue);
+    box-shadow: var(--fd-shadow);
     transform: translateX(0);
   }
-  to {
-    /* Half the track plus half a gap: exactly one pass, including the gap after its last card. */
-    transform: translateX(calc(-50% - var(--gap) / 2));
+
+  .fd-reel-card.is-active:hover {
+    border-color: var(--fd-vanilla);
+  }
+
+  /* Paper cards: blue label and title, muted count, fading to the blue card's colours. */
+  .fd-reel-card .fd-deck-rank,
+  .fd-reel-card .fd-deck-name,
+  .fd-reel-card .fd-deck-meta {
+    transition: color 0.4s ease;
+  }
+
+  .fd-reel-card:not(.is-active) .fd-deck-rank,
+  .fd-reel-card:not(.is-active) .fd-deck-name {
+    color: var(--fd-blue);
+  }
+
+  .fd-reel-card:not(.is-active) .fd-deck-meta {
+    color: var(--fd-text-muted);
+  }
+
+  /* The narrower cards wrap names sooner, so they keep three lines, still the same on every card. */
+  .fd-reel .fd-deck-name {
+    min-height: 3.45em;
+    -webkit-line-clamp: 3;
   }
 }
 
-/* Reduced motion: no rolling; the row scrolls sideways by hand instead. */
+@media (min-width: 1200px) {
+  .fd-deck-stage {
+    gap: 1.5rem;
+  }
+
+  .fd-reel {
+    --reel-gap: 1rem;
+  }
+}
+
+/* The arrows sit above the edges of the stack. */
+.fd-deck-arrow {
+  position: relative;
+  z-index: 4;
+}
+
+/* Switching cards: the old one slides out left and fades, the new one slides in from the right. */
+.fd-deck-enter-active,
+.fd-deck-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.fd-deck-enter-from {
+  opacity: 0;
+  transform: translateX(1.5rem);
+}
+
+.fd-deck-leave-to {
+  opacity: 0;
+  transform: translateX(-1.5rem);
+}
+
+.fd-deck-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+/* Eyebrow type (see .fd-eyebrow), in beige like all text on blue. */
+.fd-deck-rank {
+  color: var(--fd-beige);
+  font-size: var(--fd-eyebrow);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fd-deck-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--fd-control-sm);
+  height: var(--fd-control-sm);
+  border-radius: 50%;
+  background: var(--fd-vanilla);
+  color: var(--fd-blue);
+}
+
+/* Same type as the values band titles (.fd-value-title). Always two lines tall, so every card is the same height
+   and the arrows beside it stay put. */
+.fd-deck-name {
+  display: -webkit-box;
+  overflow: hidden;
+  min-height: 2.3em;
+  margin-bottom: 0.25rem;
+  color: var(--fd-beige);
+  font-family: var(--fd-font-display);
+  font-size: var(--fd-section-title);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  text-transform: uppercase;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Same as the values band text (.fd-value-text). */
+.fd-deck-meta {
+  margin: 0;
+  color: color-mix(in srgb, var(--fd-beige) 85%, transparent);
+  font-size: var(--fd-body);
+}
+
+/* Square white photo tile at the bottom of the card, like the other product photos. */
+.fd-deck-img {
+  width: 100%;
+  aspect-ratio: 1;
+  margin-top: 0.75rem;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  background: var(--fd-white);
+  object-fit: contain;
+}
+
+.fd-deck-arrow {
+  flex-shrink: 0;
+  width: var(--fd-control);
+  height: var(--fd-control);
+  padding: 0;
+  border-radius: 50%;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .fd-belt {
-    overflow-x: auto;
-  }
-
-  .fd-belt-track {
-    animation: none;
+  .fd-deck-enter-active,
+  .fd-deck-leave-active,
+  .fd-reel-track,
+  .fd-reel-card {
+    transition: none;
   }
 }
 
-/* Each card matches a Trending This Week card: white photo area, then the name. The whole card is the link. */
+/* Each Trending Today card: white photo area, then the name. The whole card is the link. */
 .fd-slide {
   display: flex;
-  flex: 0 0 var(--card);
   flex-direction: column;
   padding: var(--fd-card-pad);
   border: var(--fd-border) solid var(--fd-vanilla-line);
@@ -480,14 +793,6 @@ onBeforeUnmount(function () {
   line-height: 1;
 }
 
-.fd-week-tile {
-  width: 100%;
-  height: 170px;
-  margin-bottom: 1.25rem;
-  border-radius: 0.75rem;
-  background: var(--fd-white);
-}
-
 .fd-slide-name {
   color: var(--fd-text);
   font-size: var(--fd-body);
@@ -495,27 +800,6 @@ onBeforeUnmount(function () {
   line-height: 1.3;
 }
 
-
-/* Trending This Week cards: hovering (or tabbing to) one highlights it with a blue outline. It never grows. */
-.fd-week-link {
-  display: block;
-  height: 100%;
-  border-radius: 1rem;
-}
-
-.fd-week-card {
-  transition: border-color 0.2s ease;
-}
-
-.fd-week-link:hover .fd-week-card,
-.fd-week-link:focus-visible .fd-week-card {
-  border-color: var(--fd-blue);
-}
-
-.fd-week-link:focus-visible {
-  outline: 3px solid var(--fd-vanilla);
-  outline-offset: 3px;
-}
 
 
 /* Trending This Week follows straight on, so only one section's padding sits between them. */
@@ -669,7 +953,7 @@ onBeforeUnmount(function () {
   }
 }
 
-/* Stacked: the headline and description, then the cards, then the search bar. */
+/* Stacked: the headline and description, then the search bar, then the cards. */
 @media (max-width: 1199.98px) {
   .fd-hero-grid {
     gap: 0;
@@ -679,13 +963,13 @@ onBeforeUnmount(function () {
     display: contents;
   }
 
-  .fd-cluster {
+  .fd-hero-lead {
     order: 1;
-    margin: 1rem 0 2rem;
   }
 
-  .fd-hero-lead {
+  .fd-cluster {
     order: 2;
+    margin-top: 2rem;
   }
 }
 
@@ -793,7 +1077,8 @@ onBeforeUnmount(function () {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+/* Stacked layouts keep the cards in place; only the wide layout flies them out. */
+@media (max-width: 1199.98px), (prefers-reduced-motion: reduce) {
   .fd-card--history,
   .fd-card--saving,
   .fd-card--stores {
