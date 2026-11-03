@@ -124,9 +124,10 @@ const picked = computed(function () {
   return pick.value === null ? null : shown.value[pick.value]
 })
 
-// The tooltip sits right of the guide, or left of it near the right edge
+// The tooltip sits right of the guide on the left half, and left of it on the right half, so it
+// never runs past the card, even on the smallest phones
 const tipFlip = computed(function () {
-  return pick.value !== null && xAt(pick.value) > 70
+  return pick.value !== null && xAt(pick.value) > 50
 })
 </script>
 
@@ -187,8 +188,9 @@ const tipFlip = computed(function () {
 
     <div class="fd-chart-x" aria-hidden="true">
       <template v-for="(p, i) in shown" :key="p.day">
-        <span v-if="showLabel(i)"
-          :class="{ 'is-picked': i === pick, 'is-start': i === 0, 'is-end': i === shown.length - 1, 'is-minor': minorLabel(i) }"
+        <span v-if="showLabel(i) || i === 0"
+          :class="{ 'is-picked': i === pick, 'is-start': i === 0, 'is-end': i === shown.length - 1,
+            'is-minor': minorLabel(i), 'is-first-only': i === 0 && !showLabel(i) }"
           :style="{ left: xAt(i) + '%' }">{{ dayText(p.day) }}</span>
       </template>
     </div>
@@ -391,6 +393,16 @@ const tipFlip = computed(function () {
   transform: translate(calc(-100% - 0.75rem), -50%);
 }
 
+/* The smallest phones: no room beside the point, so the tooltip sits centred above the chart */
+@media (max-width: 400px) {
+  .fd-tip,
+  .fd-tip.is-flip {
+    top: 0 !important;
+    left: 50% !important;
+    transform: translate(-50%, calc(-100% - 0.5rem));
+  }
+}
+
 .fd-hits {
   position: absolute;
   inset: 0;
@@ -431,6 +443,23 @@ const tipFlip = computed(function () {
 @media (max-width: 575.98px) {
   .fd-chart-x span.is-minor {
     display: none;
+  }
+}
+
+/* The first day's date shows only on the smallest phones, where it stands in for the others */
+.fd-chart-x span.is-first-only {
+  display: none;
+}
+
+/* The smallest phones: just the first and the last date, at the two ends */
+@media (max-width: 400px) {
+  .fd-chart-x span {
+    display: none;
+  }
+
+  .fd-chart-x span.is-start,
+  .fd-chart-x span.is-end {
+    display: inline;
   }
 }
 

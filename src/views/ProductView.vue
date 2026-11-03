@@ -120,9 +120,23 @@ const verdictNote = computed(function () {
 })
 
 // The chart shows the 5 cheapest stores only (allStores is cheapest first), so it stays short.
+// Your pick is always in it: when it is not among the 5 cheapest it takes the fifth place.
 const CHART_STORES = 5
+const pickOutsideChart = computed(function () {
+  return allStores.value.indexOf(baseRow.value) >= CHART_STORES
+})
+
 const chartStores = computed(function () {
-  return allStores.value.slice(0, CHART_STORES)
+  const rows = allStores.value
+  if (!pickOutsideChart.value) {
+    return rows.slice(0, CHART_STORES)
+  }
+  return rows.slice(0, CHART_STORES - 1).concat([baseRow.value])
+})
+
+// Where your pick's bar is in the chart, for its highlight
+const chartPick = computed(function () {
+  return chartStores.value.indexOf(baseRow.value)
 })
 
 // One line reading the store prices chart: where your pick stands against the cheapest, and the spread.
@@ -138,7 +152,9 @@ const priceRead = computed(function () {
     if (row.total > high) high = row.total
   }
   let range = ' Prices run from ' + sgd(low.total) + ' to ' + sgd(high) + ' across ' + rows.length + ' listings.'
-  if (rows.length > CHART_STORES) {
+  if (pickOutsideChart.value) {
+    range += ' The ' + (CHART_STORES - 1) + ' cheapest and your pick are shown.'
+  } else if (rows.length > CHART_STORES) {
     range += ' The ' + CHART_STORES + ' cheapest are shown.'
   }
   const more = Math.round((pick.total - low.total) * 100) / 100
@@ -280,8 +296,9 @@ const breadcrumbs = computed(function () {
     <FdBreadcrumbs :items="breadcrumbs" />
 
     <!-- Hero: the photo on the left; the title, price and buttons on the right. -->
+    <!-- Photo beside the details from 992px; a half-width window or smaller stacks them -->
     <div class="row g-4 g-lg-5 fd-product-hero">
-      <div class="col-md-4">
+      <div class="col-lg-4">
         <div class="fd-product-frame">
           <img v-img-loading v-if="product.image" :src="product.image" :alt="product.title" class="fd-product-img" />
           <span v-else class="fd-product-ph" aria-hidden="true">{{ storeInitial(product.title) }}</span>
@@ -290,7 +307,7 @@ const breadcrumbs = computed(function () {
 
       <!-- As tall as the photo: the title and price at the top, the facts and buttons at the bottom,
            so the buttons always line up with the bottom of the photo. -->
-      <div class="col-md-8 fd-product-info">
+      <div class="col-lg-8 fd-product-info">
         <div class="fd-product-top">
         <p v-if="product.brand" class="small text-secondary mb-1">{{ product.brand }}</p>
         <h1 class="fd-page-title">{{ product.title }}</h1>
@@ -393,11 +410,11 @@ const breadcrumbs = computed(function () {
 
         </div>
 
-        <!-- Store prices: one bar per listing, cheapest in green, with a line reading them. -->
+        <!-- Store prices: one bar per listing, your pick coloured like the verdict, with a line reading them. -->
         <div v-if="allStores.length > 1" class="fd-verdict-prices">
           <h3 class="fd-section-subtitle mb-1">How the prices look</h3>
           <p class="fd-verdict-read">{{ priceRead }}</p>
-          <FdStorePriceChart :rows="chartStores" />
+          <FdStorePriceChart :rows="chartStores" :pick="chartPick" :tone="verdictTone" />
         </div>
 
         <div v-if="worthItVerdict && !worthItLoading" class="fd-verdict-foot">
@@ -413,7 +430,7 @@ const breadcrumbs = computed(function () {
       The {{ allStores.length === 1 ? 'listing' : allStores.length + ' listings' }} from your search<template
         v-if="searchName"> for "{{ searchName }}"</template>, the same as on Compare.
       Prices marked + or − are against {{ baseRow.store }},
-      {{ pickedRow ? 'your pick' : 'the cheapest listing' }}.
+      {{ pickedRow ? 'your pick' : 'the cheapest listing' }}.<br />
       A listing can be a different model or size, so check its name.
     </p>
     <!-- Built like the Wishlist table: a blue header pill, then one card per listing. Roles keep it a
@@ -518,6 +535,8 @@ const breadcrumbs = computed(function () {
 /* Cards on this page use the app's card padding token (--fd-card-pad), like every other page. */
 .fd-worth-it {
   display: grid;
+  /* One column no wider than the card, so the chart shrinks with the window instead of spilling out */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
   /* It holds cards (the number tiles), so it gets the panel padding, like the folder-tab card */
   padding: var(--fd-panel-pad);
@@ -684,6 +703,7 @@ const breadcrumbs = computed(function () {
 }
 
 .fd-verdict-prices {
+  min-width: 0;
   padding-top: 1.5rem;
   border-top: 1px solid var(--fd-grey-line);
 }
@@ -695,12 +715,25 @@ const breadcrumbs = computed(function () {
 
 /* See how the AI decided on the left, the short disclaimer beside it */
 .fd-verdict-foot {
+  /* See how the AI decided, with the disclaimer under it */
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--fd-grey-line);
+}
+
+/* Stacked card (below 1200px): the number tiles, the button and the disclaimer centred */
+@media (max-width: 1199.98px) {
+  .fd-verdict-stats {
+    justify-content: center;
+  }
+
+  .fd-verdict-foot {
+    align-items: center;
+    text-align: center;
+  }
 }
 
 /* All listings, built like the Wishlist table: a blue header pill and one card per listing,
@@ -873,13 +906,13 @@ const breadcrumbs = computed(function () {
   background: var(--fd-white);
 }
 
-/* Phones: the photo sits above the title, so a smaller square, centred, keeps the price and
-   buttons closer to the top of the screen. */
-@media (max-width: 767.98px) {
+/* Stacked (below 992px): the photo sits above the title, on the left like the title, in a square
+   three quarters of the screen's width on phones, and no bigger than 24rem on a half-width window. */
+@media (max-width: 991.98px) {
   .fd-product-frame {
-    width: 12rem;
-    margin: 0 auto;
-    padding: 1rem;
+    width: min(75vw, 24rem);
+    margin: 0;
+    padding: 1.25rem;
   }
 }
 
