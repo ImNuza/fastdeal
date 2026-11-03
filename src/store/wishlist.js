@@ -210,20 +210,21 @@ export const useWishlistStore = defineStore('wishlist', () => {
         image: body.image,
         savedPrice: listing.price,
         savedStore: listing.store,
-        targetPrice: Math.round(listing.price * 0.9 * 100) / 100,
+        targetPrice: null,
+        targetSuggestion: null,
         savedAt: Date.now(),
         sleepUntil: 0,
         sleepPriceAtStart: null,
         sleepVerdictSeen: false
       })
     }
-    // A new item's target comes back from the server, which may set it from the AI.
+    // A new item's AI suggested target comes back from the server, as the target box's hint.
     write(async function () {
       const res = await axios.post('/api/wishlist', body)
       const item = findSaved(body.name, body.productId)
       if (item && res.data && !saved) {
         item.targetPrice = res.data.targetPrice
-        item.targetSource = res.data.targetSource
+        item.targetSuggestion = res.data.targetSuggestion
         item.targetReason = res.data.targetReason
       }
     })
@@ -252,9 +253,8 @@ export const useWishlistStore = defineStore('wishlist', () => {
       throw new Error('Invalid target price')
     }
 
-    item.targetPrice = newTarget
-    item.targetSource = null
-    item.targetReason = null
+    // An emptied box clears the target; the AI's suggestion stays as its hint.
+    item.targetPrice = newTarget > 0 ? newTarget : null
 
     return write(function () {
       return axios.patch(keyPath(item), {

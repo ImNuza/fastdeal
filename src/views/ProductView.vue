@@ -119,6 +119,12 @@ const verdictNote = computed(function () {
   return 'AI guidance, not financial advice.'
 })
 
+// The chart shows the 5 cheapest stores only (allStores is cheapest first), so it stays short.
+const CHART_STORES = 5
+const chartStores = computed(function () {
+  return allStores.value.slice(0, CHART_STORES)
+})
+
 // One line reading the store prices chart: where your pick stands against the cheapest, and the spread.
 const priceRead = computed(function () {
   const rows = allStores.value
@@ -131,7 +137,10 @@ const priceRead = computed(function () {
   for (const row of rows) {
     if (row.total > high) high = row.total
   }
-  const range = ' Prices run from ' + sgd(low.total) + ' to ' + sgd(high) + ' across ' + rows.length + ' listings.'
+  let range = ' Prices run from ' + sgd(low.total) + ' to ' + sgd(high) + ' across ' + rows.length + ' listings.'
+  if (rows.length > CHART_STORES) {
+    range += ' The ' + CHART_STORES + ' cheapest are shown.'
+  }
   const more = Math.round((pick.total - low.total) * 100) / 100
   if (more <= 0) {
     return 'Your pick at ' + pick.store + ' is the cheapest.' + range
@@ -173,10 +182,10 @@ const aiSteps = computed(function () {
     steps.push('Found the cheapest listing in your search: ' + input.cheapest.value + '.')
   }
   if (input.typical && input.typical.sent) {
-    steps.push('Compared it with the typical price, ' + input.typical.value + ', and the range, ' +
+    steps.push('Compared it with the usual price, ' + input.typical.value + ', and the range, ' +
       (input.range ? input.range.value : 'not shown') + '.')
   } else if (input.range) {
-    steps.push('Too few listings for a typical price, so it used the range instead: ' + input.range.value + '.')
+    steps.push('Too few listings for a usual price, so it used the range instead: ' + input.range.value + '.')
   }
   if (input['sale-now']) {
     steps.push('Checked for a listing already on sale: ' + midSentence(input['sale-now'].value) + '.')
@@ -190,7 +199,7 @@ const aiSteps = computed(function () {
     steps.push('Also saw the rating: ' + input.rating.value + '.')
   }
   if (v.source === 'rules') {
-    steps.push('The AI did not answer, so fixed rules decided: 10% or more under the typical price is a buy, ' +
+    steps.push('The AI did not answer, so fixed rules decided: 10% or more under the usual price is a buy, ' +
       'and 10% or more over it is a wait. Otherwise, a big sale within 14 days is worth the wait. ' +
       'Otherwise, the price is fair.')
   }
@@ -255,8 +264,6 @@ const breadcrumbs = computed(function () {
   return items
 })
 
-// Every listing at once, with the page scrolling, and the total under the card.
-const listTotal = computed(function () { return allStores.value.length })
 </script>
 
 <template>
@@ -347,7 +354,10 @@ const listTotal = computed(function () { return allStores.value.length })
         <span class="fd-ai-tag">AI</span>
       </div>
 
-      <div class="card fd-worth-it" :class="verdictTone ? 'is-' + verdictTone : ''">
+      <!-- Wide screens: the verdict, its numbers and the button on the left half, the store prices
+           chart on the right half. Smaller screens stack them, with the button last, after the chart. -->
+      <div class="card fd-worth-it" :class="[verdictTone ? 'is-' + verdictTone : '', { 'has-prices': allStores.length > 1 }]">
+        <div class="fd-worth-main">
         <p v-if="worthItLoading" class="small text-secondary mb-0 d-flex align-items-center gap-2">
           <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
           <span>Asking our AI whether to buy now or wait…</span>
@@ -367,7 +377,7 @@ const listTotal = computed(function () { return allStores.value.length })
 
         <!-- The numbers the verdict weighs -->
         <ul class="fd-verdict-stats" role="list">
-          <li>
+          <li class="is-pick">
             <span>Your pick</span>
             <strong>{{ sgd(baseRow.total) }}</strong>
           </li>
@@ -376,16 +386,18 @@ const listTotal = computed(function () { return allStores.value.length })
             <strong>{{ sgd(cheapest.total) }}</strong>
           </li>
           <li v-if="product.typicalPrice">
-            <span>Typical</span>
+            <span>Usual price</span>
             <strong>{{ sgd(product.typicalPrice) }}</strong>
           </li>
         </ul>
+
+        </div>
 
         <!-- Store prices: one bar per listing, cheapest in green, with a line reading them. -->
         <div v-if="allStores.length > 1" class="fd-verdict-prices">
           <h3 class="fd-section-subtitle mb-1">How the prices look</h3>
           <p class="fd-verdict-read">{{ priceRead }}</p>
-          <FdStorePriceChart :rows="allStores" />
+          <FdStorePriceChart :rows="chartStores" />
         </div>
 
         <div v-if="worthItVerdict && !worthItLoading" class="fd-verdict-foot">
@@ -457,8 +469,6 @@ const listTotal = computed(function () { return allStores.value.length })
       </div>
       </FdScrollArea>
     </div>
-    <!-- The total under the card, worded and placed like the Friends and Wishlist totals. -->
-    <p v-if="listTotal > 0" class="fd-list-total fd-store-total">Total: {{ listTotal }} {{ listTotal === 1 ? 'listing' : 'listings' }}</p>
     </div>
 
     <!-- What buyers say: one card per review, in a row that scrolls sideways. -->
@@ -505,23 +515,60 @@ const listTotal = computed(function () { return allStores.value.length })
 </template>
 
 <style scoped>
-/* The total ends the All listings section; the next section adds the standard gap above itself. */
-.fd-store-total {
-  margin-bottom: 0;
-}
-
 /* Cards on this page use the app's card padding token (--fd-card-pad), like every other page. */
 .fd-worth-it {
+  display: grid;
   gap: 1.5rem;
-  padding: var(--fd-card-pad);
+  /* It holds cards (the number tiles), so it gets the panel padding, like the folder-tab card */
+  padding: var(--fd-panel-pad);
+}
+
+/* The verdict, tiles and button, one above the other */
+.fd-worth-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+/* From 1200px: the verdict on the left half, the store prices chart on the right half, with a
+   line between them instead of the line above the chart. */
+@media (min-width: 1200px) {
+  /* The chart spans both rows on the right; the verdict fills the top left and the button row
+     sits at the bottom left, level with the end of the chart */
+  .fd-worth-it.has-prices {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
+    gap: 1.5rem 2rem;
+  }
+
+  .fd-worth-it.has-prices .fd-worth-main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .fd-worth-it.has-prices .fd-verdict-foot {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .fd-worth-it.has-prices .fd-verdict-prices {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    padding: 0 0 0 2rem;
+    border-top: 0;
+    border-left: 1px solid var(--fd-grey-line);
+  }
 }
 
 /* Buy: a tea green edge; wait: vanilla. The icon circle takes the same colour. */
 .fd-worth-it.is-buy {
+  border-width: 3px;
   border-color: var(--fd-green);
 }
 
 .fd-worth-it.is-wait {
+  border-width: 3px;
   border-color: var(--fd-vanilla);
 }
 
@@ -573,9 +620,10 @@ const listTotal = computed(function () { return allStores.value.length })
 
 /* The number tiles in one row on every screen, numbers at the section title size */
 .fd-verdict-stats {
-  display: grid;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
+  /* Each tile is as wide as its price, side by side; one that does not fit moves to the next line
+     whole, never stretched across the card */
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   margin: 0;
   padding: 0;
@@ -584,12 +632,39 @@ const listTotal = computed(function () { return allStores.value.length })
 
 .fd-verdict-stats li {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: 0.25rem;
-  padding: 0.75rem 1rem;
+  /* A floor so short prices still make a tidy tile */
+  min-width: 8.5rem;
+  padding: var(--fd-row-pad);
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: var(--fd-radius);
   background: var(--fd-beige);
+}
+
+/* Hover highlights a tile with a blue border, like every card in the app (no growing or lifting) */
+.fd-verdict-stats li {
+  transition: border-color 0.15s ease;
+}
+
+.fd-verdict-stats li:hover {
+  border-color: var(--fd-blue);
+}
+
+/* Your pick stands out: blue with beige text, like the blue header pills */
+.fd-verdict-stats li.is-pick {
+  border-color: var(--fd-blue);
+  background: var(--fd-blue);
+}
+
+.fd-verdict-stats li.is-pick:hover {
+  border-color: var(--fd-vanilla);
+}
+
+.fd-verdict-stats li.is-pick span,
+.fd-verdict-stats li.is-pick strong {
+  color: var(--fd-beige);
 }
 
 .fd-verdict-stats span {
@@ -604,16 +679,8 @@ const listTotal = computed(function () { return allStores.value.length })
   font-size: var(--fd-section-title);
   font-weight: 400;
   line-height: 1.1;
-}
-
-@media (max-width: 575.98px) {
-  .fd-verdict-stats {
-    gap: 0.5rem;
-  }
-
-  .fd-verdict-stats li {
-    padding: 0.625rem 0.5rem;
-  }
+  /* A price never breaks across lines */
+  white-space: nowrap;
 }
 
 .fd-verdict-prices {
@@ -664,7 +731,8 @@ const listTotal = computed(function () { return allStores.value.length })
 /* The card around All listings: paper, vanilla line and corners, like the Wishlist and Friends
    cards, without their folder tabs. */
 .fd-store-panel {
-  padding: var(--fd-card-pad);
+  /* It holds the listing cards, so the panel padding, like the Worth it? card above it */
+  padding: var(--fd-panel-pad);
   border: var(--fd-border) solid var(--fd-vanilla-line);
   border-radius: var(--fd-radius);
   background: var(--fd-paper);

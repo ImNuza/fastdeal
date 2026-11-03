@@ -13,7 +13,9 @@ import Friendship from './models/friendship-model.js'
 import { toPairKey } from './models/pair-key.js'
 import { search,identifyImage } from './models/shoppingapimodel.js'
 import { worthIt } from './models/worth-it-model.js'
-import { suggestTarget } from './models/target-price-model.js'
+import { suggestTarget, summarizeListings } from './models/target-price-model.js'
+import ProductCache from './models/product-cache-model.js'
+import SearchCache from './models/search-cache-model.js'
 import SearchLog from './models/search-log-model.js'
 import PriceDay from './models/price-day-model.js'
 import { sgDay, findHistory, findSearchHistory, historyByProductId } from './services/priceHistory.js'
@@ -1013,7 +1015,7 @@ function toWishItem(row) {
     savedPrice: row.savedPrice,
     savedStore: row.savedStore,
     targetPrice: row.targetPrice,
-    targetSource: row.targetSource || null,
+    targetSuggestion: row.targetSuggestion || null,
     targetReason: row.targetReason || null,
     savedAt: row.savedAt ? row.savedAt.getTime() : 0,
     sleepUntil: row.sleepUntil ? row.sleepUntil.getTime() : 0,
@@ -1050,6 +1052,22 @@ app.get('/api/wishlist/friends', requireUser, async (req, res) => {
   }
 })
 
+// The store listings for a product as rows of { store, total }, from the caches only (no SerpApi
+// credit): the product page's stores, else the search's listings. Empty when neither is cached.
+async function cachedListings(productId, q) {
+  if (productId) {
+    const product = await ProductCache.findOne({ productId: productId }, 'stores').lean()
+    if (product && product.stores && product.stores.length) return product.stores
+  }
+  if (q) {
+    const search = await SearchCache.findOne({ queryKey: toProductKey(q) }, 'listings').lean()
+    if (search && search.listings) {
+      return search.listings.map(function (row) { return { store: row.store, total: row.price } })
+    }
+  }
+  return []
+}
+
 // Save a product, or switch a saved product to another store and price.
 // targetPrice, savedAt and the sleep fields are used only for a new row: the one-time
 // copy of an old browser wishlist sends them.
@@ -1073,15 +1091,15 @@ app.post('/api/wishlist', requireUser, async (req, res) => {
       await existing.save()
       return res.json(toWishItem(existing))
     }
-    // The target: one sent with the item, else the AI's suggestion when the product has price
-    // history, else 10% under the saved price.
+    // No target is set for the shopper: only one sent with the item (the old browser wishlist
+    // copy). The AI suggests one from the price history and the listings, shown as a hint.
     const productId = text(req.body.productId) || null
-    let targetPrice = priceOrNull(req.body.targetPrice)
+    const targetPrice = priceOrNull(req.body.targetPrice)
     let ai = null
     if (!targetPrice) {
       const history = await findHistory(productId)
-      ai = history ? await suggestTarget({ name, savedPrice: price, store, history, sale: nextBigSale() }) : null
-      targetPrice = ai ? ai.price : Math.round(price * 0.9 * 100) / 100
+      const listings = summarizeListings(await cachedListings(productId, text(req.body.q)))
+      ai = await suggestTarget({ name, savedPrice: price, store, history, listings, sale: nextBigSale() })
     }
     const row = await WishlistItem.create({
       firebaseUid: req.uid,
@@ -1093,7 +1111,7 @@ app.post('/api/wishlist', requireUser, async (req, res) => {
       savedPrice: price,
       savedStore: store,
       targetPrice,
-      targetSource: ai ? 'ai' : null,
+      targetSuggestion: ai ? ai.price : null,
       targetReason: ai ? ai.reason : null,
       savedAt: dateOrNull(req.body.savedAt) || new Date(),
       sleepUntil: dateOrNull(req.body.sleepUntil),
@@ -1128,9 +1146,8 @@ app.patch('/api/wishlist/:productKey', requireUser, async (req, res) => {
       // Reset email state only if the target actually changes.
       if (row.targetPrice !== newTarget) {
         set.targetPrice = newTarget
-        // The shopper's own number now, not the AI's.
+        // The shopper's own number now. The AI's suggestion stays, as the hint for an empty box.
         set.targetSource = null
-        set.targetReason = null
         set.targetEmailFor = null
         set.targetNotifiedFor = null
         set.lastCheckedAt = null
