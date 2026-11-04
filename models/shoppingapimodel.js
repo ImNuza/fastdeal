@@ -126,8 +126,6 @@ async function logSearch(sessionId, query, productKey, searchTerm, listings) {
 }
 
 export async function search(q, sessionId) {
-  if (!hasSerpKey()) throw new Error('SERPAPI_API_KEY is not set')
-
   const rawQuery = String(q || '').trim()
   if (!rawQuery) throw new Error('Query is required')
   const productKey = toProductKey(rawQuery)
@@ -147,6 +145,9 @@ export async function search(q, sessionId) {
       cached: true
     }
   }
+
+  // Only a live search needs a key. A saved search (like the seeded demo ones) works without one.
+  if (!hasSerpKey()) throw new Error('SERPAPI_API_KEY is not set')
 
   const pre = await preprocess(rawQuery)
 

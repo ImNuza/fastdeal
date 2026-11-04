@@ -238,9 +238,9 @@ async function loadFromSerpApi(productId, productKey, q, cached) {
   return row
 }
 
-// The product page lists the same listings as Compare (the team agreed this on 2 Nov): the first
-// 10 Google Shopping listings with a price, for the search q. The other stores from Google
-// Immersive Product are not shown. search() reuses the saved search for 6 hours, so this costs no
+// The product page lists the same listings as Compare (the team agreed this on 2 Nov): every
+// Google Shopping listing with a price, for the search q. No cut-off, so the listing clicked on
+// Compare is always there as Your pick. The other stores from Google Immersive Product are not shown. search() reuses the saved search for 6 hours, so this costs no
 // SerpApi credit when the shopper comes from Compare. Returns [] when there is no search or it fails.
 async function searchListings(q) {
   if (!q) {
@@ -248,7 +248,7 @@ async function searchListings(q) {
   }
   try {
     const result = await search(q)
-    return result.listings.filter(function (row) { return Number(row.price) > 0 }).slice(0, 10)
+    return result.listings.filter(function (row) { return Number(row.price) > 0 })
   } catch (error) {
     return []
   }

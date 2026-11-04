@@ -45,6 +45,11 @@ function pickColour() {
   return colours.muted
 }
 
+// Fewer price labels on a narrow chart, so "S$100" and "S$200" do not run together on phones
+function tickLimit(width) {
+  return width < 400 ? 4 : 6
+}
+
 function barColours() {
   return props.rows.map(function (row, i) {
     return i === props.pick ? pickColour() : colours.blue
@@ -74,6 +79,9 @@ onMounted(function () {
     options: {
       indexAxis: 'y',
       maintainAspectRatio: false,
+      onResize: function (chart, size) {
+        chart.options.scales.x.ticks.maxTicksLimit = tickLimit(size.width)
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -93,7 +101,7 @@ onMounted(function () {
           border: { display: false },
           grid: { color: colours.line },
           ticks: {
-            maxTicksLimit: 6, maxRotation: 0, color: colours.muted, font: font,
+            maxTicksLimit: tickLimit(canvas.value.parentNode.clientWidth), maxRotation: 0, color: colours.muted, font: font,
             callback: function (value) { return 'S$' + value }
           }
         },
