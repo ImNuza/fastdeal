@@ -469,7 +469,7 @@ const listTotal = computed(function () { return filteredUsers.value.length })
               <span>Joined {{ formatDate(u.createdAt) }}</span>
             </div>
             <div class="fd-user-action">
-              <span v-if="u.firebaseUid === auth.user?.uid" class="small text-secondary">You</span>
+              <span v-if="u.firebaseUid === auth.firebaseUser?.uid" class="small text-secondary">You</span>
               <button v-else-if="u.role !== 'admin'" class="btn btn-sm btn-dark" type="button"
                 @click="askRoleChange(u, 'admin')">Promote</button>
               <button v-else class="btn btn-sm btn-outline-dark" type="button"

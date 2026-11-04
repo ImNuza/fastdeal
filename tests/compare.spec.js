@@ -1,6 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import searchIphone from './fixtures/search-iphone.json' with { type: 'json' };
+import worthIt from './fixtures/worth-it.json' with { type: 'json' };
 
 // The saved search has 10 listings from 5 stores. The cheapest is Apple iPhone 16 at
 // Swiftronics USA for S$806. A page shows 8 listings.
@@ -88,5 +89,60 @@ test.describe('Compare page', () => {
     await expect(range.getByRole('button', { name: '30 days' })).toHaveAttribute('aria-pressed', 'true');
     await range.getByRole('button', { name: '7 days' }).click();
     await expect(range.getByRole('button', { name: '7 days' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+test.describe('Compare with a seeded demo search', () => {
+  // No mock for /api/search here: the server reads the Samsung search that npm run seed saves, so
+  // no SerpApi call runs. It has 12 listings, and the cheapest is Etoren at S$1336.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem('fastdeal-entry-choice', 'guest'));
+    await page.route('**/api/worth-it*', (route) => route.fulfill({ json: worthIt }));
+  });
+
+  /** @param {import('@playwright/test').Page} page */
+  async function searchSamsung(page) {
+    await page.goto('/');
+    const box = page.getByRole('combobox').first();
+    await box.fill('Samsung Galaxy S25 Ultra');
+    await box.press('Enter');
+    await expect(page).toHaveURL(/\/compare\?q=Samsung/);
+  }
+
+  test('user searches from Home and sees every listing with the cheapest marked', async ({ page }) => {
+    await searchSamsung(page);
+
+    await expect(page.getByText('Showing 1 to 8 of 12 listings')).toBeVisible();
+    const cheapest = page.getByRole('article').filter({ hasText: 'Cheapest' });
+    await expect(cheapest).toHaveCount(1);
+    await expect(cheapest).toContainText('S$1336');
+    await expect(cheapest).toContainText('Etoren.com');
+  });
+
+  test('user opens the cheapest listing and sees it as Your pick on the product page', async ({ page }) => {
+    await searchSamsung(page);
+
+    const cheapest = page.getByRole('article').filter({ hasText: 'Cheapest' });
+    await cheapest.getByRole('link').first().click();
+
+    await expect(page).toHaveURL(/\/product\/1487224435158991865/);
+    const stats = page.getByRole('list').filter({ hasText: 'Usual price' });
+    await expect(stats).toContainText('Your pick');
+    await expect(stats).toContainText('S$1336.00');
+  });
+
+  test('user sees the search under Recent searches and can remove it', async ({ page }) => {
+    // A logged-out user's recent searches stay in this browser only.
+    await searchSamsung(page);
+    await page.goto('/');
+
+    const box = page.getByRole('combobox').first();
+    await box.click();
+    const recent = page.getByRole('option', { name: /Samsung Galaxy S25 Ultra/i });
+    await expect(recent).toBeVisible();
+    await expect(recent).toContainText('Recent search');
+
+    await page.getByRole('button', { name: /^Remove .*Samsung Galaxy S25 Ultra.* from recent searches$/i }).click();
+    await expect(recent).toHaveCount(0);
   });
 });

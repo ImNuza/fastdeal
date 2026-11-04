@@ -200,6 +200,24 @@ Batch 9 (3 Nov): new `services/__tests__/geminiKeys.spec.js` (5 tests, `fetch` m
 reads `GEMINI_API_KEY_2` up to `_10`.
 Totals: 34 E2E tests in 11 files, 102 unit tests in 12 files.
 
+Batch 10 (4 Nov, after the Render test): one test for each feature that had none, and API security tests.
+No new package. The new tests use the seeded demo searches (no SerpApi credit) or mock the route.
+
+| File | Login | Tests |
+|---|---|---|
+| `product.spec.js` | none | +1: the 11th Samsung listing is Your pick (the bug fixed in PR #71). |
+| `compare.spec.js` | none | +3: a real demo search from Home, its cheapest listing as Your pick, recent searches. |
+| `auth.spec.js` (new) | none, `@user` | 9: login and sign-up form messages, login back to the wanted page, the log out pop-up, log out. |
+| `navbar.spec.js` (new) | none, `@user`, `@admin` | 5: links for each kind of user, the phone menu, the phone search. |
+| `admin.spec.js` | `@admin` | +3: "You" on your own row, the Admins tab, Promote and Demote `bernardlo` (put back at the end). |
+| `friends.spec.js` | `@user` | +3: accept, decline, remove a friend. These and the send test run one at a time. Cleanup deletes the pair through the API. |
+| `wishlist.spec.js` | `@admin` | +3: save, open and delete a budget; send a Buy together invite and a failed one (invite route mocked). |
+| `api-security.spec.js` (new) | none, `@user`, `@admin` | 22: 14 routes refuse no login, a made-up token, health and `/erd`, 403 for a normal user on the admin routes and on self-promotion, 400 for an admin's own role and an unknown role. |
+
+The admin test found a bug: the admin's own row showed Demote, because `AdminView.vue` compared with `auth.user.uid`,
+which does not exist. It now uses `auth.firebaseUser.uid`.
+Totals: 88 E2E tests in 15 files, 136 unit and component tests in 18 files (224 in total).
+
 Batch 4, after Ronald's AI verdict merges: Compare filters and sort, the cheapest badge, the verdict (with a saved Gemini response). About 3 tests. Then check `product.spec.js` and `target-price-alert.spec.js`.
 
 Rules for this batch:

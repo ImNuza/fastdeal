@@ -189,7 +189,7 @@ For building and tests:
 
 7. Tests
 --------
-Three levels of tests: unit, component and end-to-end, 176 tests in total. None of them calls
+Three levels of tests: unit, component and end-to-end, 224 tests in total. None of them calls
 SerpApi or Gemini: the tests use saved responses from tests/fixtures/ or the demo searches that
 npm run seed saves.
 
@@ -203,7 +203,7 @@ Unit and component tests (Vitest), 136 tests in 18 files, in the __tests__ folde
   @vue/test-utils, click it and check what it shows and emits: the confirm pop-up, the page
   buttons and the list search box.
 
-End-to-end tests (Playwright), 40 tests in 12 files, in tests/:
+End-to-end tests (Playwright), 88 tests in 15 files, in tests/:
 1. Once, install the browser:
      npx playwright install chromium
 2. Put E2E_DEMO_PASSWORD=demo1234 in .env.
@@ -218,17 +218,30 @@ End-to-end tests (Playwright), 40 tests in 12 files, in tests/:
 
 What the E2E tests cover:
 - smoke.spec.js: home page, search, login redirect, admin access and the 403 page
-- compare.spec.js: the cheapest badge, page buttons, store filter, sort, no-match message and
-  the price history chart
+- auth.spec.js: login and sign-up form messages, login back to the page you wanted, log out
+- navbar.spec.js: the links for each kind of user, the phone menu and the phone search
+- compare.spec.js: the cheapest badge, page buttons, store filter, sort, no-match message, the
+  price history chart, a real demo search from Home to the product page, recent searches
 - trending.spec.js, home.spec.js: Trending lists, links to Compare, photo fallback
 - product.spec.js: the product page, the AI verdict, and the "See how the AI decided" pop-up
-- wishlist.spec.js: save and remove, search, sort, tabs, Sleep on it, Plan a budget, Buy Together,
-  the remove pop-up
+- wishlist.spec.js: save and remove, search, sort, tabs, Sleep on it, Plan a budget (plan, save,
+  open again and delete), Buy Together (open, send an invite, a failed invite), the remove pop-up
 - target-price-alert.spec.js: set and change a target price
-- friends.spec.js: friend list search, requests between the two demo accounts, the remove pop-up
+- friends.spec.js: friend list search, the remove pop-up, and requests between the two demo
+  accounts: send, accept, decline and remove a friend
 - notifications.spec.js: tabs, search, mark as read, an expired Buy Together invite
-- admin.spec.js, account.spec.js: admin insights and user search, account settings
+- admin.spec.js: insights for 7 and 30 days, user search, the Admins tab, Promote and Demote
+- account.spec.js: account settings
 - errors.spec.js: the 404 page and the server error page
+- api-security.spec.js: requests sent straight to the API with Playwright's request fixture.
+  Every route that needs a login refuses a request without one, a made-up token is refused, a
+  normal user cannot read the admin data or make themselves an admin, and an admin cannot change
+  their own role.
+
+Not tested end to end, on purpose: a real sign-up and Google sign-in (tests must not create
+users), photo search and the live AI answers (they call Gemini), live searches (they call
+SerpApi), and the price alert emails (they send real email). The logic behind the AI verdict,
+the target price check and the price history has unit tests.
 
 The tests are repeatable: every test that changes data puts it back, and npm run seed resets the
 demo accounts. A test tagged @admin runs as demo@smu.edu.sg, a test tagged @user runs as
