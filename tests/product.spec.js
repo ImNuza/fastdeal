@@ -76,3 +76,24 @@ test.describe('Product page', () => {
     await expect(page.getByText('The AI did not answer, so fixed rules estimated this', { exact: false })).toBeVisible();
   });
 });
+
+test.describe('Product page with the seeded demo search', () => {
+  // No mock for /api/product here: the server reads the Samsung search and product page that
+  // `npm run seed` pins in the cache, so no SerpApi call runs. The test server has no Gemini key.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem('fastdeal-entry-choice', 'guest'));
+    await page.route('**/api/worth-it*', (route) => route.fulfill({ json: worthIt }));
+  });
+
+  test('user who clicks the 11th Compare listing sees it as Your pick', async ({ page }) => {
+    // The Samsung search has 12 listings. The cheapest, Etoren at S$1336, is the 11th. The page
+    // once kept only the first 10, so it showed another listing as Your pick.
+    await page.goto('/product/1487224435158991865?q=Samsung%20Galaxy%20S25%20Ultra&store=Etoren.com');
+
+    const table = page.getByRole('table', { name: 'All listings' });
+    await expect(table.getByRole('row')).toHaveCount(12 + 1);
+    const stats = page.getByRole('list').filter({ hasText: 'Usual price' });
+    await expect(stats).toContainText('Your pick');
+    await expect(stats).toContainText('S$1336.00');
+  });
+});

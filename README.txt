@@ -189,8 +189,9 @@ For building and tests:
 
 7. Tests
 --------
-Three levels of tests: unit, component and end-to-end, 175 tests in total. None of them calls
-SerpApi or Gemini: the tests use saved responses from tests/fixtures/.
+Three levels of tests: unit, component and end-to-end, 176 tests in total. None of them calls
+SerpApi or Gemini: the tests use saved responses from tests/fixtures/ or the demo searches that
+npm run seed saves.
 
 Unit and component tests (Vitest), 136 tests in 18 files, in the __tests__ folders:
   npm run test:unit
@@ -202,7 +203,7 @@ Unit and component tests (Vitest), 136 tests in 18 files, in the __tests__ folde
   @vue/test-utils, click it and check what it shows and emits: the confirm pop-up, the page
   buttons and the list search box.
 
-End-to-end tests (Playwright), 39 tests in 12 files, in tests/:
+End-to-end tests (Playwright), 40 tests in 12 files, in tests/:
 1. Once, install the browser:
      npx playwright install chromium
 2. Put E2E_DEMO_PASSWORD=demo1234 in .env.

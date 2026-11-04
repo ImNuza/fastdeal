@@ -616,7 +616,8 @@ const listTotal = computed(function () { return filteredUsers.value.length })
   position: relative;
   display: flex;
   align-items: flex-end;
-  gap: 4%;
+  /* A fixed gap: 30 bars with a 4% gap took 116% of the width */
+  gap: 2px;
   height: 100%;
 }
 
@@ -718,16 +719,20 @@ const listTotal = computed(function () { return filteredUsers.value.length })
 
 .fd-chart-x {
   display: flex;
-  gap: 4%;
+  gap: 2px;
   margin-top: 0.5rem;
   padding-left: 2.5rem;
 }
 
 .fd-chart-x span {
   flex: 1;
+  /* A date is wider than its column on the 30-day chart. It stays centred under its bar and
+     spreads to both sides, instead of widening the column or running past the card. */
+  display: flex;
+  justify-content: center;
+  min-width: 0;
   color: var(--fd-text-muted);
   font-size: var(--fd-small);
-  text-align: center;
   white-space: nowrap;
 }
 
