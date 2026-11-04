@@ -17,9 +17,11 @@ export async function fetchProduct(productId, q) {
   return data
 }
 
-//search with feature
-export async function fetchSearchedWith(q,sid) {
+// "Customers who viewed this also viewed": what other shoppers searched with this one.
+// [] when the server fails, so the section just stays hidden.
+export async function fetchSearchedWith(q, sid) {
   const res = await fetch('/api/searched-with?key=' + encodeURIComponent(q || '') + '&sid=' + encodeURIComponent(sid || ''))
+  if (!res.ok) return []
   return res.json()
 }
 // AI "Worth It" verdict for one product. The server reads the product's live stores and the

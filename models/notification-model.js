@@ -1,4 +1,3 @@
-//import { type } from 'firebase/firestore/pipelines'
 import mongoose from 'mongoose'
 
 // One alert for one user. The Notifications page lists these, newest first.
@@ -79,6 +78,15 @@ notificationSchema.index(
   {
     unique: true,
     partialFilterExpression: { type: 'sleep-ended' }
+  }
+)
+
+// One sale-soon alert per user per sale, even when two requests add it at the same moment.
+notificationSchema.index(
+  { firebaseUid: 1, productKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { type: 'sale-soon' }
   }
 )
 

@@ -17,12 +17,10 @@ test.describe('Product page', () => {
 
     await expect(page.getByRole('heading', { level: 1, name: productIphone.title })).toBeVisible();
 
-    // One row per Compare listing, 8 a page, plus the header row. The pager says how many in all.
+    // One row per Compare listing, all in one scroll area, plus the header row.
     await expect(page.getByRole('heading', { name: 'All listings' })).toBeVisible();
     const table = page.getByRole('table', { name: 'All listings' });
-    await expect(table.getByRole('row')).toHaveCount(8 + 1);
-    // Screen readers hear "Showing 1 to 8 of 10 listings". It is not shown on the screen.
-    await expect(page.getByText('Showing 1 to 8 of ' + productIphone.stores.length + ' listings', { exact: true })).toBeAttached();
+    await expect(table.getByRole('row')).toHaveCount(productIphone.stores.length + 1);
 
     // The listing clicked on Compare is Your pick.
     const pick = table.getByRole('row', { name: new RegExp(productIphone.pick.store) });
@@ -40,7 +38,11 @@ test.describe('Product page', () => {
     // The tag shows a fixed label for the decision, not the AI's own headline.
     await expect(page.getByText('Wait for a sale', { exact: true })).toBeVisible();
     await expect(page.getByText(worthIt.reason)).toBeVisible();
-    await expect(page.getByText('Based on: ' + worthIt.summary)).toBeVisible();
+    // The numbers the verdict weighs: your pick, the cheapest and the usual price.
+    const stats = page.getByRole('list').filter({ hasText: 'Usual price' });
+    await expect(stats).toContainText('Your pick');
+    await expect(stats).toContainText('S$806.00');
+    await expect(stats).toContainText('S$1661.53');
   });
 
   test('user can open how the AI decided in a pop-up and close it', async ({ page }) => {
@@ -71,6 +73,6 @@ test.describe('Product page', () => {
     await page.goto('/product/' + productIphone.productId + '?q=iphone%2016');
 
     await expect(page.getByText(rules.reason)).toBeVisible();
-    await expect(page.getByText('The AI did not answer, so this is an estimate', { exact: false })).toBeVisible();
+    await expect(page.getByText('The AI did not answer, so fixed rules estimated this', { exact: false })).toBeVisible();
   });
 });

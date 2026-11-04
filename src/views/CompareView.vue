@@ -23,7 +23,7 @@ const { user } = storeToRefs(useAuthStore())
 const { isSaved, savedFrom, saveProduct } = useWishlistStore()
 const router = useRouter()
 
-// The search results and related products live in the compare store.
+// The search results live in the compare store. "Customers who viewed this also viewed" is loaded below.
 const compareStore = useCompareStore()
 const { result, loading, failed, cheapest } = storeToRefs(compareStore)
 const { loadResult, showFailed } = compareStore
@@ -180,7 +180,7 @@ function onSaveFrom(row) {
 
 onMounted(async function () {
   const q = String(route.query.q || '').trim()
-  if (!q || q.toLowerCase() === 'fail') {
+  if (!q) {
     showFailed()
     return
   }
