@@ -291,4 +291,109 @@ test.describe('Wishlist', () => {
     await dialog.getByRole('button', { name: /^(Cancel|Done)$/ }).click();
     await expect(dialog).toBeHidden();
   });
+
+  test('user can save a budget, open it again after a reload and delete it @admin', async ({ page }) => {
+    const name = 'E2E budget ' + Date.now();
+    await open(page, '/wishlist');
+    await page.getByRole('tab', { name: 'Plan a budget' }).click();
+
+    // Start clean: delete a budget left over from an earlier failed run.
+    const leftover = page.getByRole('button', { name: /^Delete E2E budget / });
+    while (await leftover.count()) {
+      await leftover.first().click();
+      await page.getByRole('dialog', { name: 'Delete budget' }).getByRole('button', { name: 'Delete', exact: true }).click();
+      await expect(page.getByRole('dialog', { name: 'Delete budget' })).toBeHidden();
+    }
+
+    await page.getByRole('button', { name: 'New budget', exact: true }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Plan a budget' });
+    await dialog.getByRole('checkbox', { name: IPHONE.name }).check();
+    await dialog.getByRole('checkbox', { name: POKEMON.name }).check();
+    await dialog.getByLabel('Your budget').fill('1100');
+    await expect(async () => {
+      await dialog.getByRole('button', { name: 'Find best combination' }).click();
+      await expect(dialog.getByText('left of S$1100.00')).toBeVisible({ timeout: 3000 });
+    }).toPass({ timeout: 20000 });
+
+    // Save it under a name.
+    await dialog.getByRole('button', { name: 'Save it for later' }).click();
+    await dialog.getByLabel('Give this budget a name').fill(name);
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+
+    // Once saved, the pop-up takes the budget's name as its title.
+    const saved = page.getByRole('dialog', { name: name });
+    await expect(saved.getByText(/^Last updated/)).toBeVisible();
+    await saved.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(saved).toBeHidden();
+
+    try {
+      // After a reload the budget is still there and opens with its amount.
+      await open(page, '/wishlist');
+      await page.getByRole('tab', { name: 'Plan a budget' }).click();
+      await page.getByRole('button', { name: new RegExp('^' + literal(name)) }).click();
+      await expect(saved.getByLabel('Your budget')).toHaveValue('1100');
+      await saved.getByRole('button', { name: 'Close', exact: true }).click();
+      await expect(saved).toBeHidden();
+    } finally {
+      // Delete it, after the pop-up asks first, so the demo account keeps no new budget.
+      await page.getByRole('button', { name: 'Delete ' + name, exact: true }).click();
+      await page.getByRole('dialog', { name: 'Delete budget' }).getByRole('button', { name: 'Delete', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Delete ' + name, exact: true })).toHaveCount(0);
+    }
+  });
+
+  test('user can send a Buy together invite and sees it was sent @admin', async ({ page }) => {
+    // Give the page a Telegram ID, and never send a real invite to a team account.
+    await page.route('**/api/users/me', async (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      const response = await route.fetch();
+      const body = await response.json();
+      return route.fulfill({ response, json: { ...body, telegramUsername: 'demo_tg' } });
+    });
+    /** @type {any} */
+    let sent = null;
+    await page.route('**/api/buy-together/invite', (route) => {
+      sent = route.request().postDataJSON();
+      return route.fulfill({ json: { ok: true } });
+    });
+
+    await open(page, '/wishlist');
+    await page.getByRole('button', { name: new RegExp('friends? saved ' + literal(SONY.name) + '\\. Buy together') }).click();
+    const dialog = page.getByRole('dialog', { name: 'Buy together' });
+    const send = dialog.getByRole('button', { name: 'Send Invites' });
+
+    // Nobody is ticked yet, so Send Invites is off.
+    await expect(send).toBeDisabled();
+    await dialog.getByRole('checkbox', { name: 'jayden' }).check();
+    await send.click();
+
+    await expect(dialog.getByRole('status')).toHaveText("Invite sent! They'll text you if they're interested.");
+    expect(sent.friendUids).toHaveLength(1);
+    expect(sent.productKey).toBeTruthy();
+    await dialog.getByRole('button', { name: 'Done' }).click();
+    await expect(dialog).toBeHidden();
+  });
+
+  test('user sees the reason when a Buy together invite fails @admin', async ({ page }) => {
+    await page.route('**/api/users/me', async (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      const response = await route.fetch();
+      const body = await response.json();
+      return route.fulfill({ response, json: { ...body, telegramUsername: 'demo_tg' } });
+    });
+    await page.route('**/api/buy-together/invite', (route) => route.fulfill({
+      status: 400, json: { error: 'You already invited this friend.' }
+    }));
+
+    await open(page, '/wishlist');
+    await page.getByRole('button', { name: new RegExp('friends? saved ' + literal(SONY.name) + '\\. Buy together') }).click();
+    const dialog = page.getByRole('dialog', { name: 'Buy together' });
+    await dialog.getByRole('checkbox', { name: 'jayden' }).check();
+    await dialog.getByRole('button', { name: 'Send Invites' }).click();
+
+    await expect(dialog.getByRole('alert')).toHaveText('You already invited this friend.');
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toBeHidden();
+  });
 });

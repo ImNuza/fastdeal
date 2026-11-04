@@ -50,59 +50,132 @@ test.describe('Friends', () => {
     await expect(dialog).toBeHidden();
     await expect(page.getByText('zoedharm', { exact: true })).toBeVisible();
   });
+});
 
-  test('user can send a friend request that the other user then sees @user', async ({ page, browser }) => {
+// The login token the page sends to the API. The page gets it from the saved session.
+/** @param {import('@playwright/test').Page} page */
+async function tokenOf(page) {
+  const call = page.waitForRequest((req) => req.url().includes('/api/') && 'authorization' in req.headers());
+  await page.goto('/account');
+  return (await call).headers()['authorization'];
+}
+
+test.describe('Friend requests between demo.user and demo', () => {
+  // Each test sends a request from demo.user to demo, so they run one at a time.
+  test.describe.configure({ mode: 'serial' });
+
+  /** @type {import('@playwright/test').BrowserContext} */
+  let adminContext;
+  /** @type {import('@playwright/test').Page} */
+  let adminPage;
+
+  test.beforeEach(async ({ page, browser }) => {
+    await page.addInitScript(() => sessionStorage.setItem('fastdeal-entry-choice', 'guest'));
     // Second browser context, logged in as demo (admin), who receives the request.
-    const adminContext = await browser.newContext({ storageState: 'playwright/.auth/admin.json' });
+    adminContext = await browser.newContext({ storageState: 'playwright/.auth/admin.json' });
     await adminContext.addInitScript(() => sessionStorage.setItem('fastdeal-entry-choice', 'guest'));
-    const adminPage = await adminContext.newPage();
+    adminPage = await adminContext.newPage();
+  });
 
-    // Searching "demo" also finds fastdealdemo (the presentation account), so take the Add friend button
-    // in the row whose username is exactly "demo": the deepest block that holds both.
-    const demoRow = page.locator('div')
+  // Delete the friendship or request between the two accounts, so the database goes back to
+  // normal even when a step failed. demo.user has no friends after npm run seed.
+  test.afterEach(async ({ page, request }) => {
+    const userToken = await tokenOf(page);
+    const adminToken = await tokenOf(adminPage);
+    const me = await (await request.get('/api/users/me', { headers: { Authorization: userToken } })).json();
+    const demo = await (await request.get('/api/users/me', { headers: { Authorization: adminToken } })).json();
+    const pairKey = [me.firebaseUid, demo.firebaseUid].sort().join('|');
+    await request.delete('/api/friends/' + encodeURIComponent(pairKey), { headers: { Authorization: userToken } });
+    await adminContext.close();
+  });
+
+  // Searching "demo" also finds fastdealdemo (the presentation account), so take the button in the
+  // row whose username is exactly "demo": the deepest block that holds both.
+  /** @param {import('@playwright/test').Page} page */
+  function demoRow(page) {
+    return page.locator('div')
       .filter({ has: page.getByText('demo', { exact: true }) })
       .filter({ has: page.getByRole('button') })
       .last();
-    const addButton = demoRow.getByRole('button', { name: 'Add friend', exact: true });
-    const cancelButton = page.getByRole('button', { name: 'Cancel the request to demo', exact: true });
+  }
 
-    async function findDemo() {
-      await page.goto('/friends');
-      await page.getByRole('tab', { name: 'Add Friend' }).click();
-      await page.getByLabel('Search people by username').fill('demo');
-      await expect(page.getByText('demo', { exact: true })).toBeVisible();
-    }
+  // Send a request from demo.user to demo on the Add Friend tab.
+  /** @param {import('@playwright/test').Page} page */
+  async function sendRequest(page) {
+    await page.goto('/friends');
+    await page.getByRole('tab', { name: 'Add Friend' }).click();
+    await page.getByLabel('Search people by username').fill('demo');
+    await demoRow(page).getByRole('button', { name: 'Add friend', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Cancel the request to demo', exact: true })).toBeVisible();
+  }
 
-    try {
-      // Start clean: cancel a request left over from an earlier failed run.
-      await findDemo();
-      await expect(addButton.or(cancelButton)).toBeVisible();
-      if (await cancelButton.isVisible()) {
-        await cancelButton.click();
-      }
-      await expect(addButton).toBeVisible();
+  test('user can send a friend request that the other user then sees @user', async ({ page }) => {
+    await sendRequest(page);
 
-      // Send the request.
-      await addButton.click();
-      await expect(cancelButton).toBeVisible();
+    // demo sees it under Requests on the Friends page.
+    await adminPage.goto('/friends');
+    await adminPage.getByRole('tab', { name: 'Requests' }).click();
+    await expect(adminPage.getByText('demouser', { exact: true })).toBeVisible();
 
-      // demo sees it under Requests on the Friends page.
-      await adminPage.goto('/friends');
-      await adminPage.getByRole('tab', { name: 'Requests' }).click();
-      await expect(adminPage.getByText('demouser', { exact: true })).toBeVisible();
+    // demo also gets a friend request notice in the Friends tab on Notifications.
+    await adminPage.goto('/notifications');
+    await adminPage.getByRole('tab', { name: 'Friends' }).click();
+    await expect(adminPage.getByText('demouser sent you a friend request.').first()).toBeVisible();
+  });
 
-      // demo also gets a friend request notice in the Friends tab on Notifications.
-      await adminPage.goto('/notifications');
-      await adminPage.getByRole('tab', { name: 'Friends' }).click();
-      await expect(adminPage.getByText('demouser sent you a friend request.').first()).toBeVisible();
-    } finally {
-      // Cancel the request so the database goes back to normal.
-      await findDemo();
-      if (await cancelButton.isVisible()) {
-        await cancelButton.click();
-        await expect(addButton).toBeVisible();
-      }
-      await adminContext.close();
-    }
+  test('admin can accept a friend request, and both see each other as friends @user', async ({ page }) => {
+    await sendRequest(page);
+
+    await adminPage.goto('/friends');
+    await adminPage.getByRole('tab', { name: 'Requests' }).click();
+    const request = adminPage.locator('div')
+      .filter({ has: adminPage.getByText('demouser', { exact: true }) })
+      .filter({ has: adminPage.getByRole('button', { name: 'Accept' }) })
+      .last();
+    await request.getByRole('button', { name: 'Accept' }).click();
+    await expect(adminPage.getByRole('button', { name: 'Decline demouser' })).toHaveCount(0);
+
+    // demo's friend list now has demouser.
+    await adminPage.getByRole('tab', { name: 'Friends' }).click();
+    await adminPage.getByLabel('Search your friends').fill('demouser');
+    await expect(adminPage.getByText('demouser', { exact: true })).toBeVisible();
+
+    // demouser's friend list has demo.
+    await page.goto('/friends');
+    await expect(page.getByRole('button', { name: 'Remove demo as a friend', exact: true })).toBeVisible();
+  });
+
+  test('admin can decline a friend request, and the sender can ask again @user', async ({ page }) => {
+    await sendRequest(page);
+
+    await adminPage.goto('/friends');
+    await adminPage.getByRole('tab', { name: 'Requests' }).click();
+    await adminPage.getByRole('button', { name: 'Decline demouser' }).click();
+    await expect(adminPage.getByRole('button', { name: 'Decline demouser' })).toHaveCount(0);
+
+    // The request is gone for the sender too, so Add friend shows again.
+    await page.goto('/friends');
+    await page.getByRole('tab', { name: 'Add Friend' }).click();
+    await page.getByLabel('Search people by username').fill('demo');
+    await expect(demoRow(page).getByRole('button', { name: 'Add friend', exact: true })).toBeVisible();
+  });
+
+  test('user can remove a friend after the pop-up asks first @user', async ({ page }) => {
+    await sendRequest(page);
+    await adminPage.goto('/friends');
+    await adminPage.getByRole('tab', { name: 'Requests' }).click();
+    await adminPage.locator('div')
+      .filter({ has: adminPage.getByText('demouser', { exact: true }) })
+      .filter({ has: adminPage.getByRole('button', { name: 'Accept' }) })
+      .last()
+      .getByRole('button', { name: 'Accept' })
+      .click();
+    await expect(adminPage.getByRole('button', { name: 'Decline demouser' })).toHaveCount(0);
+
+    await page.goto('/friends');
+    await page.getByRole('button', { name: 'Remove demo as a friend', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Remove friend' }).getByRole('button', { name: 'Remove', exact: true }).click();
+
+    await expect(page.getByRole('button', { name: 'Remove demo as a friend', exact: true })).toHaveCount(0);
   });
 });
