@@ -771,6 +771,30 @@ app.get('/api/trending' , async (req,res) =>{
 
 })
 
+app.get('/api/suggest', async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim().toLowerCase()
+    if (q.length < 2) {
+      return res.json([])
+    }
+    const safe = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+    const rows = await SearchLog.aggregate([
+      { $match: { $or: [{ productName: safe }, { productKey: safe }] } },
+      { $group: {
+          _id: { $toLower: { $trim: { input: { $ifNull: ['$productName', '$productKey'] } } } },
+          query: { $first: '$productName' },
+          count: { $sum: 1 }
+      } },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: 5 }
+    ])
+    res.json(rows)
+  } catch (error) {
+    console.error('[Suggest]', error)
+    res.status(500).json({ error: 'Failed to load suggestions' })
+  }
+})
+
 //search with feature
 app.get('/api/searched-with',async (req,res)=>{
   try{

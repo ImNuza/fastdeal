@@ -61,6 +61,28 @@ function nameOf(item) {
 const searchFocused = ref(false)
 const activeIndex = ref(-1)
 
+const remote = ref([])
+let suggestTimer = null
+
+watch(query, function (value) {
+  clearTimeout(suggestTimer)
+  const q = value.trim()
+  if (q.length < 2) {
+    remote.value = []
+    return
+  }
+  suggestTimer = setTimeout(async function () {
+    try {
+      const res = await axios.get('/api/suggest', { params: { q: q }, quiet: true })
+      if (query.value.trim() === q) {
+        remote.value = res.data
+      }
+    } catch (error) {
+      remote.value = []
+    }
+  }, 250)
+})
+
 const suggestions = computed(function () {
   const q = query.value.trim().toLowerCase()
   if (!q) {
@@ -68,9 +90,7 @@ const suggestions = computed(function () {
       return { name: name, before: '', match: '', after: itemName(name), detail: 'Recent search', icon: 'clock', recent: true }
     })
   }
-  return week.value.filter(function (item) {
-    return nameOf(item).toLowerCase().includes(q)
-  }).slice(0, 5).map(function (item) {
+  return remote.value.map(function (item) {
     const name = nameOf(item)
     const start = name.toLowerCase().indexOf(q)
     return {
@@ -79,7 +99,7 @@ const suggestions = computed(function () {
       before: start >= 0 ? name.slice(0, start) : '',
       match: start >= 0 ? name.slice(start, start + q.length) : '',
       after: start >= 0 ? name.slice(start + q.length) : name,
-      detail: item.count + (item.count === 1 ? ' search' : ' searches') + ' this week',
+      detail: item.count + (item.count === 1 ? ' search' : ' searches'),
       icon: 'tag'
     }
   })

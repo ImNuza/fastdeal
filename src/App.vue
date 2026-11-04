@@ -197,6 +197,14 @@ function toggleSearch() {
   }
 }
 
+//close Menu after a user selects a tab
+function closeMenu() {
+  const menu = document.getElementById('fdNav')
+  if (menu && menu.classList.contains('show')) {
+    window.bootstrap.Collapse.getOrCreateInstance(menu).hide()
+  }
+}
+
 watch(() => route.fullPath, () => { searchOpen.value = false })
 
 // Bootstrap ignores show and hide mid-animation, so its own events say whether the menu is open.
@@ -286,7 +294,7 @@ watch([() => route.path, user], maybeShowEntryDialog)
       <div ref="navMenu" class="collapse navbar-collapse" id="fdNav">
         <!-- Desktop: beside the logo. Not on Home, which has its own in the hero. -->
         <FdSearchBar v-if="!route.meta.heroSearch" compact class="fd-nav-search d-none d-lg-block" />
-        <ul class="navbar-nav ms-auto align-items-lg-center fd-nav-right">
+        <ul class="navbar-nav ms-auto align-items-lg-center fd-nav-right" @click="closeMenu">
           <li class="nav-item">
             <router-link class="nav-link fd-icon-link" :class="{ active: isNavActive('/wishlist') }" active-class="" exact-active-class="" to="/wishlist">
               <FdIcon name="tag" />
