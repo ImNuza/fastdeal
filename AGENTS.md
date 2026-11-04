@@ -22,7 +22,7 @@ npm run build
 npm run seed         # resets the demo account data
 npm run test:e2e     # Playwright; starts both servers itself
 npm run test:report
-npm run test:unit    # Vitest unit tests in __tests__ folders
+npm run test:unit    # Vitest unit and component tests in __tests__ folders
 ```
 Run `npm run build` and `npm run test:e2e` before a change goes to `main`.
 
@@ -32,9 +32,11 @@ Run `npm run build` and `npm run test:e2e` before a change goes to `main`.
 - `src/store/`: shared state and API calls (auth, wishlist, compare, product, trending, admin). Views call the stores.
 - `src/router/index.js`: `requiresAuth` and `requiresRole: 'admin'` route guards.
 - `tests/`: Playwright tests. Plan and owners: `docs/test-plan.md`.
+- `docs/fastdeal-erd.html`: the one ERD, served at `/erd`. Change it when a model in `models/` changes.
 - There is no `src/mock/` folder. The team removed the sample data. Do not add it back.
 
 ## Tests
+- Component tests use `@vue/test-utils` and start with `// @vitest-environment jsdom`. The rest run in node.
 - Never call SerpApi or Gemini from a test. Return a saved response from `tests/fixtures/` with `page.route`.
 - Demo logins: `demo@smu.edu.sg` (admin, has the demo data) and `demo.user@smu.edu.sg` (normal user). The presentation account
   `fastdealdemo1@gmail.com` (username `fastdealdemo`, normal user, password in README.txt) is for the video and the prof.
@@ -61,6 +63,7 @@ Run `npm run build` and `npm run test:e2e` before a change goes to `main`.
 - `models/shoppingapimodel.js` hides Gemini errors and searches with the raw query. Search can look fine while Gemini is broken. Test Gemini on its own.
 - `main` has both `package-lock.json` and `pnpm-lock.yaml`. Render runs `npm install`. Add packages with npm.
 - `main` has no rate limit on the paid routes (`/api/search`, `/api/product/:id`, `/api/identify-image`). Commit `ef27b8c` had one, but it was on the deleted `delete-mock` branch.
-- Render is on the free plan and sleeps. Open the site two minutes before a demo.
+- Render is on the paid Starter plan (bought 3 Nov 2026). It does not sleep, and it can send SMTP email
+  (the free plan blocks ports 25, 465 and 587).
 - If Render shows `update_failed` after a good build, read the app logs. A file imported but not committed causes `ERR_MODULE_NOT_FOUND`.
 - Agent rules live only in this file. `CLAUDE.md` is in `.gitignore`, because Claude Code skips `AGENTS.md` when a `CLAUDE.md` exists.

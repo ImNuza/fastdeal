@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { fetchProduct, fetchSearchedWith } from '../services/productApi.js'
+import { fetchProduct } from '../services/productApi.js'
 import { useErrorStore } from './error.js'
 
 export const useProductStore = defineStore('product', () => {
@@ -8,7 +8,6 @@ export const useProductStore = defineStore('product', () => {
   const product = ref(null)
   const loading = ref(true)
   const errorText = ref('')
-  const searchedWith = ref([])
 
   // getters: stores come back cheapest total first
   const cheapest = computed(function () {
@@ -29,7 +28,6 @@ export const useProductStore = defineStore('product', () => {
   async function loadProduct(productId, q) {
     // Clear the last product so a new visit never shows the old one.
     product.value = null
-    searchedWith.value = []
     errorText.value = ''
     loading.value = true
     try {
@@ -47,10 +45,7 @@ export const useProductStore = defineStore('product', () => {
     } finally {
       loading.value = false
     }
-    if (product.value) {
-      searchedWith.value = await fetchSearchedWith(product.value.q || q)
-    }
   }
 
-  return { product, loading, errorText, searchedWith, cheapest, percentOf, loadProduct }
+  return { product, loading, errorText, cheapest, percentOf, loadProduct }
 })

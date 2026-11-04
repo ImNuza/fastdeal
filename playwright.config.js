@@ -9,6 +9,15 @@ import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.resolve(import.meta.dirname, '.env') });
 
+// The tests never call SerpApi or Gemini. The test server starts with every key blank, so a page
+// that asks the server for a live search or an AI answer gets the no-key fallback instead.
+// dotenv in server.js does not replace a variable that is already set.
+const noApiKeys = {};
+for (const name of ['SERPAPI_API_KEY', 'GEMINI_API_KEY']) {
+  noApiKeys[name] = '';
+  for (let n = 2; n <= 10; n++) noApiKeys[name + '_' + n] = '';
+}
+
 /**
  * @see https://playwright.dev/docs/test-configuration
  */
@@ -83,6 +92,7 @@ export default defineConfig({
       command: 'npm run start',
       url: 'http://localhost:3000/health',
       reuseExistingServer: true,
+      env: noApiKeys,
     },
     {
       command: 'npm run dev',

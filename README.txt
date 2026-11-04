@@ -5,9 +5,28 @@ good time to buy, and helps you wait for a better price.
 
 Live app:  https://fastdeal-iqzg.onrender.com
 Git repo:  https://github.com/ImNuza/fastdeal (public)
+Video:     [YouTube link to be added]
 
-The live app runs on Render's free plan. It sleeps when nobody uses it, so the first page can take
-up to a minute to load. After that it is fast.
+The live app runs on a paid Render plan, so it is always on. Please use the live app: it has every
+key set up. Section 3 shows how to run it on your own computer.
+
+
+0. Start here (for graders)
+---------------------------
+1. Open https://fastdeal-iqzg.onrender.com
+2. Log in with the presentation account in section 1.
+3. Type one of these 7 demo searches in the search bar. Only these have a 30-day price history:
+     Apple iPhone 16 Pro
+     Sony WH-1000XM5 wireless headphones
+     Owala bottle
+     Dyson V15 Detect
+     Nespresso Capsules 50 Pack
+     Kindle Paperwhite
+     Samsung Galaxy S25 Ultra
+4. On Compare, see the price history chart above the listings. Then open a listing.
+5. On the product page, see the AI "Worth it?" verdict and the store price bars under it.
+6. Save the product, then open Wishlist. The empty target box shows the AI's suggested target price.
+7. Any other search works too. It is live, so it shows today's prices with no history.
 
 
 1. Logins
@@ -35,17 +54,21 @@ You can also create your own account on the Sign up page, or log in with Google.
 --------------
 Logged out:
 - Home (/): search a product by name, or press the camera icon to search with a photo (AI finds the
-  product). Trending Today and Trending This Week show what people search.
-- Compare (/compare?q=...): every listing for the search, with filters (price, store, rating, free
-  shipping, on sale) and sort.
+  product, photos up to 8 MB). Trending Today and Trending This Week show what people search.
+- Compare (/compare?q=...): every listing for the search, with filters (price, store, rating) and
+  sort. A demo search also shows its 30-day price history chart. "Customers who viewed this also
+  viewed" shows other products that shoppers searched with this one.
 - Product page: the same listings as Compare, cheapest first, with the one you clicked as
-  "Your pick", and the AI "Worth it?" verdict on your pick. "See how the AI decided" opens a pop-up with the steps behind the verdict and the numbers it used.
+  "Your pick", and the AI "Worth it?" verdict on your pick. "How the prices look" shows one bar per
+  store, so you see where your pick sits. "See how the AI decided" opens a pop-up with the steps
+  behind the verdict and the numbers it used.
   If both Gemini models are busy, the card shows an estimate from fixed rules and says so.
 - Trending (/trending): the most searched products.
 
 Logged in as demo@smu.edu.sg:
 - Wishlist (/wishlist): saved products with the best price now, price drops, a target price alert
-  per product, Sleep on it (lock a product for a while before you buy), and Plan a budget.
+  per product (with an AI suggested target, and an email when the price reaches it), Sleep on it
+  (lock a product for a while before you buy), and Plan a budget.
 - Friends (/friends): friends, add friend, requests. Buy Together shows when a friend saved the
   same product, so you can split the shipping.
 - Notifications (/notifications): price drops, target price reached, sale reminders, friends.
@@ -140,23 +163,46 @@ history. Type one of these in the search bar (case and extra spaces do not matte
 - The 30-day history is made up: npm run seed writes 30 days for each listing in these searches and
   each demo wishlist product, ending at the real captured price. The rows have source "seed".
 - Any other search is live, and its products have no history.
-- API: GET /api/search gives listing.history for each listing that has one, GET /api/product/:id
-  gives history (or null), and GET /api/price-history?productId= gives { history }.
-  history is { days, low, lowDay, high, average, last, weekChange, seeded, points: [{ day, price }] }.
+
+6b. Libraries
+-------------
+All are free and open source. We did not copy code from other projects.
+In the browser:
+- Vue 3, Vue Router, Pinia: the pages, the page routes and the shared state.
+- Bootstrap 5.3.3 (CDN): layout, grid and components. Google Fonts: Anton and DM Sans.
+- axios: calls to our own /api routes.
+- Firebase (JS SDK): sign up and login.
+- Chart.js: the store price bars on the product page.
+On the server:
+- Express: the web server and the /api routes.
+- Mongoose: the MongoDB models.
+- firebase-admin: checks the login token on each request.
+- serpapi: the SerpApi client.
+- multer: reads the uploaded photo for photo search.
+- nodemailer: sends the target price email.
+- dotenv: reads .env.
+For building and tests:
+- Vite and @vitejs/plugin-vue: build the Vue app.
+- Vitest, @vue/test-utils and jsdom: unit and component tests.
+- Playwright: end-to-end tests.
 
 
 7. Tests
 --------
-Two kinds of tests. Neither one calls SerpApi or Gemini: the tests use saved responses from
-tests/fixtures/.
+Three levels of tests: unit, component and end-to-end, 175 tests in total. None of them calls
+SerpApi or Gemini: the tests use saved responses from tests/fixtures/.
 
-Unit tests (Vitest), 102 tests in 12 files, in the __tests__ folders:
+Unit and component tests (Vitest), 136 tests in 18 files, in the __tests__ folders:
   npm run test:unit
-They test the pure logic: the typical price, the store price rows, the budget planner, the AI verdict
-inputs, prompt and rule fallback, the seeded price history and its 30-day window, the SerpApi and Gemini
-key fallbacks, keys, formats and search history.
+- Unit tests (119 tests, 15 files) test the pure logic: the typical price, the store price rows,
+  the budget planner, the AI verdict inputs, prompt and rule fallback, the AI suggested target,
+  the price the target alert checks, the seeded price history and its 30-day window, the SerpApi
+  and Gemini key fallbacks, keys, formats and search history.
+- Component tests (17 tests, 3 files in src/components/__tests__) mount one Vue component with
+  @vue/test-utils, click it and check what it shows and emits: the confirm pop-up, the page
+  buttons and the list search box.
 
-End-to-end tests (Playwright), 34 tests in 11 files, in tests/:
+End-to-end tests (Playwright), 39 tests in 12 files, in tests/:
 1. Once, install the browser:
      npx playwright install chromium
 2. Put E2E_DEMO_PASSWORD=demo1234 in .env.
@@ -171,6 +217,8 @@ End-to-end tests (Playwright), 34 tests in 11 files, in tests/:
 
 What the E2E tests cover:
 - smoke.spec.js: home page, search, login redirect, admin access and the 403 page
+- compare.spec.js: the cheapest badge, page buttons, store filter, sort, no-match message and
+  the price history chart
 - trending.spec.js, home.spec.js: Trending lists, links to Compare, photo fallback
 - product.spec.js: the product page, the AI verdict, and the "See how the AI decided" pop-up
 - wishlist.spec.js: save and remove, search, sort, tabs, Sleep on it, Plan a budget, Buy Together,
@@ -196,7 +244,7 @@ demo.user@smu.edu.sg, and the rest run logged out.
 - data/                seed.js, demo-products.json (real products team members saved) and the
                        sale calendar.
 - tests/               Playwright tests and fixtures.
-- docs/                ERD (also at /erd in the app) and plans.
+- docs/                The database ERD (also at /erd in the app), the test plan and the proposal.
 
 
 9. Use of AI / LLM

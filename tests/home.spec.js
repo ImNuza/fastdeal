@@ -10,7 +10,8 @@ test.describe('Home page trending', () => {
   test('user can see items under Trending Today and Trending This Week', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: 'Trending Today' })).toBeVisible();
+    // Until today has enough searches, the section shows yesterday's list and says so.
+    await expect(page.getByRole('heading', { name: /^Trending (Today|Yesterday)$/ })).toBeVisible();
     await expect(page.getByLabel('Trending today').getByRole('link').first()).toBeVisible();
 
     await expect(page.getByRole('heading', { name: 'Trending This Week' })).toBeVisible();

@@ -19,7 +19,7 @@ import FdStorePriceChart from '../components/FdStorePriceChart.vue'
 const route = useRoute()
 
 // The product, its loading state and the cheapest/ratings maths live in the product store.
-const { product, loading, errorText, searchedWith, cheapest } = storeToRefs(useProductStore())
+const { product, loading, errorText, cheapest } = storeToRefs(useProductStore())
 const { loadProduct } = useProductStore()
 
 // AI "Worth It" verdict (buy now or wait). View-local: it is about presentation here,

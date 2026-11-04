@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import axios from 'axios'
 import { itemName } from '../services/itemName.js'
 import { sessionId } from '../services/searchSession.js'
-import { fetchSearchedWith } from '../services/productApi.js'
 
 // ---------------------------------------------------------------
 // Helpers (they do not use the store's own state)
@@ -66,15 +65,6 @@ async function saveRecentSearch(query, productKey) {
   }
 }
 
-async function orEmpty(request) {
-  try {
-    const data = await request
-    return Array.isArray(data) ? data : []
-  } catch (err) {
-    return []
-  }
-}
-
 // ---------------------------------------------------------------
 // Compare store
 // ---------------------------------------------------------------
@@ -84,7 +74,7 @@ export const useCompareStore = defineStore('compare', () => {
   const loading = ref(true)
   const failed = ref(false)
 
-  // Everything on the page is real: live listings and what other shoppers searched with this product. A failed search shows the error state, never fake data.
+  // Everything on the page is real: live listings. A failed search shows the error state, never fake data.
   async function loadResult(q) {
     result.value = null
     failed.value = false
@@ -96,8 +86,7 @@ export const useCompareStore = defineStore('compare', () => {
       loading.value = false
       return
     }
-    const related = await orEmpty(fetchSearchedWith(live.productKey))
-    result.value = { name: live.name, listings: live.listings, related: related.slice(0, 8), searchHistory: live.history }
+    result.value = { name: live.name, listings: live.listings, searchHistory: live.history }
     loading.value = false
   }
 

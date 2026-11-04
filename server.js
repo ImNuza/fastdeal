@@ -1,5 +1,3 @@
-// import dotenv from 'dotenv'
-// dotenv.config()
 import 'dotenv/config'
 import express from 'express'
 import { initializeApp } from 'firebase-admin/app'
@@ -37,9 +35,7 @@ const app = express()
 app.use(express.json())
 
 const PORT = process.env.PORT || 3000
-const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd-v4.html')
-const erdV3Path = path.join(__dirname, 'docs', 'fastdeal-erd-v3.html')
-const erdPresentPath = path.join(__dirname, 'docs', 'fastdeal-erd-present.html')
+const erdPath = path.join(__dirname, 'docs', 'fastdeal-erd.html')
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } })
 
 // Checking a login token needs only the project id, not a service account key.
@@ -541,7 +537,17 @@ app.delete('/api/me/recent-searches', requireUser, async (req, res) => {
   }
 })
 
-app.post('/api/identify-image', upload.single('photo'), async (req, res) => {
+// multer's own errors (a photo over 8 MB) would reach Express as an HTML 500 page,
+// so they are sent back as JSON like every other error here.
+function uploadPhoto(req, res, next) {
+  upload.single('photo')(req, res, function (err) {
+    if (!err) return next()
+    const tooBig = err.code === 'LIMIT_FILE_SIZE'
+    res.status(tooBig ? 413 : 400).json({ error: tooBig ? 'The photo is over 8 MB. Use a smaller photo.' : 'Could not read the photo.' })
+  })
+}
+
+app.post('/api/identify-image', uploadPhoto, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'photo required' })
     const name = await identifyImage(req.file.buffer.toString('base64'), req.file.mimetype)
@@ -877,18 +883,23 @@ async function addSaleSoonNotification(firebaseUid) {
   const others = items.length - 1
   const saved = items[0].productName + (others ? ' and ' + others + ' more' : '')
   const when = sale.daysAway === 0 ? 'today' : sale.daysAway === 1 ? 'tomorrow' : 'in ' + sale.daysAway + ' days'
-  await Notification.updateOne(
-    { firebaseUid, type: 'sale-soon', productKey: 'sale:' + sale.id + ':' + sale.day },
-    {
-      $setOnInsert: {
-        title: sale.name + ' is ' + when,
-        body: saved + (others ? ' are' : ' is') + ' on your wishlist.' +
-          (sale.stores.length ? ' ' + sale.stores.join(' and ') + ' usually join this sale.' : ''),
-        link: '/wishlist'
-      }
-    },
-    { upsert: true }
-  )
+  try {
+    await Notification.updateOne(
+      { firebaseUid, type: 'sale-soon', productKey: 'sale:' + sale.id + ':' + sale.day },
+      {
+        $setOnInsert: {
+          title: sale.name + ' is ' + when,
+          body: saved + (others ? ' are' : ' is') + ' on your wishlist.' +
+            (sale.stores.length ? ' ' + sale.stores.join(' and ') + ' usually join this sale.' : ''),
+          link: '/wishlist'
+        }
+      },
+      { upsert: true }
+    )
+  } catch (error) {
+    // 11000: another request added this alert a moment ago. The unique index keeps only one.
+    if (error.code !== 11000) throw error
+  }
 }
 
 //retrieve notifications
@@ -1263,9 +1274,15 @@ app.delete('/api/wishlist/:productKey', requireUser, async (req, res) => {
 
 // --- Admin routes ---
 // requireAdmin sits after requireUser so req.uid is already set.
+// A database error here would stop the whole server (Express 4 does not catch it), so it is caught.
 async function requireAdmin(req, res, next) {
-  const dbUser = await User.findOne({ firebaseUid: req.uid }).select('role')
-  if (!dbUser || dbUser.role !== 'admin') return res.status(403).json({ error: 'Admins only' })
+  try {
+    const dbUser = await User.findOne({ firebaseUid: req.uid }).select('role')
+    if (!dbUser || dbUser.role !== 'admin') return res.status(403).json({ error: 'Admins only' })
+  } catch (error) {
+    console.error('[Admin check]', error)
+    return res.status(500).json({ error: 'Could not check your role. Try again.' })
+  }
   next()
 }
 
@@ -1419,16 +1436,6 @@ app.put('/api/admin/users/:firebaseUid/role', requireUser, requireAdmin, async (
 // Database ERD for the team and graders
 app.get('/erd', (req, res) => {
   res.sendFile(erdPath)
-})
-
-// The previous version, linked from the v4 page
-app.get('/erd/v3', (req, res) => {
-  res.sendFile(erdV3Path)
-})
-
-// Clean ERD for presenting in class
-app.get('/erd/present', (req, res) => {
-  res.sendFile(erdPresentPath)
 })
 
 app.use(express.static(path.join(__dirname, 'dist')))

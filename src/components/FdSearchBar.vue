@@ -161,8 +161,14 @@ async function onPhoto(event) {
   if (!file) {
     return
   }
-  photoError.value = ''
   photoName.value = ''
+  // The server takes photos up to 8 MB, so a bigger one is stopped here with no upload.
+  if (file.size > 8 * 1024 * 1024) {
+    photoError.value = 'The photo is over 8 MB. Use a smaller photo.'
+    event.target.value = ''
+    return
+  }
+  photoError.value = ''
   photoBusy.value = true
   try {
     const form = new FormData()
