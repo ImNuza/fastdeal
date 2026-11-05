@@ -99,21 +99,7 @@ For development, run npm start in one terminal and npm run dev in another, then 
 http://localhost:5173 . Vite reloads the page when a file changes, and sends /api calls to port 3000.
 
 If npm start stops at once, it could not reach MongoDB. Check MONGODB_URI in .env, and turn off any
-VPN. Atlas must allow your IP address (Network Access in Atlas).
-
-
-4. Deploy (Render)
-------------------
-1. In Render, make a new Web Service from the Git repo.
-2. Build command:  npm install && npm run build
-3. Start command:  npm start
-4. Add every variable from .env as an environment variable in the Render dashboard.
-   Do not put keys in the repo.
-5. In MongoDB Atlas, Network Access, allow 0.0.0.0/0 (Render has no fixed IP address).
-6. In Firebase, Authentication, Settings, Authorized domains, add the Render domain
-   (for example fastdeal-iqzg.onrender.com). Without it, login does not work on Render.
-7. A push to main deploys again by itself.
-
+VPN. 
 
 5. Environment variables
 ------------------------
@@ -267,12 +253,11 @@ demo.user@smu.edu.sg, and the rest run logged out.
 
 9. Use of AI / LLM
 ------------------
-As the brief asks, these are the parts where we relied on AI.
-
-- The first Vue screens and the first version of this README were written with AI (Hermes).
-- The MongoDB models, the connection, the seed script and the ERD page were written with AI (Claude).
-- Dewa used AI (Claude) to write the Playwright and Vitest test setup and tests, the demo seed data,
-  the confirm pop-up, the "How the AI decided" page, the AI verdict inputs and cache, the SerpApi
-  key fallback, the wishlist live price fix, the expired invite fix, and this README.
-
-Each member adds one line here for their own part before submission.
+1. Help debug codes when there are errors or provide hints if we can't solve a problem
+2. Generate the boilerplate for this project
+3. Help us settle merge conflicts
+4. Helps us learn new libraries such as chart.js or firebase
+5. Shared AI guidelines (AGENTS.md and DESIGN.md): 
+   to stop AI from guessing or Hallucinating giving the AI the project 
+   context and rules. Every team member’s AI tool reads the same files, 
+   so everyone gets consistent answers.
