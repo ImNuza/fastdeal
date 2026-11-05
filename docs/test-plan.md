@@ -216,7 +216,7 @@ No new package. The new tests use the seeded demo searches (no SerpApi credit) o
 
 The admin test found a bug: the admin's own row showed Demote, because `AdminView.vue` compared with `auth.user.uid`,
 which does not exist. It now uses `auth.firebaseUser.uid`.
-Totals: 88 E2E tests in 15 files, 136 unit and component tests in 18 files (224 in total).
+Totals: 88 E2E tests in 15 files, 138 unit and component tests in 19 files (226 in total).
 
 Batch 4, after Ronald's AI verdict merges: Compare filters and sort, the cheapest badge, the verdict (with a saved Gemini response). About 3 tests. Then check `product.spec.js` and `target-price-alert.spec.js`.
 
