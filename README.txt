@@ -5,7 +5,7 @@ good time to buy, and helps you wait for a better price.
 
 Live app:  https://fastdeal-iqzg.onrender.com
 Git repo:  https://github.com/ImNuza/fastdeal (public)
-Video:     [YouTube link to be added]
+Video:     https://youtu.be/GCNUgiMYAtg
 
 The live app runs on a paid Render plan, so it is always on. Please use the live app: it has every
 key set up. Section 3 shows how to run it on your own computer.
