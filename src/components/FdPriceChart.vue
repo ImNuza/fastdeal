@@ -32,6 +32,13 @@ const pick = ref(null)
 const today = computed(function () { return shown.value[shown.value.length - 1] })
 const first = computed(function () { return shown.value[0] })
 
+// The demo history ends on the capture day (3 Nov), so after that day the label names the date.
+// The Singapore date is UTC+8, the same as sgDay in services/priceHistory.js.
+const whatText = computed(function () {
+  const sgToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+  return today.value.day === sgToday ? 'Lowest price today' : 'Lowest price on ' + dayText(today.value.day)
+})
+
 // Percent change from the first day in the range; null when there is nothing to compare with
 const change = computed(function () {
   if (shown.value.length < 2 || !first.value.price) return null
@@ -135,7 +142,7 @@ const tipFlip = computed(function () {
   <div class="card fd-chart-card">
     <div class="fd-chart-head">
       <div>
-        <!-- No visible title: the price and "Lowest price today" say what the card is. Screen readers
+        <!-- No visible title: the price and its "Lowest price" label say what the card is. Screen readers
              still hear it as the Price history section. -->
         <h2 class="visually-hidden">Price history</h2>
         <!-- The price with how it moved over the range beside it, then what the price is -->
@@ -146,7 +153,7 @@ const tipFlip = computed(function () {
             <span>since {{ dayText(first.day) }}</span>
           </p>
         </div>
-        <p class="fd-chart-what">Lowest price today</p>
+        <p class="fd-chart-what">{{ whatText }}</p>
       </div>
       <div class="fd-chart-side">
         <div v-if="ranges.length" class="fd-range" role="group" aria-label="Date range">

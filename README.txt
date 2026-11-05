@@ -162,6 +162,10 @@ history. Type one of these in the search bar (case and extra spaces do not matte
   demo: true, so they never call SerpApi again. Their prices are from the capture day.
 - The 30-day history is made up: npm run seed writes 30 days for each listing in these searches and
   each demo wishlist product, ending at the real captured price. The rows have source "seed".
+- Limitation: the history always ends on the capture day, 3 Nov 2026 (5 Oct to 3 Nov). The dates
+  do not move, so after 3 Nov the chart shows no newer days, and its label reads "Lowest price on
+  3 Nov". This is on purpose: we did not want to show made-up prices for days we never checked.
+  You do not need to run npm run seed for this. The rows are in the database and do not expire.
 - Any other search is live, and its products have no history.
 
 6b. Libraries
@@ -189,19 +193,19 @@ For building and tests:
 
 7. Tests
 --------
-Three levels of tests: unit, component and end-to-end, 224 tests in total. None of them calls
+Three levels of tests: unit, component and end-to-end, 226 tests in total. None of them calls
 SerpApi or Gemini: the tests use saved responses from tests/fixtures/ or the demo searches that
 npm run seed saves.
 
-Unit and component tests (Vitest), 136 tests in 18 files, in the __tests__ folders:
+Unit and component tests (Vitest), 138 tests in 19 files, in the __tests__ folders:
   npm run test:unit
 - Unit tests (119 tests, 15 files) test the pure logic: the typical price, the store price rows,
   the budget planner, the AI verdict inputs, prompt and rule fallback, the AI suggested target,
   the price the target alert checks, the seeded price history and its 30-day window, the SerpApi
   and Gemini key fallbacks, keys, formats and search history.
-- Component tests (17 tests, 3 files in src/components/__tests__) mount one Vue component with
+- Component tests (19 tests, 4 files in src/components/__tests__) mount one Vue component with
   @vue/test-utils, click it and check what it shows and emits: the confirm pop-up, the page
-  buttons and the list search box.
+  buttons, the list search box and the price history label.
 
 End-to-end tests (Playwright), 88 tests in 15 files, in tests/:
 1. Once, install the browser:
